@@ -1,0 +1,11 @@
+name: DISABLED - Publish (TestPyPI)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "TestPyPI publishing disabled. Use PyPI workflow only."
+

@@ -1,0 +1,31 @@
+name: SDK Publish (TestPyPI)
+
+on:
+  push:
+    tags:
+      - 'sdk-v*'
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Build wheel and sdist
+        run: ~/.local/bin/uv build
+      - name: Publish to TestPyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        run: |
+          ~/.local/bin/uv pip install twine
+          ~/.local/bin/uv run twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+
+
