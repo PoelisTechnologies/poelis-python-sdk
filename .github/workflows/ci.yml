@@ -34,9 +34,9 @@ jobs:
       run: |
         uv run ruff check .
 
-    - name: Run type checking
+    - name: Run import sort fix (I001) and type checks
       run: |
-        uv run ruff check --select I .
+        uv run ruff check --select I --fix .
 
     - name: Run tests with pytest (unit + integration scaffold)
       run: |

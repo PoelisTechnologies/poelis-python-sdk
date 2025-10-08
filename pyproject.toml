@@ -35,6 +35,9 @@ Issues = "https://github.com/PoelisTechnologies/poelis-python-sdk/issues"
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+extend-exclude = [
+  "notebooks/",
+]
 
 [tool.pytest.ini_options]
 addopts = "-q"
