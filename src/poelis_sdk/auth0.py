@@ -32,17 +32,19 @@ class Auth0TokenManager:
         self.base_url = base_url
         
         # Extract Auth0 domain from API key format
-        # Format: poelis_live_org_dev_<client_id>_<secret>
+        # Format: poelis_live_org_dev_<client_id>
         parts = api_key.split('_')
-        if len(parts) >= 4 and parts[0] == 'poelis' and parts[1] == 'live':
-            self.client_id = parts[3]  # Extract client_id from API key
-            self.client_secret = '_'.join(parts[4:])  # Rest is secret
+        if len(parts) >= 4 and parts[0] == 'poelis' and parts[1] == 'live' and parts[2] == 'org' and parts[3] == 'dev':
+            # For now, use the Machine to Machine application credentials
+            # TODO: Parse client_id from API key when webapp generates proper format
+            self.client_id = "XcSLURURuQNEVvX2PF5DplNhTY6YCT4C"  # Machine to Machine app
+            self.client_secret = "TM_Fv8FsfAaqvODf7ayyE_LrZM2KbbpdtLIIMqkIZwFXfKYLdOFcO2qmyO0v970-"
         else:
-            raise ValueError("Invalid API key format. Expected: poelis_live_org_dev_<client_id>_<secret>")
+            raise ValueError("Invalid API key format. Expected: poelis_live_org_dev_<client_id>")
         
         # Derive Auth0 domain and audience
         self.auth0_domain = "poelis-prod.eu.auth0.com" 
-        self.audience = base_url
+        self.audience = "poelis-auth-api"  # Use the API identifier, not the GCP URL
         
         self._token: Optional[str] = None
         self._expires_at: float = 0
