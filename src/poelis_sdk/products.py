@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from typing import Generator, Optional, List
+from typing import Generator, Optional, List, TYPE_CHECKING
 
 from ._transport import Transport
 from .models import PaginatedProducts, Product
+
+if TYPE_CHECKING:
+    from .workspaces import WorkspacesClient
 
 """Products resource client."""
 
@@ -11,10 +14,11 @@ from .models import PaginatedProducts, Product
 class ProductsClient:
     """Client for product resources."""
 
-    def __init__(self, transport: Transport) -> None:
-        """Initialize with shared transport."""
+    def __init__(self, transport: Transport, workspaces_client: Optional["WorkspacesClient"] = None) -> None:
+        """Initialize with shared transport and optional workspaces client."""
 
         self._t = transport
+        self._workspaces_client = workspaces_client
 
     def list_by_workspace(self, *, workspace_id: str, q: Optional[str] = None, limit: int = 100, offset: int = 0) -> PaginatedProducts:
         """List products using GraphQL for a given workspace.
@@ -51,5 +55,27 @@ class ProductsClient:
             for product in page.data:
                 yield product
             offset += len(page.data)
+
+    def iter_all(self, *, q: Optional[str] = None, page_size: int = 100) -> Generator[Product, None, None]:
+        """Iterate products across all workspaces.
+        
+        Args:
+            q: Optional free-text filter.
+            page_size: Page size for each workspace iteration.
+            
+        Raises:
+            RuntimeError: If workspaces client is not available.
+        """
+        if self._workspaces_client is None:
+            raise RuntimeError("Workspaces client not available. Cannot iterate across all workspaces.")
+            
+        # Get all workspaces
+        workspaces = self._workspaces_client.list(limit=1000, offset=0)
+        
+        for workspace in workspaces:
+            workspace_id = workspace['id']
+            # Iterate through products in this workspace
+            for product in self.iter_all_by_workspace(workspace_id=workspace_id, q=q, page_size=page_size):
+                yield product
 
 

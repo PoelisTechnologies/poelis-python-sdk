@@ -7,8 +7,9 @@ metadata so it stays in sync with ``pyproject.toml`` without manual edits.
 from importlib import metadata
 
 from .client import PoelisClient
+from .logging import configure_logging, quiet_logging, verbose_logging, debug_logging, get_logger
 
-__all__ = ["PoelisClient", "__version__"]
+__all__ = ["PoelisClient", "__version__", "configure_logging", "quiet_logging", "verbose_logging", "debug_logging", "get_logger"]
 
 def _resolve_version() -> str:
     """Return installed package version or a dev fallback.

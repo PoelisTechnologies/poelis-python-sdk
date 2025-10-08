@@ -10,6 +10,7 @@ from .items import ItemsClient
 from .search import SearchClient
 from .workspaces import WorkspacesClient
 from .browser import Browser
+from .logging import quiet_logging
 
 """Core client for the Poelis Python SDK.
 
@@ -54,6 +55,9 @@ class PoelisClient:
             timeout_seconds: Network timeout in seconds.
         """
 
+        # Configure quiet logging by default for production use
+        quiet_logging()
+
         self._config = ClientConfig(
             base_url=base_url,
             api_key=api_key,
@@ -70,10 +74,10 @@ class PoelisClient:
         )
 
         # Resource clients
-        self.products = ProductsClient(self._transport)
+        self.workspaces = WorkspacesClient(self._transport)
+        self.products = ProductsClient(self._transport, self.workspaces)
         self.items = ItemsClient(self._transport)
         self.search = SearchClient(self._transport)
-        self.workspaces = WorkspacesClient(self._transport)
         self.browser = Browser(self)
 
     @classmethod
