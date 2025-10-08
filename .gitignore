@@ -209,4 +209,7 @@ __marimo__/
 
 # Others
 .cursor/
-.github/
+# Allow GitHub workflows
+!/.github/
+!/.github/workflows/
+!/.github/workflows/*.yml
