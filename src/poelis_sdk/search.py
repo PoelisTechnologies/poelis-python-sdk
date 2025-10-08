@@ -14,11 +14,11 @@ class SearchClient:
         self._t = transport
 
     def products(self, *, q: str, workspace_id: str, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
-        """Search/list products via GraphQL products(workspace_id, q)."""
+        """Search/list products via GraphQL products(workspaceId, q)."""
 
         query = (
             "query($ws: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  products(workspace_id: $ws, q: $q, limit: $limit, offset: $offset) { id name code description workspace_id }\n"
+            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) { id name code description workspaceId }\n"
             "}"
         )
         variables = {"ws": workspace_id, "q": q, "limit": int(limit), "offset": int(offset)}
@@ -35,7 +35,7 @@ class SearchClient:
 
         query = (
             "query($pid: ID!, $q: String, $parent: ID, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, q: $q, parentItemId: $parent, limit: $limit, offset: $offset) { id name code description productId parentId owner }\n"
+            "  items(productId: $pid, q: $q, parentItemId: $parent, limit: $limit, offset: $offset) { id name code description productId parentId owner position }\n"
             "}"
         )
         variables = {"pid": product_id, "q": q, "parent": parent_item_id, "limit": int(limit), "offset": int(offset)}

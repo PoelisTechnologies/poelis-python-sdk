@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+from types import MethodType
 import re
 
 from .org_validation import get_organization_context_message
@@ -10,6 +11,10 @@ from .org_validation import get_organization_context_message
 Provides lazy, name-based navigation across workspaces → products → items → child items,
 with optional property listing on items. Designed for notebook UX.
 """
+
+
+# Internal guard to avoid repeated completer installation
+_AUTO_COMPLETER_INSTALLED: bool = False
 
 
 class _Node:
@@ -33,34 +38,37 @@ class _Node:
     def __dir__(self) -> List[str]:  # pragma: no cover - notebook UX
         # Ensure children are loaded so TAB shows options immediately
         self._load_children()
-        keys = list(self._children_cache.keys()) + ["properties", "id", "name", "refresh", "names", "props"]
+        keys = list(self._children_cache.keys())
         if self._level == "item":
             # Include property names directly on item for suggestions
             prop_keys = list(self._props_key_map().keys())
             keys.extend(prop_keys)
-        return sorted(keys)
+        return sorted(set(keys))
 
-    @property
-    def id(self) -> Optional[str]:
-        return self._id
-
-    @property
-    def name(self) -> Optional[str]:
-        return self._name
-
-    def refresh(self) -> "_Node":
+    # Intentionally no public id/name/refresh to keep suggestions minimal
+    def _refresh(self) -> "_Node":
         self._children_cache.clear()
         self._props_cache = None
         return self
 
-    def names(self) -> List[str]:
-        """Return display names of children at this level (forces a lazy load)."""
+    def _names(self) -> List[str]:
+        """Return display names of children at this level (internal)."""
         self._load_children()
         return [child._name or "" for child in self._children_cache.values()]
 
+    def _suggest(self) -> List[str]:
+        """Return suggested attribute names for interactive usage.
+
+        Only child keys are returned; for item level, property keys are also included.
+        """
+        self._load_children()
+        suggestions: List[str] = list(self._children_cache.keys())
+        if self._level == "item":
+            suggestions.extend(list(self._props_key_map().keys()))
+        return sorted(set(suggestions))
+
     def __getattr__(self, attr: str) -> Any:
-        if attr in {"properties", "id", "name", "refresh"}:
-            return object.__getattribute__(self, attr)
+        # No public properties/id/name/refresh
         if attr == "props":  # item-level properties pseudo-node
             if self._level != "item":
                 raise AttributeError("props")
@@ -92,8 +100,7 @@ class _Node:
             return self._children_cache[safe]
         raise KeyError(key)
 
-    @property
-    def properties(self) -> List[Dict[str, Any]]:
+    def _properties(self) -> List[Dict[str, Any]]:
         if self._props_cache is not None:
             return self._props_cache
         if self._level != "item":
@@ -138,7 +145,7 @@ class _Node:
         out: Dict[str, Dict[str, Any]] = {}
         if self._level != "item":
             return out
-        props = self.properties
+        props = self._properties()
         used_names: Dict[str, int] = {}
         for i, pr in enumerate(props):
             # Try to get name from various possible fields
@@ -188,7 +195,7 @@ class _Node:
                 return
             q = (
                 "query($pid: ID!, $parent: ID!, $limit: Int!, $offset: Int!) {\n"
-                "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name code description productId parentId owner }\n"
+                "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name code description productId parentId owner position }\n"
                 "}"
             )
             r = self._client._transport.graphql(q, {"pid": pid, "parent": self._id, "limit": 1000, "offset": 0})
@@ -211,6 +218,15 @@ class Browser:
 
     def __init__(self, client: Any) -> None:
         self._root = _Node(client, "root", None, None, None)
+        # Best-effort: auto-enable curated completion in interactive shells
+        global _AUTO_COMPLETER_INSTALLED
+        if not _AUTO_COMPLETER_INSTALLED:
+            try:
+                if enable_dynamic_completion():
+                    _AUTO_COMPLETER_INSTALLED = True
+            except Exception:
+                # Non-interactive or IPython not available; ignore silently
+                pass
 
     def __getattr__(self, attr: str) -> Any:  # pragma: no cover - notebook UX
         return getattr(self._root, attr)
@@ -227,7 +243,15 @@ class Browser:
     def __dir__(self) -> list[str]:  # pragma: no cover - notebook UX
         # Ensure children are loaded so TAB shows options
         self._root._load_children()
-        return sorted([*self._root._children_cache.keys(), "names"]) 
+        return sorted([*self._root._children_cache.keys()]) 
+
+    def _names(self) -> List[str]:
+        """Return display names of root-level children (workspaces)."""
+        return self._root._names()
+
+    # keep suggest internal so it doesn't appear in help/dir
+    def _suggest(self) -> List[str]:
+        return self._root._suggest()
 
 
 def _safe_key(name: str) -> str:
@@ -255,7 +279,7 @@ class _PropsNode:
     def _ensure_loaded(self) -> None:
         if self._children_cache:
             return
-        props = self._item.properties
+        props = self._item._properties()
         used_names: Dict[str, int] = {}
         names_list = []
         for i, pr in enumerate(props):
@@ -276,7 +300,7 @@ class _PropsNode:
 
     def __dir__(self) -> List[str]:  # pragma: no cover - notebook UX
         self._ensure_loaded()
-        return sorted(list(self._children_cache.keys()) + ["names"]) 
+        return sorted(list(self._children_cache.keys())) 
 
     def names(self) -> List[str]:
         self._ensure_loaded()
@@ -294,12 +318,20 @@ class _PropsNode:
             return self._children_cache[key]
         # match by display name
         for safe, data in self._children_cache.items():
-            if data.raw.get("name") == key:
-                return data
+            try:
+                if getattr(data, "_raw", {}).get("name") == key:  # type: ignore[arg-type]
+                    return data
+            except Exception:
+                continue
         safe = _safe_key(key)
         if safe in self._children_cache:
             return self._children_cache[safe]
         raise KeyError(key)
+
+    # keep suggest internal so it doesn't appear in help/dir
+    def _suggest(self) -> List[str]:
+        self._ensure_loaded()
+        return sorted(list(self._children_cache.keys()))
 
 
 class _PropWrapper:
@@ -310,10 +342,6 @@ class _PropWrapper:
 
     def __init__(self, prop: Dict[str, Any]) -> None:
         self._raw = prop
-
-    @property
-    def raw(self) -> Dict[str, Any]:
-        return self._raw
 
     @property
     def value(self) -> Any:  # type: ignore[override]
@@ -337,8 +365,123 @@ class _PropWrapper:
             return p.get("value")
         return None
 
+    @property
+    def category(self) -> Optional[str]:
+        p = self._raw
+        cat = p.get("category")
+        return str(cat) if cat is not None else None
+
+    def __dir__(self) -> List[str]:  # pragma: no cover - notebook UX
+        # Expose only the minimal attributes for browsing
+        return ["value", "category"]
+
     def __repr__(self) -> str:  # pragma: no cover - notebook UX
         name = self._raw.get("name") or self._raw.get("id")
         return f"<property {name}: {self.value}>"
 
+
+
+def enable_dynamic_completion() -> bool:
+    """Enable dynamic attribute completion in IPython/Jupyter environments.
+
+    This helper attempts to configure IPython to use runtime-based completion
+    (disabling Jedi) so that our dynamic `__dir__` and `suggest()` methods are
+    respected by TAB completion. Returns True if an interactive shell was found
+    and configured, False otherwise.
+    """
+
+    try:
+        # Deferred import to avoid hard dependency
+        from IPython import get_ipython  # type: ignore
+    except Exception:
+        return False
+
+    ip = None
+    try:
+        ip = get_ipython()  # type: ignore[assignment]
+    except Exception:
+        ip = None
+    if ip is None:
+        return False
+
+    enabled = False
+    # Best-effort configuration: rely on IPython's fallback (non-Jedi) completer
+    try:
+        if hasattr(ip, "Completer") and hasattr(ip.Completer, "use_jedi"):
+            # Disable Jedi to let IPython consult __dir__ dynamically
+            ip.Completer.use_jedi = False  # type: ignore[assignment]
+            # Greedy completion improves attribute completion depth
+            if hasattr(ip.Completer, "greedy"):
+                ip.Completer.greedy = True  # type: ignore[assignment]
+            enabled = True
+    except Exception:
+        pass
+
+    # Additionally, install a lightweight attribute completer that uses suggest()
+    try:
+        comp = getattr(ip, "Completer", None)
+        if comp is not None and hasattr(comp, "attr_matches"):
+            orig_attr_matches = comp.attr_matches  # type: ignore[attr-defined]
+
+            def _poelis_attr_matches(self: Any, text: str) -> List[str]:  # pragma: no cover - interactive behavior
+                try:
+                    # text is like "client.browser.uh2.pr" → split at last dot
+                    obj_expr, _, prefix = text.rpartition(".")
+                    if not obj_expr:
+                        return orig_attr_matches(text)  # type: ignore[operator]
+                    # Evaluate the object in the user namespace
+                    ns = getattr(self, "namespace", {})
+                    obj_val = eval(obj_expr, ns, ns)
+
+                    # For Poelis browser objects, show ONLY our curated suggestions
+                    from_types = (Browser, _Node, _PropsNode, _PropWrapper)
+                    if isinstance(obj_val, from_types):
+                        # Build suggestion list
+                        if isinstance(obj_val, _PropWrapper):
+                            sugg: List[str] = ["value", "category"]
+                        elif hasattr(obj_val, "_suggest"):
+                            sugg = list(getattr(obj_val, "_suggest")())  # type: ignore[no-untyped-call]
+                        else:
+                            sugg = list(dir(obj_val))
+                        # Filter by prefix and format matches as full attribute paths
+                        out: List[str] = []
+                        for s in sugg:
+                            if not prefix or str(s).startswith(prefix):
+                                out.append(f"{obj_expr}.{s}")
+                        return out
+
+                    # Otherwise, fall back to default behavior
+                    return orig_attr_matches(text)  # type: ignore[operator]
+                except Exception:
+                    # fall back to original on any error
+                    return orig_attr_matches(text)  # type: ignore[operator]
+
+            comp.attr_matches = MethodType(_poelis_attr_matches, comp)  # type: ignore[assignment]
+            enabled = True
+    except Exception:
+        pass
+
+    # Also register as a high-priority matcher in IPCompleter.matchers
+    try:
+        comp = getattr(ip, "Completer", None)
+        if comp is not None and hasattr(comp, "matchers") and not getattr(comp, "_poelis_matcher_installed", False):
+            orig_attr_matches = comp.attr_matches  # type: ignore[attr-defined]
+
+            def _poelis_matcher(self: Any, text: str) -> List[str]:  # pragma: no cover - interactive behavior
+                # Delegate to our attribute logic for dotted expressions; otherwise empty
+                if "." in text:
+                    try:
+                        return self.attr_matches(text)  # type: ignore[operator]
+                    except Exception:
+                        return orig_attr_matches(text)  # type: ignore[operator]
+                return []
+
+            # Prepend our matcher so it's consulted early
+            comp.matchers.insert(0, MethodType(_poelis_matcher, comp))  # type: ignore[arg-type]
+            setattr(comp, "_poelis_matcher_installed", True)
+            enabled = True
+    except Exception:
+        pass
+
+    return bool(enabled)
 

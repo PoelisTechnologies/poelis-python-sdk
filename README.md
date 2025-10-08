@@ -19,22 +19,6 @@ client = PoelisClient(
     api_key="poelis_live_A1B2C3...",    # Organization Settings → API Keys
     org_id="tenant_uci_001",            # same section
 )
-
-# Workspaces → Products
-workspaces = client.workspaces.list(limit=10, offset=0)
-ws_id = workspaces[0]["id"]
-
-page = client.products.list_by_workspace(workspace_id=ws_id, limit=10, offset=0)
-print([p.name for p in page.data])
-
-# Items for a product
-pid = page.data[0].id
-items = client.items.list_by_product(product_id=pid, limit=10, offset=0)
-print([i.get("name") for i in items])
-
-# Property search
-props = client.search.properties(q="*", workspace_id=ws_id, limit=10, offset=0)
-print(props["total"], len(props["hits"]))
 ```
 
 ## Configuration
@@ -50,7 +34,6 @@ print(props["total"], len(props["hits"]))
 ```bash
 export POELIS_API_KEY=poelis_live_A1B2C3...
 export POELIS_ORG_ID=tenant_id_001
-# POELIS_BASE_URL is optional - defaults to the managed GCP endpoint
 ```
 
 
