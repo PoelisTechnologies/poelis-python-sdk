@@ -11,11 +11,13 @@ jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -47,6 +49,7 @@ jobs:
       run: |
         git config user.name "github-actions"
         git config user.email "github-actions@users.noreply.github.com"
+        git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
         git tag v${{ steps.v.outputs.version }}
         git push origin v${{ steps.v.outputs.version }}
 
