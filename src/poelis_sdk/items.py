@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Generator, Any, Optional, Dict, List
 
 from ._transport import Transport
+from .org_validation import validate_item_organization, filter_by_organization
 
 """Items resource client."""
 
@@ -14,11 +15,14 @@ class ItemsClient:
         self._t = transport
 
     def list_by_product(self, *, product_id: str, q: Optional[str] = None, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
-        """List items for a product via GraphQL with optional text filter."""
+        """List items for a product via GraphQL with optional text filter.
+        
+        Returns only items that belong to the client's configured organization.
+        """
 
         query = (
             "query($pid: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, q: $q, limit: $limit, offset: $offset) { id name code description productId parentId owner }\n"
+            "  items(productId: $pid, q: $q, limit: $limit, offset: $offset) { id name code description productId parentId owner orgId }\n"
             "}"
         )
         variables = {"pid": product_id, "q": q, "limit": int(limit), "offset": int(offset)}
@@ -27,14 +31,24 @@ class ItemsClient:
         payload = resp.json()
         if "errors" in payload:
             raise RuntimeError(str(payload["errors"]))
-        return payload.get("data", {}).get("items", [])
+        
+        items = payload.get("data", {}).get("items", [])
+        
+        # Client-side organization filtering as backup protection
+        expected_org_id = self._t._org_id
+        filtered_items = filter_by_organization(items, expected_org_id, "items")
+        
+        return filtered_items
 
     def get(self, item_id: str) -> Dict[str, Any]:
-        """Get a single item by id via GraphQL."""
+        """Get a single item by id via GraphQL.
+        
+        Returns the item only if it belongs to the client's configured organization.
+        """
 
         query = (
             "query($id: ID!) {\n"
-            "  item(id: $id) { id name code description productId parentId owner }\n"
+            "  item(id: $id) { id name code description productId parentId owner orgId }\n"
             "}"
         )
         resp = self._t.graphql(query=query, variables={"id": item_id})
@@ -42,7 +56,16 @@ class ItemsClient:
         payload = resp.json()
         if "errors" in payload:
             raise RuntimeError(str(payload["errors"]))
-        return payload.get("data", {}).get("item")
+        
+        item = payload.get("data", {}).get("item")
+        if item is None:
+            raise RuntimeError(f"Item with id '{item_id}' not found")
+        
+        # Validate that the item belongs to the configured organization
+        expected_org_id = self._t._org_id
+        validate_item_organization(item, expected_org_id)
+        
+        return item
 
     def iter_all_by_product(self, *, product_id: str, q: Optional[str] = None, page_size: int = 100) -> Generator[dict, None, None]:
         """Iterate items via GraphQL for a given product."""

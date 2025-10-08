@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 import re
 
+from .org_validation import get_organization_context_message
+
 """GraphQL-backed dot-path browser for Poelis SDK.
 
 Provides lazy, name-based navigation across workspaces → products → items → child items,
@@ -204,7 +206,9 @@ class Browser:
         return getattr(self._root, attr)
 
     def __repr__(self) -> str:  # pragma: no cover - notebook UX
-        return "<browser root>"
+        org_id = self._root._client.org_id
+        org_context = get_organization_context_message(org_id) if org_id else "🔒 Organization: Not configured"
+        return f"<browser root> ({org_context})"
 
     def __getitem__(self, key: str) -> Any:  # pragma: no cover - notebook UX
         """Delegate index-based access to the root node so names work: browser["Workspace Name"]."""
