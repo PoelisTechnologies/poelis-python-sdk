@@ -8,16 +8,7 @@ from __future__ import annotations
 import os
 import pytest
 
-from typing import TYPE_CHECKING
-
 from poelis_sdk import PoelisClient
-
-if TYPE_CHECKING:  # pragma: no cover - typing-only imports for pytest
-    from _pytest.capture import CaptureFixture
-    from _pytest.fixtures import FixtureRequest
-    from _pytest.logging import LogCaptureFixture
-    from _pytest.monkeypatch import MonkeyPatch
-    from pytest_mock.plugin import MockerFixture
 
 
 @pytest.mark.integration
