@@ -99,11 +99,11 @@ class _Node:
         if self._level != "item":
             self._props_cache = []
             return self._props_cache
-        # Try direct properties(item_id: ...) first; fallback to searchProperties
+        # Try direct properties(itemId: ...) first; fallback to searchProperties
         q = (
             "query($iid: ID!) {\n"
-            "  properties(item_id: $iid) {\n"
-            "    __typename id name owner\n"
+            "  properties(itemId: $iid) {\n"
+            "    __typename\n"
             "    ... on NumericProperty { integerPart exponent category }\n"
             "    ... on TextProperty { value }\n"
             "    ... on DateProperty { value }\n"
@@ -121,7 +121,7 @@ class _Node:
             q2 = (
                 "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
                 "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-                "    hits { id name propertyType category textValue numericValue dateValue owner }\n"
+                "    hits { id workspaceId productId itemId propertyType name category value owner }\n"
                 "  }\n"
                 "}"
             )
@@ -139,9 +139,19 @@ class _Node:
         if self._level != "item":
             return out
         props = self.properties
-        for pr in props:
-            display = pr.get("name") or pr.get("id")
+        used_names: Dict[str, int] = {}
+        for i, pr in enumerate(props):
+            # Try to get name from various possible fields
+            display = pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
             safe = _safe_key(str(display))
+            
+            # Handle duplicate names by adding a suffix
+            if safe in used_names:
+                used_names[safe] += 1
+                safe = f"{safe}_{used_names[safe]}"
+            else:
+                used_names[safe] = 0
+                
             out[safe] = _PropWrapper(pr)
         return out
 
@@ -246,11 +256,23 @@ class _PropsNode:
         if self._children_cache:
             return
         props = self._item.properties
-        for pr in props:
-            display = pr.get("name") or pr.get("id")
+        used_names: Dict[str, int] = {}
+        names_list = []
+        for i, pr in enumerate(props):
+            # Try to get name from various possible fields
+            display = pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
             safe = _safe_key(str(display))
+            
+            # Handle duplicate names by adding a suffix
+            if safe in used_names:
+                used_names[safe] += 1
+                safe = f"{safe}_{used_names[safe]}"
+            else:
+                used_names[safe] = 0
+                
             self._children_cache[safe] = _PropWrapper(pr)
-        self._names = [p.get("name") or p.get("id") for p in props]
+            names_list.append(display)
+        self._names = names_list
 
     def __dir__(self) -> List[str]:  # pragma: no cover - notebook UX
         self._ensure_loaded()

@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Generator, Any, Optional, Dict, List
 
 from ._transport import Transport
-from .org_validation import validate_item_organization, filter_by_organization
 
 """Items resource client."""
 
@@ -22,7 +21,7 @@ class ItemsClient:
 
         query = (
             "query($pid: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, q: $q, limit: $limit, offset: $offset) { id name code description productId parentId owner orgId }\n"
+            "  items(productId: $pid, q: $q, limit: $limit, offset: $offset) { id name code description productId parentId owner }\n"
             "}"
         )
         variables = {"pid": product_id, "q": q, "limit": int(limit), "offset": int(offset)}
@@ -34,11 +33,7 @@ class ItemsClient:
         
         items = payload.get("data", {}).get("items", [])
         
-        # Client-side organization filtering as backup protection
-        expected_org_id = self._t._org_id
-        filtered_items = filter_by_organization(items, expected_org_id, "items")
-        
-        return filtered_items
+        return items
 
     def get(self, item_id: str) -> Dict[str, Any]:
         """Get a single item by id via GraphQL.
@@ -48,7 +43,7 @@ class ItemsClient:
 
         query = (
             "query($id: ID!) {\n"
-            "  item(id: $id) { id name code description productId parentId owner orgId }\n"
+            "  item(id: $id) { id name code description productId parentId owner }\n"
             "}"
         )
         resp = self._t.graphql(query=query, variables={"id": item_id})
@@ -60,10 +55,6 @@ class ItemsClient:
         item = payload.get("data", {}).get("item")
         if item is None:
             raise RuntimeError(f"Item with id '{item_id}' not found")
-        
-        # Validate that the item belongs to the configured organization
-        expected_org_id = self._t._org_id
-        validate_item_organization(item, expected_org_id)
         
         return item
 
