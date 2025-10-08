@@ -77,10 +77,6 @@ def filter_by_organization(data_list: List[Dict[str, Any]], expected_org_id: str
         else:
             cross_org_count += 1
     
-    if cross_org_count > 0:
-        # Log warning about cross-org data (but don't fail)
-        print(f"⚠️  Warning: Filtered out {cross_org_count} {data_type} from other organizations")
-    
     return filtered
 
 

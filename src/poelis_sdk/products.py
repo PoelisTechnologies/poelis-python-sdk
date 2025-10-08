@@ -4,6 +4,7 @@ from typing import Generator, Optional, List, TYPE_CHECKING
 
 from ._transport import Transport
 from .models import PaginatedProducts, Product
+from .org_validation import filter_by_organization
 
 if TYPE_CHECKING:
     from .workspaces import WorkspacesClient
@@ -32,7 +33,7 @@ class ProductsClient:
 
         query = (
             "query($ws: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) { id name code description workspaceId }\n"
+            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) { id name code description workspaceId orgId }\n"
             "}"
         )
         variables = {"ws": workspace_id, "q": q, "limit": int(limit), "offset": int(offset)}
@@ -41,8 +42,14 @@ class ProductsClient:
         payload = resp.json()
         if "errors" in payload:
             raise RuntimeError(str(payload["errors"]))
-        rows: List[dict] = payload.get("data", {}).get("products", [])
-        return PaginatedProducts(data=[Product(**r) for r in rows], limit=limit, offset=offset)
+        
+        products = payload.get("data", {}).get("products", [])
+        
+        # Client-side organization filtering as backup protection
+        expected_org_id = self._t._org_id
+        filtered_products = filter_by_organization(products, expected_org_id, "products")
+        
+        return PaginatedProducts(data=[Product(**r) for r in filtered_products], limit=limit, offset=offset)
 
     def iter_all_by_workspace(self, *, workspace_id: str, q: Optional[str] = None, page_size: int = 100, start_offset: int = 0) -> Generator[Product, None, None]:
         """Iterate products via GraphQL with offset pagination for a workspace."""
