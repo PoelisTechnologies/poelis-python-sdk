@@ -538,7 +538,7 @@ wheels = [
 
 [[package]]
 name = "poelis-sdk"
-version = "0.1.2"
+version = "0.1.7"
 source = { editable = "." }
 dependencies = [
     { name = "build" },
