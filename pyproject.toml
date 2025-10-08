@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "poelis-sdk"
-version = "0.1.4"
+version = "0.1.6"
 description = "Official Python SDK for Poelis"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://poelis.ai"
+Homepage = "https://poelis.com"
 Source = "https://github.com/PoelisTechnologies/poelis-python-sdk"
 Issues = "https://github.com/PoelisTechnologies/poelis-python-sdk/issues"
 
