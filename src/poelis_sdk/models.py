@@ -12,8 +12,9 @@ class Product(BaseModel):
 
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
-    workspace_id: Optional[str] = None
-    org_id: Optional[str] = None
+    workspaceId: Optional[str] = None
+    code: Optional[str] = None
+    description: Optional[str] = None
 
 
 class PaginatedProducts(BaseModel):
