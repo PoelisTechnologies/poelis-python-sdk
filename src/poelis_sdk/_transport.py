@@ -6,6 +6,7 @@ import random
 import httpx
 
 from .exceptions import ClientError, HTTPError, NotFoundError, RateLimitError, ServerError, UnauthorizedError
+from .auth0 import Auth0TokenManager
 
 """HTTP transport abstraction for the Poelis SDK.
 
@@ -28,8 +29,8 @@ class Transport:
 
         Args:
             base_url: Base API URL.
-            token: Bearer token for Authorization header.
-            org_id: Optional organization id for tenant scoping.
+            api_key: API key for Auth0 authentication.
+            org_id: Organization id for tenant scoping.
             timeout_seconds: Request timeout in seconds.
         """
 
@@ -37,13 +38,18 @@ class Transport:
         self._api_key = api_key
         self._org_id = org_id
         self._timeout = timeout_seconds
+        
+        # Initialize Auth0 token manager
+        self._auth0_manager = Auth0TokenManager(api_key, org_id, base_url)
 
     def _headers(self, extra: Optional[Mapping[str, str]] = None) -> Dict[str, str]:
         headers: Dict[str, str] = {
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
-        headers["Authorization"] = f"ApiKey {self._api_key}"
+        # Get fresh JWT token from Auth0
+        token = self._auth0_manager.get_token()
+        headers["Authorization"] = f"Bearer {token}"
         headers["X-Poelis-Org"] = self._org_id
         if extra:
             headers.update(dict(extra))
