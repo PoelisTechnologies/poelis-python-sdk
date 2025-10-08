@@ -17,16 +17,20 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: 'latest'
+
     - name: Extract version
       id: v
       run: |
-        VER=$(python - <<'PY'
-import tomllib, sys
-with open('pyproject.toml','rb') as f:
-    data = tomllib.load(f)
-print(data['project']['version'])
-PY
-        )
+        VER=$(python -c "import tomllib;print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
         echo "version=$VER" >> $GITHUB_OUTPUT
 
     - name: Check if tag exists
@@ -45,16 +49,6 @@ PY
         git config user.email "github-actions@users.noreply.github.com"
         git tag v${{ steps.v.outputs.version }}
         git push origin v${{ steps.v.outputs.version }}
-
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-
-    - name: Install uv
-      uses: astral-sh/setup-uv@v3
-      with:
-        version: 'latest'
 
     - name: Install build tooling
       run: |
