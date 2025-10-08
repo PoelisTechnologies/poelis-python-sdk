@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from ._transport import Transport
-from .org_validation import validate_workspace_organization, filter_by_organization, get_organization_context_message
+from .org_validation import validate_workspace_organization, filter_by_organization
 
 """Workspaces GraphQL client."""
 

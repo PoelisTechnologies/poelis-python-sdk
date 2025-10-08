@@ -6,7 +6,6 @@ This module provides utilities to configure logging levels for the SDK and its d
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 
 def configure_logging(
