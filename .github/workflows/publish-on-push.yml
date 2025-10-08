@@ -61,9 +61,27 @@ jobs:
       run: |
         uv run python -m build
 
-    - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
+    - name: List built packages
+      run: |
+        ls -la dist/
+        echo "Package contents:"
+        for pkg in dist/*; do
+          echo "Package: $pkg"
+          if [[ $pkg == *.whl ]]; then
+            unzip -l "$pkg" | head -10
+          elif [[ $pkg == *.tar.gz ]]; then
+            tar -tzf "$pkg" | head -10
+          fi
+        done
+
+    - name: Install twine
+      run: |
+        uv add twine
+
+    - name: Publish to PyPI with twine
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      run: |
+        uv run twine upload --skip-existing --verbose dist/*
 
