@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from types import MethodType
 import re
+import time
 
 from .org_validation import get_organization_context_message
 
@@ -26,6 +27,10 @@ class _Node:
         self._name = name
         self._children_cache: Dict[str, "_Node"] = {}
         self._props_cache: Optional[List[Dict[str, Any]]] = None
+        # Performance optimization: cache metadata with TTL
+        self._children_loaded_at: Optional[float] = None
+        self._props_loaded_at: Optional[float] = None
+        self._cache_ttl: float = 30.0  # 30 seconds cache TTL
 
     def __repr__(self) -> str:  # pragma: no cover - notebook UX
         path = []
@@ -36,8 +41,9 @@ class _Node:
         return f"<{self._level}:{'.'.join(reversed(path)) or '*'}>"
 
     def __dir__(self) -> List[str]:  # pragma: no cover - notebook UX
-        # Ensure children are loaded so TAB shows options immediately
-        self._load_children()
+        # Performance optimization: only load children if cache is stale or empty
+        if self._is_children_cache_stale():
+            self._load_children()
         keys = list(self._children_cache.keys())
         if self._level == "item":
             # Include property names directly on item for suggestions
@@ -49,11 +55,30 @@ class _Node:
     def _refresh(self) -> "_Node":
         self._children_cache.clear()
         self._props_cache = None
+        self._children_loaded_at = None
+        self._props_loaded_at = None
         return self
+
+    def _is_children_cache_stale(self) -> bool:
+        """Check if children cache is stale and needs refresh."""
+        if not self._children_cache:
+            return True
+        if self._children_loaded_at is None:
+            return True
+        return time.time() - self._children_loaded_at > self._cache_ttl
+
+    def _is_props_cache_stale(self) -> bool:
+        """Check if properties cache is stale and needs refresh."""
+        if self._props_cache is None:
+            return True
+        if self._props_loaded_at is None:
+            return True
+        return time.time() - self._props_loaded_at > self._cache_ttl
 
     def _names(self) -> List[str]:
         """Return display names of children at this level (internal)."""
-        self._load_children()
+        if self._is_children_cache_stale():
+            self._load_children()
         return [child._name or "" for child in self._children_cache.values()]
 
     def names(self) -> List[str]:
@@ -65,7 +90,8 @@ class _Node:
 
         Only child keys are returned; for item level, property keys are also included.
         """
-        self._load_children()
+        if self._is_children_cache_stale():
+            self._load_children()
         suggestions: List[str] = list(self._children_cache.keys())
         if self._level == "item":
             suggestions.extend(list(self._props_key_map().keys()))
@@ -78,7 +104,8 @@ class _Node:
                 raise AttributeError("props")
             return _PropsNode(self)
         if attr not in self._children_cache:
-            self._load_children()
+            if self._is_children_cache_stale():
+                self._load_children()
         if attr in self._children_cache:
             return self._children_cache[attr]
         # Expose properties as direct attributes on item level
@@ -93,7 +120,8 @@ class _Node:
 
         This enables names with spaces or symbols: browser["Workspace Name"].
         """
-        self._load_children()
+        if self._is_children_cache_stale():
+            self._load_children()
         if key in self._children_cache:
             return self._children_cache[key]
         for child in self._children_cache.values():
@@ -105,10 +133,11 @@ class _Node:
         raise KeyError(key)
 
     def _properties(self) -> List[Dict[str, Any]]:
-        if self._props_cache is not None:
-            return self._props_cache
+        if not self._is_props_cache_stale():
+            return self._props_cache or []
         if self._level != "item":
             self._props_cache = []
+            self._props_loaded_at = time.time()
             return self._props_cache
         # Try direct properties(itemId: ...) first; fallback to searchProperties
         q = (
@@ -128,6 +157,7 @@ class _Node:
             if "errors" in data:
                 raise RuntimeError(data["errors"])  # trigger fallback
             self._props_cache = data.get("data", {}).get("properties", []) or []
+            self._props_loaded_at = time.time()
         except Exception:
             q2 = (
                 "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
@@ -142,6 +172,7 @@ class _Node:
             if "errors" in data2:
                 raise RuntimeError(data2["errors"])  # propagate
             self._props_cache = data2.get("data", {}).get("searchProperties", {}).get("hits", []) or []
+            self._props_loaded_at = time.time()
         return self._props_cache
 
     def _props_key_map(self) -> Dict[str, Dict[str, Any]]:
@@ -172,20 +203,26 @@ class _Node:
             for w in rows:
                 display = w.get("name") or str(w.get("id"))
                 nm = _safe_key(display)
-                self._children_cache[nm] = _Node(self._client, "workspace", self, w["id"], display)
+                child = _Node(self._client, "workspace", self, w["id"], display)
+                child._cache_ttl = self._cache_ttl
+                self._children_cache[nm] = child
         elif self._level == "workspace":
             page = self._client.products.list_by_workspace(workspace_id=self._id, limit=200, offset=0)
             for p in page.data:
                 display = p.name or str(p.id)
                 nm = _safe_key(display)
-                self._children_cache[nm] = _Node(self._client, "product", self, p.id, display)
+                child = _Node(self._client, "product", self, p.id, display)
+                child._cache_ttl = self._cache_ttl
+                self._children_cache[nm] = child
         elif self._level == "product":
             rows = self._client.items.list_by_product(product_id=self._id, limit=1000, offset=0)
             for it in rows:
                 if it.get("parentId") is None:
                     display = it.get("name") or str(it["id"]) 
                     nm = _safe_key(display)
-                    self._children_cache[nm] = _Node(self._client, "item", self, it["id"], display)
+                    child = _Node(self._client, "item", self, it["id"], display)
+                    child._cache_ttl = self._cache_ttl
+                    self._children_cache[nm] = child
         elif self._level == "item":
             # Fetch children items by parent; derive productId from ancestor product
             anc = self
@@ -214,14 +251,27 @@ class _Node:
                     continue
                 display = it2.get("name") or str(it2["id"]) 
                 nm = _safe_key(display)
-                self._children_cache[nm] = _Node(self._client, "item", self, it2["id"], display)
+                child = _Node(self._client, "item", self, it2["id"], display)
+                child._cache_ttl = self._cache_ttl
+                self._children_cache[nm] = child
+        
+        # Mark cache as fresh
+        self._children_loaded_at = time.time()
 
 
 class Browser:
     """Public browser entrypoint."""
 
-    def __init__(self, client: Any) -> None:
+    def __init__(self, client: Any, cache_ttl: float = 30.0) -> None:
+        """Initialize browser with optional cache TTL.
+        
+        Args:
+            client: PoelisClient instance
+            cache_ttl: Cache time-to-live in seconds (default: 30)
+        """
         self._root = _Node(client, "root", None, None, None)
+        # Set cache TTL for all nodes
+        self._root._cache_ttl = cache_ttl
         # Best-effort: auto-enable curated completion in interactive shells
         global _AUTO_COMPLETER_INSTALLED
         if not _AUTO_COMPLETER_INSTALLED:
@@ -245,8 +295,9 @@ class Browser:
         return self._root[key]
 
     def __dir__(self) -> list[str]:  # pragma: no cover - notebook UX
-        # Ensure children are loaded so TAB shows options
-        self._root._load_children()
+        # Performance optimization: only load children if cache is stale or empty
+        if self._root._is_children_cache_stale():
+            self._root._load_children()
         return sorted([*self._root._children_cache.keys()]) 
 
     def _names(self) -> List[str]:
@@ -288,13 +339,18 @@ class _PropsNode:
         self._item = item_node
         self._children_cache: Dict[str, _PropWrapper] = {}
         self._names: List[str] = []
+        self._loaded_at: Optional[float] = None
+        self._cache_ttl: float = item_node._cache_ttl  # Inherit cache TTL from parent node
 
     def __repr__(self) -> str:  # pragma: no cover - notebook UX
         return f"<props of {self._item.name or self._item.id}>"
 
     def _ensure_loaded(self) -> None:
-        if self._children_cache:
-            return
+        # Performance optimization: only load if cache is stale or empty
+        if self._children_cache and self._loaded_at is not None:
+            if time.time() - self._loaded_at <= self._cache_ttl:
+                return
+        
         props = self._item._properties()
         used_names: Dict[str, int] = {}
         names_list = []
@@ -313,6 +369,7 @@ class _PropsNode:
             self._children_cache[safe] = _PropWrapper(pr)
             names_list.append(display)
         self._names = names_list
+        self._loaded_at = time.time()
 
     def __dir__(self) -> List[str]:  # pragma: no cover - notebook UX
         self._ensure_loaded()
