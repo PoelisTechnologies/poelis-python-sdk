@@ -56,6 +56,10 @@ class _Node:
         self._load_children()
         return [child._name or "" for child in self._children_cache.values()]
 
+    def names(self) -> List[str]:
+        """Public: return display names of children at this level."""
+        return self._names()
+
     def _suggest(self) -> List[str]:
         """Return suggested attribute names for interactive usage.
 
@@ -249,8 +253,20 @@ class Browser:
         """Return display names of root-level children (workspaces)."""
         return self._root._names()
 
+    def names(self) -> List[str]:
+        """Public: return display names of root-level children (workspaces)."""
+        return self._root._names()
+
     # keep suggest internal so it doesn't appear in help/dir
     def _suggest(self) -> List[str]:
+        return self._root._suggest()
+
+    def suggest(self) -> List[str]:
+        """Return curated attribute suggestions at the current root level.
+
+        This mirrors the internal `_suggest` used for interactive completion,
+        but is exposed publicly for tests and programmatic usage.
+        """
         return self._root._suggest()
 
 

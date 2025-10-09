@@ -46,7 +46,7 @@ class _MockTransport(httpx.BaseTransport):
 
 
 def test_auth_header_and_pagination(monkeypatch: "MonkeyPatch") -> None:
-    """Verify Authorization header exists and pagination iterates over all pages."""
+    """Verify auth headers exist and pagination iterates over all pages."""
 
     client = PoelisClient(base_url="http://example.com", api_key="k", org_id="o")
 
@@ -72,7 +72,9 @@ def test_auth_header_and_pagination(monkeypatch: "MonkeyPatch") -> None:
         # Check headers on first request
         assert mt.requests, "no requests captured"
         first = mt.requests[0]
-        assert first.headers.get("Authorization") == "ApiKey k"
+        # Default auth mode is API key headers and Authorization: Api-Key
+        assert first.headers.get("X-API-Key") == "k" or first.headers.get("X-Poelis-Api-Key") == "k"
+        assert first.headers.get("Authorization") == "Api-Key k"
         assert first.headers.get("Accept") == "application/json"
     finally:
         _T.__init__ = _orig_init  # type: ignore[assignment]

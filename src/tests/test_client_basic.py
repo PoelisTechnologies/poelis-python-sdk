@@ -34,7 +34,7 @@ def test_client_default_base_url() -> None:
 
 
 def test_client_api_key_headers(monkeypatch: "MonkeyPatch") -> None:
-    """When api_key and org_id are provided, use ApiKey and X-Poelis-Org headers."""
+    """When api_key and org_id are provided, use API key and X-Poelis-Org headers by default."""
 
     import httpx
     from poelis_sdk.client import Transport as _T
@@ -62,7 +62,8 @@ def test_client_api_key_headers(monkeypatch: "MonkeyPatch") -> None:
         # trigger a request to test headers
         client._transport.get("/health")
         assert t.last is not None
-        assert t.last.headers.get("Authorization") == "ApiKey poelis_live_abc"
+        assert t.last.headers.get("X-API-Key") == "poelis_live_abc" or t.last.headers.get("X-Poelis-Api-Key") == "poelis_live_abc"
+        assert t.last.headers.get("Authorization") == "Api-Key poelis_live_abc"
         assert t.last.headers.get("X-Poelis-Org") == "tenant_x"
     finally:
         _T.__init__ = orig  # type: ignore[assignment]

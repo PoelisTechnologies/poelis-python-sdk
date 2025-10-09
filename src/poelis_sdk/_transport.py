@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Mapping, Optional
+import os
 import time
 import random
 import httpx
 
 from .exceptions import ClientError, HTTPError, NotFoundError, RateLimitError, ServerError, UnauthorizedError
-from .auth0 import Auth0TokenManager
 
 """HTTP transport abstraction for the Poelis SDK.
 
@@ -29,7 +29,7 @@ class Transport:
 
         Args:
             base_url: Base API URL.
-            api_key: API key for Auth0 authentication.
+            api_key: API key provided by backend to authenticate requests.
             org_id: Organization id for tenant scoping.
             timeout_seconds: Request timeout in seconds.
         """
@@ -38,18 +38,32 @@ class Transport:
         self._api_key = api_key
         self._org_id = org_id
         self._timeout = timeout_seconds
+        # Auth mode is intentionally read from environment to keep the public
+        # constructor signature stable for tests and backwards-compatibility.
+        # Supported values:
+        # - "bearer" (default): Authorization: Bearer <api_key>
+        # - "api_key": X-API-Key/X-Poelis-Api-Key headers with no Authorization
+        self._auth_mode = os.environ.get("POELIS_AUTH_MODE", "api_key").strip().lower()
         
-        # Initialize Auth0 token manager
-        self._auth0_manager = Auth0TokenManager(api_key, org_id, base_url)
 
     def _headers(self, extra: Optional[Mapping[str, str]] = None) -> Dict[str, str]:
         headers: Dict[str, str] = {
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
-        # Get fresh JWT token from Auth0
-        token = self._auth0_manager.get_token()
-        headers["Authorization"] = f"Bearer {token}"
+        # Resolve auth mode with a safe fallback in case tests monkeypatch __init__
+        auth_mode = getattr(self, "_auth_mode", None) or os.environ.get("POELIS_AUTH_MODE", "api_key").strip().lower()
+        if auth_mode == "api_key":
+            # Some staging environments expect an API key header and reject Bearer
+            # Include common header variants for compatibility; backend may accept either.
+            headers["X-API-Key"] = self._api_key
+            headers["X-Poelis-Api-Key"] = self._api_key
+            # Additionally include Authorization with Api-Key scheme for services
+            # that only read credentials from Authorization.
+            headers["Authorization"] = f"Api-Key {self._api_key}"
+        else:
+            # Default: send API key as Bearer token
+            headers["Authorization"] = f"Bearer {self._api_key}"
         headers["X-Poelis-Org"] = self._org_id
         if extra:
             headers.update(dict(extra))

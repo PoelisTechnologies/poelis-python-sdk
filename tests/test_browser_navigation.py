@@ -6,6 +6,7 @@ These tests avoid reliance on IPython and focus on programmatic APIs.
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Dict
+import json
 
 import httpx
 
@@ -22,7 +23,7 @@ class _MockTransport(httpx.BaseTransport):
     def handle_request(self, request: httpx.Request) -> httpx.Response:  # type: ignore[override]
         self.requests.append(request)
         if request.method == "POST" and request.url.path == "/v1/graphql":
-            payload = request.json()  # type: ignore[no-untyped-call]
+            payload = json.loads(request.content.decode("utf-8"))
             query: str = payload.get("query", "")
             vars: Dict[str, Any] = payload.get("variables", {})
 
@@ -77,15 +78,6 @@ def _client_with_graphql_mock(t: httpx.BaseTransport) -> PoelisClient:
         self._org_id = org_id
         self._timeout = timeout_seconds
 
-        # minimal stubs for headers used by transport
-        class _Auth0:
-            def __init__(self) -> None:
-                pass
-
-            def get_token(self) -> str:
-                return "tok"
-
-        self._auth0_manager = _Auth0()
 
     orig = _T.__init__
     _T.__init__ = _init  # type: ignore[assignment]
