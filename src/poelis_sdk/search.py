@@ -54,7 +54,7 @@ class SearchClient:
             "query($q: String!, $ws: ID, $pid: ID, $iid: ID, $ptype: String, $cat: String, $limit: Int!, $offset: Int!, $sort: String) {\n"
             "  searchProperties(q: $q, workspaceId: $ws, productId: $pid, itemId: $iid, propertyType: $ptype, category: $cat, limit: $limit, offset: $offset, sort: $sort) {\n"
             "    query total limit offset processingTimeMs\n"
-            "    hits { id workspaceId productId itemId propertyType name category value owner }\n"
+            "    hits { id workspaceId productId itemId propertyType name category value parsedValue owner }\n"
             "  }\n"
             "}"
         )

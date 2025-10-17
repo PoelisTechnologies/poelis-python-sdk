@@ -140,39 +140,77 @@ class _Node:
             self._props_loaded_at = time.time()
             return self._props_cache
         # Try direct properties(itemId: ...) first; fallback to searchProperties
-        q = (
+        # Attempt 1: query with parsedValue support
+        q_parsed = (
             "query($iid: ID!) {\n"
             "  properties(itemId: $iid) {\n"
             "    __typename\n"
-            "    ... on NumericProperty { integerPart exponent category }\n"
-            "    ... on TextProperty { value }\n"
+            "    ... on NumericProperty { category value parsedValue }\n"
+            "    ... on TextProperty { value parsedValue }\n"
             "    ... on DateProperty { value }\n"
             "  }\n"
             "}"
         )
         try:
-            r = self._client._transport.graphql(q, {"iid": self._id})
+            r = self._client._transport.graphql(q_parsed, {"iid": self._id})
             r.raise_for_status()
             data = r.json()
             if "errors" in data:
-                raise RuntimeError(data["errors"])  # trigger fallback
+                raise RuntimeError(data["errors"])  # try value-only shape
             self._props_cache = data.get("data", {}).get("properties", []) or []
             self._props_loaded_at = time.time()
         except Exception:
-            q2 = (
-                "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
-                "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-                "    hits { id workspaceId productId itemId propertyType name category value owner }\n"
+            # Attempt 2: value-only, legacy compatible
+            q_value_only = (
+                "query($iid: ID!) {\n"
+                "  properties(itemId: $iid) {\n"
+                "    __typename\n"
+                "    ... on NumericProperty { category value }\n"
+                "    ... on TextProperty { value }\n"
+                "    ... on DateProperty { value }\n"
                 "  }\n"
                 "}"
             )
-            r2 = self._client._transport.graphql(q2, {"iid": self._id, "limit": 100, "offset": 0})
-            r2.raise_for_status()
-            data2 = r2.json()
-            if "errors" in data2:
-                raise RuntimeError(data2["errors"])  # propagate
-            self._props_cache = data2.get("data", {}).get("searchProperties", {}).get("hits", []) or []
-            self._props_loaded_at = time.time()
+            try:
+                r = self._client._transport.graphql(q_value_only, {"iid": self._id})
+                r.raise_for_status()
+                data = r.json()
+                if "errors" in data:
+                    raise RuntimeError(data["errors"])  # trigger fallback to search
+                self._props_cache = data.get("data", {}).get("properties", []) or []
+                self._props_loaded_at = time.time()
+            except Exception:
+                # Fallback to searchProperties
+                q2_parsed = (
+                    "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
+                    "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
+                    "    hits { id workspaceId productId itemId propertyType name category value parsedValue owner }\n"
+                    "  }\n"
+                    "}"
+                )
+                try:
+                    r2 = self._client._transport.graphql(q2_parsed, {"iid": self._id, "limit": 100, "offset": 0})
+                    r2.raise_for_status()
+                    data2 = r2.json()
+                    if "errors" in data2:
+                        raise RuntimeError(data2["errors"])  # try minimal
+                    self._props_cache = data2.get("data", {}).get("searchProperties", {}).get("hits", []) or []
+                    self._props_loaded_at = time.time()
+                except Exception:
+                    q2_min = (
+                        "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
+                        "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
+                        "    hits { id workspaceId productId itemId propertyType name category value owner }\n"
+                        "  }\n"
+                        "}"
+                    )
+                    r3 = self._client._transport.graphql(q2_min, {"iid": self._id, "limit": 100, "offset": 0})
+                    r3.raise_for_status()
+                    data3 = r3.json()
+                    if "errors" in data3:
+                        raise RuntimeError(data3["errors"])  # propagate
+                    self._props_cache = data3.get("data", {}).get("searchProperties", {}).get("hits", []) or []
+                    self._props_loaded_at = time.time()
         return self._props_cache
 
     def _props_key_map(self) -> Dict[str, Dict[str, Any]]:
@@ -419,6 +457,10 @@ class _PropWrapper:
     @property
     def value(self) -> Any:  # type: ignore[override]
         p = self._raw
+        # Use parsedValue if available (new backend feature)
+        if "parsedValue" in p:
+            return p["parsedValue"]
+        # Fallback to legacy parsing logic for backward compatibility
         # searchProperties shape
         if "numericValue" in p and p.get("numericValue") is not None:
             return p["numericValue"]
