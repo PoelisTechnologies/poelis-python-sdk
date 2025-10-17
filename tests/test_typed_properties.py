@@ -9,11 +9,11 @@ from poelis_sdk.models import NumericProperty, TextProperty, DateProperty, Prope
 from poelis_sdk.browser import _PropWrapper
 
 if TYPE_CHECKING:
-    from _pytest.capture import CaptureFixture
-    from _pytest.fixtures import FixtureRequest
-    from _pytest.logging import LogCaptureFixture
-    from _pytest.monkeypatch import MonkeyPatch
-    from pytest_mock.plugin import MockerFixture
+    from _pytest.capture import CaptureFixture  # noqa: F401
+    from _pytest.fixtures import FixtureRequest  # noqa: F401
+    from _pytest.logging import LogCaptureFixture  # noqa: F401
+    from _pytest.monkeypatch import MonkeyPatch  # noqa: F401
+    from pytest_mock.plugin import MockerFixture  # noqa: F401
 
 
 class TestTypedPropertyModels:
