@@ -142,7 +142,7 @@ class _Node:
         # Try direct properties(itemId: ...) first; fallback to searchProperties
         # Attempt 1: query with parsedValue support
         q_parsed = (
-            "query($iid: ID!) \n"
+            "query($iid: ID!) {\n"
             "  properties(itemId: $iid) {\n"
             "    __typename\n"
             "    ... on NumericProperty { id name category value parsedValue }\n"
@@ -162,7 +162,7 @@ class _Node:
         except Exception:
             # Attempt 2: value-only, legacy compatible
             q_value_only = (
-                "query($iid: ID!) \n"
+                "query($iid: ID!) {\n"
                 "  properties(itemId: $iid) {\n"
                 "    __typename\n"
                 "    ... on NumericProperty { id name category value }\n"
