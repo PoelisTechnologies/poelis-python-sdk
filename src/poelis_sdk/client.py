@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from typing import Optional
 import os
+from typing import Optional
 
 from pydantic import BaseModel, Field, HttpUrl
+
 from ._transport import Transport
-from .products import ProductsClient
+from .browser import Browser
 from .items import ItemsClient
+from .logging import quiet_logging
+from .products import ProductsClient
 from .search import SearchClient
 from .workspaces import WorkspacesClient
-from .browser import Browser
-from .logging import quiet_logging
 
 """Core client for the Poelis Python SDK.
 

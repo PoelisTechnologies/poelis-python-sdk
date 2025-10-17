@@ -1,12 +1,20 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Mapping, Optional
 import os
-import time
 import random
+import time
+from typing import Any, Dict, Mapping, Optional
+
 import httpx
 
-from .exceptions import ClientError, HTTPError, NotFoundError, RateLimitError, ServerError, UnauthorizedError
+from .exceptions import (
+    ClientError,
+    HTTPError,
+    NotFoundError,
+    RateLimitError,
+    ServerError,
+    UnauthorizedError,
+)
 
 """HTTP transport abstraction for the Poelis SDK.
 

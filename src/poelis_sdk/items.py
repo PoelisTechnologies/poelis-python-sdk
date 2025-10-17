@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Generator, Any, Optional, Dict, List
+from typing import Any, Dict, Generator, List, Optional
 
 from ._transport import Transport
 

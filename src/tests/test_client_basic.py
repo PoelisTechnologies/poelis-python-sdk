@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-
 from poelis_sdk import PoelisClient
 
 if TYPE_CHECKING:
@@ -37,6 +36,7 @@ def test_client_api_key_headers(monkeypatch: "MonkeyPatch") -> None:
     """When api_key and org_id are provided, use API key and X-Poelis-Org headers by default."""
 
     import httpx
+
     from poelis_sdk.client import Transport as _T
 
     class _Tpt(httpx.BaseTransport):

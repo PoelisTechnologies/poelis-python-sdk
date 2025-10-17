@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
-from types import MethodType
 import re
 import time
+from types import MethodType
+from typing import Any, Dict, List, Optional
 
 from .org_validation import get_organization_context_message
 
@@ -142,12 +142,12 @@ class _Node:
         # Try direct properties(itemId: ...) first; fallback to searchProperties
         # Attempt 1: query with parsedValue support
         q_parsed = (
-            "query($iid: ID!) {\n"
+            "query($iid: ID!) \n"
             "  properties(itemId: $iid) {\n"
             "    __typename\n"
-            "    ... on NumericProperty { category value parsedValue }\n"
-            "    ... on TextProperty { value parsedValue }\n"
-            "    ... on DateProperty { value }\n"
+            "    ... on NumericProperty { id name category value parsedValue }\n"
+            "    ... on TextProperty { id name value parsedValue }\n"
+            "    ... on DateProperty { id name value }\n"
             "  }\n"
             "}"
         )
@@ -162,12 +162,12 @@ class _Node:
         except Exception:
             # Attempt 2: value-only, legacy compatible
             q_value_only = (
-                "query($iid: ID!) {\n"
+                "query($iid: ID!) \n"
                 "  properties(itemId: $iid) {\n"
                 "    __typename\n"
-                "    ... on NumericProperty { category value }\n"
-                "    ... on TextProperty { value }\n"
-                "    ... on DateProperty { value }\n"
+                "    ... on NumericProperty { id name category value }\n"
+                "    ... on TextProperty { id name value }\n"
+                "    ... on DateProperty { id name value }\n"
                 "  }\n"
                 "}"
             )

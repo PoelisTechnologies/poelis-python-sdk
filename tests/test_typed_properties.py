@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from poelis_sdk.models import NumericProperty, TextProperty, DateProperty, PropertySearchResult
 from poelis_sdk.browser import _PropWrapper
+from poelis_sdk.models import DateProperty, NumericProperty, PropertySearchResult, TextProperty
 
 if TYPE_CHECKING:
     from _pytest.capture import CaptureFixture  # noqa: F401

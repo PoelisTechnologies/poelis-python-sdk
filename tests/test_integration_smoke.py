@@ -6,6 +6,7 @@ Skips by default unless POELIS_API_KEY and POELIS_ORG_ID are set.
 from __future__ import annotations
 
 import os
+
 import pytest
 
 from poelis_sdk import PoelisClient

@@ -5,8 +5,8 @@ These tests avoid reliance on IPython and focus on programmatic APIs.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict
 import json
+from typing import TYPE_CHECKING, Any, Dict
 
 import httpx
 
