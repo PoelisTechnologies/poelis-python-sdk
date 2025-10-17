@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-import pytest
 
 from poelis_sdk.models import NumericProperty, TextProperty, DateProperty, PropertySearchResult
 from poelis_sdk.browser import _PropWrapper
