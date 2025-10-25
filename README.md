@@ -1,6 +1,6 @@
 # Poelis Python SDK
 
-Python SDK for Poelis.
+Python SDK for Poelis - explore your data with simple dot notation.
 
 ## Installation
 
@@ -10,61 +10,83 @@ pip install -U poelis-sdk
 
 Requires Python 3.11+.
 
-## Quickstart (API key + org ID)
+## Quick Start
 
 ```python
 from poelis_sdk import PoelisClient
 
-client = PoelisClient(
-    api_key="poelis_live_A1B2C3...",    # Organization Settings → API Keys
-    org_id="tenant_uci_001",            # same section
+# Create client
+poelis = PoelisClient(
+    api_key="poelis_live_A1B2C3...",    # Get from Organization Settings → API Keys
+    org_id="tenant_uci_001",            # Same section
 )
+
+# Use the browser for easy exploration
+poelis = poelis.browser  # Now you can use dot notation!
+
+# Explore your data
+poelis.workspace_name.product_name.item_name
 ```
 
-## Configuration
+## Getting Your Credentials
 
-### Getting your API key and org ID
-
-1. Navigate to Organization Settings → API Keys.
-2. Click “Create API key”, choose a name and scopes (read-only by default recommended).
-3. Copy the full key when shown (it will be visible only once). Keep it secret.
-4. The `org_id` for your organization is displayed in the same section.
-5. You can rotate or revoke keys anytime. Prefer storing as env vars:
+1. Go to **Organization Settings → API Keys**
+2. Click **"Create API key"** (read-only recommended)
+3. Copy the key (shown only once) and your `org_id`
+4. Store securely as environment variables:
 
 ```bash
 export POELIS_API_KEY=poelis_live_A1B2C3...
-export POELIS_ORG_ID=tenant_id_001
+export POELIS_ORG_ID=tenant_uci_001
 ```
 
+## Browser Usage
 
-### How authentication works
-
-The SDK does not talk to Auth0. It sends your API key directly to the Poelis backend for validation on every request.
-
-- Default headers sent by the SDK:
-
-  - `X-API-Key: <api_key>` (and `X-Poelis-Api-Key` as a compatibility alias)
-  - `Authorization: Api-Key <api_key>` (compatibility for gateways expecting Authorization-only)
-  - `X-Poelis-Org: <org_id>`
-
-You can opt into Bearer mode (legacy) by setting `POELIS_AUTH_MODE=bearer`, which will send:
-
-  - `Authorization: Bearer <api_key>`
-  - `X-Poelis-Org: <org_id>`
-
-The backend validates the API key against your organization, applies authorization and filtering, and returns data.
-
-
-## Dot-path browser (Notebook UX)
-
-The SDK exposes a dot-path browser for easy exploration:
+The browser lets you navigate your Poelis data with simple dot notation:
 
 ```python
-client.browser  # then use TAB to explore
-# client.browser.<workspace>.<product>.<item>.<child>.properties
+# Navigate through your data
+poelis = poelis.browser
+
+# List workspaces
+poelis.names()  # ['workspace1', 'workspace2', ...]
+
+# Access workspace
+ws = poelis.workspace1
+
+# List products in workspace  
+ws.names()  # ['product1', 'product2', ...]
+
+# Access product
+product = ws.product1
+
+# List items in product
+product.names()  # ['item1', 'item2', ...]
+
+# Access item and its properties
+item = product.item1
+item_value = item.some_property.value  # Access property values directly
+item_category = item.some_property.category  # Access property categories directly
+
 ```
 
-See the example notebook in `notebooks/try_poelis_sdk.ipynb` for an end-to-end walkthrough (authentication, listing workspaces/products/items, and simple search queries). The client defaults to `https://api.poelis.ai` unless `POELIS_BASE_URL` is set.
+## IDE Compatibility & Autocomplete
+
+The Poelis SDK works in all Python environments, but autocomplete behavior varies by IDE:
+
+### ✅ VS Code (Recommended for Notebooks)
+- **Autocomplete**: Works perfectly with dynamic attributes
+- **Setup**: No configuration needed
+- **Experience**: Full autocomplete at all levels
+
+### ⚠️ PyCharm (Jupyter Notebooks)
+- **Autocomplete**: Limited - PyCharm uses static analysis and doesn't see dynamic attributes
+- **Code execution**: Works perfectly (attributes are real and functional)
+- **Workaround**: Call `names()` at each level to prime autocomplete
+
+## Examples
+
+See `notebooks/try_poelis_sdk.ipynb` for complete examples including authentication, data exploration, and search queries.
 
 ## Requirements
 

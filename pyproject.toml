@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "poelis-sdk"
-version = "0.3.5"
+version = "0.3.6"
 description = "Official Python SDK for Poelis"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -45,6 +45,10 @@ testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/poelis_sdk"]
+include = [
+  "src/poelis_sdk/**/*.pyi",
+  "src/poelis_sdk/py.typed",
+]
 
 [dependency-groups]
 dev = [
