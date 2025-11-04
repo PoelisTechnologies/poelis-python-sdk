@@ -40,6 +40,15 @@ class _Node:
             cur = cur._parent
         return f"<{self._level}:{'.'.join(reversed(path)) or '*'}>"
 
+    @property
+    def name(self) -> Optional[str]:
+        """Return the display name of this node if available.
+
+        Returns:
+            Optional[str]: The human-friendly display name, or None if unknown.
+        """
+        return self._name
+
     def __dir__(self) -> List[str]:  # pragma: no cover - notebook UX
         # Performance optimization: only load children if cache is stale or empty
         if self._is_children_cache_stale():
@@ -49,6 +58,13 @@ class _Node:
             # Include property names directly on item for suggestions
             prop_keys = list(self._props_key_map().keys())
             keys.extend(prop_keys)
+            keys.extend(["list_items", "list_properties"])
+        elif self._level == "product":
+            keys.append("list_items")
+        elif self._level == "workspace":
+            keys.append("list_products")
+        elif self._level == "root":
+            keys.append("list_workspaces")
         return sorted(set(keys))
 
     # Intentionally no public id/name/refresh to keep suggestions minimal
@@ -77,30 +93,62 @@ class _Node:
 
     def _names(self) -> List[str]:
         """Return display names of children at this level (internal).
-        
-        For item level, also includes property display names.
+
+        For item level, include both child item names and property display names.
         """
         if self._is_children_cache_stale():
             self._load_children()
         child_names = [child._name or "" for child in self._children_cache.values()]
-        
-        # For items, also include property names
         if self._level == "item":
             props = self._properties()
-            prop_names = []
+            prop_names: List[str] = []
             for i, pr in enumerate(props):
                 display = pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
                 prop_names.append(str(display))
             return child_names + prop_names
-        
         return child_names
 
-    def names(self) -> List[str]:
-        """Public: return display names of children at this level.
-        
-        For item level, returns both child item names and property names.
-        """
-        return self._names()
+    # names() removed in favor of list_*().names
+
+    # --- Node-list helpers ---
+    def _list_workspaces(self) -> "_NodeList":
+        if self._level != "root":
+            return _NodeList([], [])
+        if self._is_children_cache_stale():
+            self._load_children()
+        items = list(self._children_cache.values())
+        names = [n._name or "" for n in items]
+        return _NodeList(items, names)
+
+    def _list_products(self) -> "_NodeList":
+        if self._level != "workspace":
+            return _NodeList([], [])
+        if self._is_children_cache_stale():
+            self._load_children()
+        items = list(self._children_cache.values())
+        names = [n._name or "" for n in items]
+        return _NodeList(items, names)
+
+    def _list_items(self) -> "_NodeList":
+        if self._level not in ("product", "item"):
+            return _NodeList([], [])
+        if self._is_children_cache_stale():
+            self._load_children()
+        items = list(self._children_cache.values())
+        names = [n._name or "" for n in items]
+        return _NodeList(items, names)
+
+    def _list_properties(self) -> "_NodeList":
+        if self._level != "item":
+            return _NodeList([], [])
+        props = self._properties()
+        wrappers: List[_PropWrapper] = []
+        names: List[str] = []
+        for i, pr in enumerate(props):
+            display = pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
+            names.append(str(display))
+            wrappers.append(_PropWrapper(pr))
+        return _NodeList(wrappers, names)
 
     def _suggest(self) -> List[str]:
         """Return suggested attribute names for interactive usage.
@@ -112,6 +160,13 @@ class _Node:
         suggestions: List[str] = list(self._children_cache.keys())
         if self._level == "item":
             suggestions.extend(list(self._props_key_map().keys()))
+            suggestions.extend(["list_items", "list_properties"])
+        elif self._level == "product":
+            suggestions.append("list_items")
+        elif self._level == "workspace":
+            suggestions.append("list_products")
+        elif self._level == "root":
+            suggestions.append("list_workspaces")
         return sorted(set(suggestions))
 
     def __getattr__(self, attr: str) -> Any:
@@ -125,6 +180,24 @@ class _Node:
                 self._load_children()
         if attr in self._children_cache:
             return self._children_cache[attr]
+        # Dynamically expose list helpers only where meaningful
+        if attr == "list_workspaces":
+            if self._level == "root":
+                return MethodType(_Node._list_workspaces, self)
+            raise AttributeError(attr)
+        if attr == "list_products":
+            if self._level == "workspace":
+                return MethodType(_Node._list_products, self)
+            raise AttributeError(attr)
+        if attr == "list_items":
+            if self._level in ("product", "item"):
+                return MethodType(_Node._list_items, self)
+            raise AttributeError(attr)
+        if attr == "list_properties":
+            if self._level == "item":
+                return MethodType(_Node._list_properties, self)
+            raise AttributeError(attr)
+
         # Expose properties as direct attributes on item level
         if self._level == "item":
             pk = self._props_key_map()
@@ -353,27 +426,24 @@ class Browser:
         # Performance optimization: only load children if cache is stale or empty
         if self._root._is_children_cache_stale():
             self._root._load_children()
-        return sorted([*self._root._children_cache.keys()]) 
+        keys = [*self._root._children_cache.keys(), "list_workspaces"]
+        return sorted(keys)
 
     def _names(self) -> List[str]:
         """Return display names of root-level children (workspaces)."""
         return self._root._names()
 
-    def names(self) -> List[str]:
-        """Public: return display names of root-level children (workspaces)."""
-        return self._root._names()
-
     # keep suggest internal so it doesn't appear in help/dir
     def _suggest(self) -> List[str]:
-        return self._root._suggest()
+        sugg = list(self._root._suggest())
+        sugg.append("list_workspaces")
+        return sorted(set(sugg))
 
-    def suggest(self) -> List[str]:
-        """Return curated attribute suggestions at the current root level.
+    # suggest() removed from public API; dynamic completion still uses internal _suggest
 
-        This mirrors the internal `_suggest` used for interactive completion,
-        but is exposed publicly for tests and programmatic usage.
-        """
-        return self._root._suggest()
+    def list_workspaces(self) -> "_NodeList":
+        """Return workspaces as a list-like object with `.names`."""
+        return self._root._list_workspaces()
 
 
 def _safe_key(name: str) -> str:
@@ -430,9 +500,7 @@ class _PropsNode:
         self._ensure_loaded()
         return sorted(list(self._children_cache.keys())) 
 
-    def names(self) -> List[str]:
-        self._ensure_loaded()
-        return list(self._names)
+    # names() removed; use item.list_properties().names instead
 
     def __getattr__(self, attr: str) -> Any:
         self._ensure_loaded()
@@ -460,6 +528,31 @@ class _PropsNode:
     def _suggest(self) -> List[str]:
         self._ensure_loaded()
         return sorted(list(self._children_cache.keys()))
+
+
+class _NodeList:
+    """Lightweight sequence wrapper for node/property lists with `.names`.
+
+    Provides iteration and index access to underlying items, plus a `.names`
+    attribute returning the display names in the same order.
+    """
+
+    def __init__(self, items: List[Any], names: List[str]) -> None:
+        self._items = list(items)
+        self._names = list(names)
+
+    def __iter__(self):  # pragma: no cover - trivial
+        return iter(self._items)
+
+    def __len__(self) -> int:  # pragma: no cover - trivial
+        return len(self._items)
+
+    def __getitem__(self, idx: int) -> Any:  # pragma: no cover - trivial
+        return self._items[idx]
+
+    @property
+    def names(self) -> List[str]:
+        return list(self._names)
 
 
 class _PropWrapper:
@@ -502,6 +595,16 @@ class _PropWrapper:
         p = self._raw
         cat = p.get("category")
         return str(cat) if cat is not None else None
+
+    @property
+    def name(self) -> Optional[str]:
+        """Return the best-effort display name for this property.
+
+        Falls back to id or category when name is not present.
+        """
+        p = self._raw
+        n = p.get("name") or p.get("id") or p.get("category")
+        return str(n) if n is not None else None
 
     def __dir__(self) -> List[str]:  # pragma: no cover - notebook UX
         # Expose only the minimal attributes for browsing

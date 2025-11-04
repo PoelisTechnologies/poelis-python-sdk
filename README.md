@@ -49,22 +49,28 @@ The browser lets you navigate your Poelis data with simple dot notation:
 poelis = poelis.browser
 
 # List workspaces
-poelis.names()  # ['workspace1', 'workspace2', ...]
+poelis.list_workspaces().names  # ['workspace1', 'workspace2', ...]
 
 # Access workspace
 ws = poelis.workspace1
 
 # List products in workspace  
-ws.names()  # ['product1', 'product2', ...]
+ws.list_products().names  # ['product1', 'product2', ...]
 
 # Access product
 product = ws.product1
 
 # List items in product
-product.names()  # ['item1', 'item2', ...]
+product.list_items().names  # ['item1', 'item2', ...]
 
 # Access item and its properties
 item = product.item1
+
+# List children by type for more control
+item.list_items().names       # ['child_item1', 'child_item2'] - only child items
+item.list_properties().names  # ['Color', 'Weight', ...] - only properties
+
+# Access property values directly
 item_value = item.some_property.value  # Access property values directly
 item_category = item.some_property.category  # Access property categories directly
 
@@ -82,7 +88,7 @@ The Poelis SDK works in all Python environments, but autocomplete behavior varie
 ### ⚠️ PyCharm (Jupyter Notebooks)
 - **Autocomplete**: Limited - PyCharm uses static analysis and doesn't see dynamic attributes
 - **Code execution**: Works perfectly (attributes are real and functional)
-- **Workaround**: Call `names()` at each level to prime autocomplete
+- **Workaround**: Call the relevant `list_*().names` at each level to prime autocomplete
 
 ## Examples
 
