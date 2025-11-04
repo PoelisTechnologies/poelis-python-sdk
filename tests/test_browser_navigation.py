@@ -109,7 +109,11 @@ def test_browser_traversal_and_properties() -> None:
     assert item_names and "Gadget A" in item_names
     item = prod["Gadget A"]
 
-    # Properties via props helper
+    # Item names should now include both child items (none in this case) and properties
+    item_all_names = item.names()
+    assert "Color" in item_all_names and "Weight" in item_all_names
+
+    # Properties via props helper (still works)
     prop_names = item.props.names()
     assert "Color" in prop_names and "Weight" in prop_names
     assert item.props["Color"].value == "Red"

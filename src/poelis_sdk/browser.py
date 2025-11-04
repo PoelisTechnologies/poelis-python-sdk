@@ -76,13 +76,30 @@ class _Node:
         return time.time() - self._props_loaded_at > self._cache_ttl
 
     def _names(self) -> List[str]:
-        """Return display names of children at this level (internal)."""
+        """Return display names of children at this level (internal).
+        
+        For item level, also includes property display names.
+        """
         if self._is_children_cache_stale():
             self._load_children()
-        return [child._name or "" for child in self._children_cache.values()]
+        child_names = [child._name or "" for child in self._children_cache.values()]
+        
+        # For items, also include property names
+        if self._level == "item":
+            props = self._properties()
+            prop_names = []
+            for i, pr in enumerate(props):
+                display = pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
+                prop_names.append(str(display))
+            return child_names + prop_names
+        
+        return child_names
 
     def names(self) -> List[str]:
-        """Public: return display names of children at this level."""
+        """Public: return display names of children at this level.
+        
+        For item level, returns both child item names and property names.
+        """
         return self._names()
 
     def _suggest(self) -> List[str]:
