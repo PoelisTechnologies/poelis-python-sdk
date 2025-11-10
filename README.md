@@ -73,6 +73,7 @@ item.list_properties().names  # ['Color', 'Weight', ...] - only properties
 # Access property values directly
 item_value = item.some_property.value  # Access property values directly
 item_category = item.some_property.category  # Access property categories directly
+item_unit = item.some_property.unit  # Access property units directly
 
 ```
 

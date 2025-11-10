@@ -210,3 +210,49 @@ class TestPropWrapper:
         assert wrapper.value == 123.45
         assert isinstance(wrapper.value, float)
         assert wrapper.category == "Search"
+
+    def test_prop_wrapper_with_unit(self) -> None:
+        """Test _PropWrapper with displayUnit field."""
+        prop_data = {
+            "id": "prop5",
+            "name": "Weight",
+            "value": "42.5",
+            "parsedValue": 42.5,
+            "category": "Physical",
+            "displayUnit": "kg"
+        }
+        
+        wrapper = _PropWrapper(prop_data)
+        assert wrapper.value == 42.5
+        assert wrapper.category == "Physical"
+        assert wrapper.unit == "kg"
+
+    def test_prop_wrapper_without_unit(self) -> None:
+        """Test _PropWrapper without displayUnit field."""
+        prop_data = {
+            "id": "prop6",
+            "name": "Name",
+            "value": "Test",
+            "category": "Metadata"
+        }
+        
+        wrapper = _PropWrapper(prop_data)
+        assert wrapper.value == "Test"
+        assert wrapper.category == "Metadata"
+        assert wrapper.unit is None
+
+    def test_prop_wrapper_with_display_unit_snake_case(self) -> None:
+        """Test _PropWrapper with display_unit field (snake_case fallback)."""
+        prop_data = {
+            "id": "prop7",
+            "name": "Temperature",
+            "value": "25.3",
+            "parsedValue": 25.3,
+            "category": "Environmental",
+            "display_unit": "°C"
+        }
+        
+        wrapper = _PropWrapper(prop_data)
+        assert wrapper.value == 25.3
+        assert wrapper.category == "Environmental"
+        assert wrapper.unit == "°C"

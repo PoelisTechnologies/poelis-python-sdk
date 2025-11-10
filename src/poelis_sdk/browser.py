@@ -235,7 +235,7 @@ class _Node:
             "query($iid: ID!) {\n"
             "  properties(itemId: $iid) {\n"
             "    __typename\n"
-            "    ... on NumericProperty { id name category value parsedValue }\n"
+            "    ... on NumericProperty { id name category displayUnit value parsedValue }\n"
             "    ... on TextProperty { id name value parsedValue }\n"
             "    ... on DateProperty { id name value }\n"
             "  }\n"
@@ -255,7 +255,7 @@ class _Node:
                 "query($iid: ID!) {\n"
                 "  properties(itemId: $iid) {\n"
                 "    __typename\n"
-                "    ... on NumericProperty { id name category value }\n"
+                "    ... on NumericProperty { id name category displayUnit value }\n"
                 "    ... on TextProperty { id name value }\n"
                 "    ... on DateProperty { id name value }\n"
                 "  }\n"
@@ -274,7 +274,7 @@ class _Node:
                 q2_parsed = (
                     "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
                     "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-                    "    hits { id workspaceId productId itemId propertyType name category value parsedValue owner }\n"
+                    "    hits { id workspaceId productId itemId propertyType name category displayUnit value parsedValue owner }\n"
                     "  }\n"
                     "}"
                 )
@@ -290,7 +290,7 @@ class _Node:
                     q2_min = (
                         "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
                         "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-                        "    hits { id workspaceId productId itemId propertyType name category value owner }\n"
+                        "    hits { id workspaceId productId itemId propertyType name category displayUnit value owner }\n"
                         "  }\n"
                         "}"
                     )
@@ -597,6 +597,17 @@ class _PropWrapper:
         return str(cat) if cat is not None else None
 
     @property
+    def unit(self) -> Optional[str]:
+        """Return the display unit for this property.
+
+        Returns:
+            Optional[str]: The unit string (e.g., "kg", "°C"), or None if not available.
+        """
+        p = self._raw
+        unit = p.get("displayUnit") or p.get("display_unit")
+        return str(unit) if unit is not None else None
+
+    @property
     def name(self) -> Optional[str]:
         """Return the best-effort display name for this property.
 
@@ -608,7 +619,7 @@ class _PropWrapper:
 
     def __dir__(self) -> List[str]:  # pragma: no cover - notebook UX
         # Expose only the minimal attributes for browsing
-        return ["value", "category"]
+        return ["value", "category", "unit"]
 
     def __repr__(self) -> str:  # pragma: no cover - notebook UX
         name = self._raw.get("name") or self._raw.get("id")
@@ -673,7 +684,7 @@ def enable_dynamic_completion() -> bool:
                     if isinstance(obj_val, from_types):
                         # Build suggestion list
                         if isinstance(obj_val, _PropWrapper):
-                            sugg: List[str] = ["value", "category"]
+                            sugg: List[str] = ["value", "category", "unit"]
                         elif hasattr(obj_val, "_suggest"):
                             sugg = list(getattr(obj_val, "_suggest")())  # type: ignore[no-untyped-call]
                         else:
