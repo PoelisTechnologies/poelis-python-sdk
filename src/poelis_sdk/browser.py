@@ -103,7 +103,7 @@ class _Node:
             props = self._properties()
             prop_names: List[str] = []
             for i, pr in enumerate(props):
-                display = pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
+                display = pr.get("readableId") or pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
                 prop_names.append(str(display))
             return child_names + prop_names
         return child_names
@@ -145,7 +145,7 @@ class _Node:
         wrappers: List[_PropWrapper] = []
         names: List[str] = []
         for i, pr in enumerate(props):
-            display = pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
+            display = pr.get("readableId") or pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
             names.append(str(display))
             wrappers.append(_PropWrapper(pr))
         return _NodeList(wrappers, names)
@@ -235,9 +235,9 @@ class _Node:
             "query($iid: ID!) {\n"
             "  properties(itemId: $iid) {\n"
             "    __typename\n"
-            "    ... on NumericProperty { id name category displayUnit value parsedValue }\n"
-            "    ... on TextProperty { id name value parsedValue }\n"
-            "    ... on DateProperty { id name value }\n"
+            "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
+            "    ... on TextProperty { id name readableId value parsedValue }\n"
+            "    ... on DateProperty { id name readableId value }\n"
             "  }\n"
             "}"
         )
@@ -255,9 +255,9 @@ class _Node:
                 "query($iid: ID!) {\n"
                 "  properties(itemId: $iid) {\n"
                 "    __typename\n"
-                "    ... on NumericProperty { id name category displayUnit value }\n"
-                "    ... on TextProperty { id name value }\n"
-                "    ... on DateProperty { id name value }\n"
+                "    ... on NumericProperty { id name readableId category displayUnit value }\n"
+                "    ... on TextProperty { id name readableId value }\n"
+                "    ... on DateProperty { id name readableId value }\n"
                 "  }\n"
                 "}"
             )
@@ -274,7 +274,7 @@ class _Node:
                 q2_parsed = (
                     "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
                     "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-                    "    hits { id workspaceId productId itemId propertyType name category displayUnit value parsedValue owner }\n"
+                    "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value parsedValue owner }\n"
                     "  }\n"
                     "}"
                 )
@@ -290,7 +290,7 @@ class _Node:
                     q2_min = (
                         "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
                         "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-                        "    hits { id workspaceId productId itemId propertyType name category displayUnit value owner }\n"
+                        "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value owner }\n"
                         "  }\n"
                         "}"
                     )
@@ -312,7 +312,7 @@ class _Node:
         used_names: Dict[str, int] = {}
         for i, pr in enumerate(props):
             # Try to get name from various possible fields
-            display = pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
+            display = pr.get("readableId") or pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
             safe = _safe_key(str(display))
             
             # Handle duplicate names by adding a suffix
@@ -329,7 +329,7 @@ class _Node:
         if self._level == "root":
             rows = self._client.workspaces.list(limit=200, offset=0)
             for w in rows:
-                display = w.get("name") or str(w.get("id"))
+                display = w.get("readableId") or w.get("name") or str(w.get("id"))
                 nm = _safe_key(display)
                 child = _Node(self._client, "workspace", self, w["id"], display)
                 child._cache_ttl = self._cache_ttl
@@ -337,7 +337,7 @@ class _Node:
         elif self._level == "workspace":
             page = self._client.products.list_by_workspace(workspace_id=self._id, limit=200, offset=0)
             for p in page.data:
-                display = p.name or str(p.id)
+                display = p.readableId or p.name or str(p.id)
                 nm = _safe_key(display)
                 child = _Node(self._client, "product", self, p.id, display)
                 child._cache_ttl = self._cache_ttl
@@ -346,7 +346,7 @@ class _Node:
             rows = self._client.items.list_by_product(product_id=self._id, limit=1000, offset=0)
             for it in rows:
                 if it.get("parentId") is None:
-                    display = it.get("name") or str(it["id"]) 
+                    display = it.get("readableId") or it.get("name") or str(it["id"]) 
                     nm = _safe_key(display)
                     child = _Node(self._client, "item", self, it["id"], display)
                     child._cache_ttl = self._cache_ttl
@@ -364,7 +364,7 @@ class _Node:
                 return
             q = (
                 "query($pid: ID!, $parent: ID!, $limit: Int!, $offset: Int!) {\n"
-                "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name code description productId parentId owner position }\n"
+                "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name readableId code description productId parentId owner position }\n"
                 "}"
             )
             r = self._client._transport.graphql(q, {"pid": pid, "parent": self._id, "limit": 1000, "offset": 0})
@@ -377,7 +377,7 @@ class _Node:
                 # Skip the current item (GraphQL returns parent + direct children)
                 if str(it2.get("id")) == str(self._id):
                     continue
-                display = it2.get("name") or str(it2["id"]) 
+                display = it2.get("readableId") or it2.get("name") or str(it2["id"]) 
                 nm = _safe_key(display)
                 child = _Node(self._client, "item", self, it2["id"], display)
                 child._cache_ttl = self._cache_ttl
@@ -481,7 +481,7 @@ class _PropsNode:
         names_list = []
         for i, pr in enumerate(props):
             # Try to get name from various possible fields
-            display = pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
+            display = pr.get("readableId") or pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
             safe = _safe_key(str(display))
             
             # Handle duplicate names by adding a suffix
@@ -515,7 +515,8 @@ class _PropsNode:
         # match by display name
         for safe, data in self._children_cache.items():
             try:
-                if getattr(data, "_raw", {}).get("name") == key:  # type: ignore[arg-type]
+                raw = getattr(data, "_raw", {})
+                if raw.get("readableId") == key or raw.get("name") == key:  # type: ignore[arg-type]
                     return data
             except Exception:
                 continue
@@ -567,9 +568,12 @@ class _PropWrapper:
     @property
     def value(self) -> Any:  # type: ignore[override]
         p = self._raw
-        # Use parsedValue if available (new backend feature)
+        # Use parsedValue if available and not None (new backend feature)
         if "parsedValue" in p:
-            return p["parsedValue"]
+            parsed_val = p.get("parsedValue")
+            if parsed_val is not None:
+                # Recursively parse arrays/matrices that might contain string numbers
+                return self._parse_nested_value(parsed_val)
         # Fallback to legacy parsing logic for backward compatibility
         # searchProperties shape
         if "numericValue" in p and p.get("numericValue") is not None:
@@ -586,9 +590,56 @@ class _PropWrapper:
                 return (integer_part or 0) * (10 ** int(exponent))
             except Exception:
                 return integer_part
+        # If parsedValue was None or missing, try to parse the raw value for numeric properties
         if "value" in p:
-            return p.get("value")
+            raw_value = p.get("value")
+            # Check if this is a numeric property and try to parse the string
+            property_type = (p.get("__typename") or p.get("propertyType") or "").lower()
+            is_numeric = property_type in ("numericproperty", "numeric")
+            # If it's a numeric property or if the value looks like a number, try to parse it
+            if isinstance(raw_value, str) and (is_numeric or self._looks_like_number(raw_value)):
+                try:
+                    # Try to parse as float first (handles decimals), then int
+                    parsed = float(raw_value)
+                    # Return int if it's a whole number, otherwise float
+                    return int(parsed) if parsed.is_integer() else parsed
+                except (ValueError, TypeError):
+                    # If parsing fails, return the raw string
+                    return raw_value
+            return raw_value
         return None
+    
+    def _parse_nested_value(self, value: Any) -> Any:
+        """Recursively parse nested lists/arrays that might contain string numbers."""
+        if isinstance(value, list):
+            return [self._parse_nested_value(item) for item in value]
+        elif isinstance(value, str):
+            # Try to parse string as number if it looks numeric
+            if self._looks_like_number(value):
+                try:
+                    parsed = float(value)
+                    return int(parsed) if parsed.is_integer() else parsed
+                except (ValueError, TypeError):
+                    return value
+            return value
+        else:
+            # Already a number or other type, return as-is
+            return value
+    
+    def _looks_like_number(self, value: str) -> bool:
+        """Check if a string value looks like a numeric value."""
+        if not isinstance(value, str):
+            return False
+        value = value.strip()
+        if not value:
+            return False
+        # Allow optional leading sign, digits, optional decimal point, optional exponent
+        # This matches patterns like: "123", "-45.67", "1.23e-4", "+100"
+        try:
+            float(value)
+            return True
+        except ValueError:
+            return False
 
     @property
     def category(self) -> Optional[str]:
@@ -611,10 +662,10 @@ class _PropWrapper:
     def name(self) -> Optional[str]:
         """Return the best-effort display name for this property.
 
-        Falls back to id or category when name is not present.
+        Falls back to name, id, or category when readableId is not present.
         """
         p = self._raw
-        n = p.get("name") or p.get("id") or p.get("category")
+        n = p.get("readableId") or p.get("name") or p.get("id") or p.get("category")
         return str(n) if n is not None else None
 
     def __dir__(self) -> List[str]:  # pragma: no cover - notebook UX
@@ -622,7 +673,7 @@ class _PropWrapper:
         return ["value", "category", "unit"]
 
     def __repr__(self) -> str:  # pragma: no cover - notebook UX
-        name = self._raw.get("name") or self._raw.get("id")
+        name = self._raw.get("readableId") or self._raw.get("name") or self._raw.get("id")
         return f"<property {name}: {self.value}>"
 
 

@@ -32,7 +32,7 @@ class ProductsClient:
 
         query = (
             "query($ws: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) { id name workspaceId code description }\n"
+            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) { id name readableId workspaceId code description }\n"
             "}"
         )
         variables = {"ws": workspace_id, "q": q, "limit": int(limit), "offset": int(offset)}

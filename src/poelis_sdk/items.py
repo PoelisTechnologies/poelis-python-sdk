@@ -21,7 +21,7 @@ class ItemsClient:
 
         query = (
             "query($pid: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, q: $q, limit: $limit, offset: $offset) { id name code description productId parentId owner position }\n"
+            "  items(productId: $pid, q: $q, limit: $limit, offset: $offset) { id name readableId code description productId parentId owner position }\n"
             "}"
         )
         variables = {"pid": product_id, "q": q, "limit": int(limit), "offset": int(offset)}
@@ -43,7 +43,7 @@ class ItemsClient:
 
         query = (
             "query($id: ID!) {\n"
-            "  item(id: $id) { id name code description productId parentId owner position }\n"
+            "  item(id: $id) { id name readableId code description productId parentId owner position }\n"
             "}"
         )
         resp = self._t.graphql(query=query, variables={"id": item_id})
