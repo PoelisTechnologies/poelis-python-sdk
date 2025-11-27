@@ -135,6 +135,28 @@ class _Node:
     def _list_items(self) -> "_NodeList":
         if self._level not in ("product", "item", "version"):
             return _NodeList([], [])
+        # If called on a product node, delegate to baseline (latest version)
+        if self._level == "product":
+            try:
+                page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
+                versions = getattr(page, "data", []) or []
+                if versions:
+                    latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
+                    version_number = getattr(latest_version, "version_number", None)
+                    if version_number is not None:
+                        # Create baseline version node and delegate to it
+                        baseline_node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
+                        baseline_node._cache_ttl = self._cache_ttl
+                        return baseline_node._list_items()
+                # If no versions found, fall back to draft
+                draft_node = _Node(self._client, "version", self, None, "draft")
+                draft_node._cache_ttl = self._cache_ttl
+                return draft_node._list_items()
+            except Exception:
+                # On error, fall back to draft
+                draft_node = _Node(self._client, "version", self, None, "draft")
+                draft_node._cache_ttl = self._cache_ttl
+                return draft_node._list_items()
         if self._is_children_cache_stale():
             self._load_children()
         items = list(self._children_cache.values())
