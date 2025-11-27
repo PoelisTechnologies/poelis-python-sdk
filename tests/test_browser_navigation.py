@@ -44,11 +44,13 @@ class _MockTransport(httpx.BaseTransport):
                 ]}}
                 return httpx.Response(200, json=data)
 
-            # Items by product (top-level only)
-            if "items(productId:" in query and "parentItemId" not in query:
+            # Items by product (top-level only, but include child items for draft queries)
+            if "items(productId:" in query and "parentItemId" not in query and "version:" not in query:
                 assert vars.get("pid") == "p1"
+                # For draft queries, include both parent and child items
                 data = {"data": {"items": [
                     {"id": "i1", "name": "Gadget A", "code": "GA", "description": "", "productId": "p1", "parentId": None, "owner": "o", "position": 1},
+                    {"id": "i2", "name": "Child Item", "code": "CI", "description": "", "productId": "p1", "parentId": "i1", "owner": "o", "position": 1},
                 ]}}
                 return httpx.Response(200, json=data)
 
@@ -62,14 +64,51 @@ class _MockTransport(httpx.BaseTransport):
                     data = {"data": {"items": []}}
                 return httpx.Response(200, json=data)
 
-            # Properties for item
-            if query.strip().startswith("query($iid: ID!) {\n  properties"):
-                assert vars.get("iid") == "i1"
-                data = {"data": {"properties": [
-                    {"__typename": "TextProperty", "name": "Color", "value": "Red"},
-                    {"__typename": "NumericProperty", "name": "Weight", "integerPart": 5, "exponent": 0, "category": "Mass"},
+            # Properties for item (both with and without version)
+            if "properties(itemId:" in query:
+                item_id = vars.get("iid")
+                version = vars.get("version")
+                if item_id == "i1":
+                    # Return properties for parent item (no demo_property_mass here)
+                    # Note: "Color" and "Weight" use capitalized readableId to match existing tests
+                    data = {"data": {"properties": [
+                        {"__typename": "TextProperty", "id": "p1", "name": "Color", "readableId": "Color", "value": "Red", "parsedValue": "Red"},
+                        {"__typename": "NumericProperty", "id": "p3", "name": "Weight", "readableId": "Weight", "integerPart": 5, "exponent": 0, "category": "Mass"},
+                    ]}}
+                    return httpx.Response(200, json=data)
+                elif item_id == "i2":
+                    # Return properties for child item (demo_property_mass is here)
+                    data = {"data": {"properties": [
+                        {"__typename": "NumericProperty", "id": "p2", "name": "Mass", "readableId": "demo_property_mass", "category": "Mass", "displayUnit": "kg", "value": "10.5", "parsedValue": 10.5},
+                    ]}}
+                    return httpx.Response(200, json=data)
+                else:
+                    # Return empty for other items
+                    data = {"data": {"properties": []}}
+                    return httpx.Response(200, json=data)
+
+            # Product versions
+            if "productVersions(" in query:
+                assert vars.get("pid") == "p1"
+                data = {"data": {"productVersions": [
+                    {"productId": "p1", "versionNumber": 1, "title": "version 1", "description": "First version", "createdAt": "2024-01-01T00:00:00Z"},
+                    {"productId": "p1", "versionNumber": 2, "title": "version 2", "description": "Second version", "createdAt": "2024-01-02T00:00:00Z"},
+                    {"productId": "p1", "versionNumber": 3, "title": "version 3", "description": "Third version", "createdAt": "2024-01-03T00:00:00Z"},
                 ]}}
                 return httpx.Response(200, json=data)
+
+            # Versioned items
+            if "items(productId:" in query and "version:" in query:
+                assert vars.get("pid") == "p1"
+                version = vars.get("version", {})
+                version_number = version.get("versionNumber") if isinstance(version, dict) else None
+                # Include both parent and child items for all versioned queries
+                data = {"data": {"items": [
+                    {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "owner": "o", "position": 1},
+                    {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "owner": "o", "position": 1},
+                ]}}
+                return httpx.Response(200, json=data)
+
 
             return httpx.Response(200, json={"data": {}})
 
@@ -167,7 +206,7 @@ def test_names_filtering() -> None:
     item_props_only = item.list_properties().names
     assert "Color" in item_props_only
     assert "Weight" in item_props_only
-    assert len(item_props_only) == 2
+    assert len(item_props_only) == 2  # Color, Weight (demo_property_mass is in child item)
     
     # Test invalid filters at different levels: should not exist on these nodes
     with pytest.raises(AttributeError):
@@ -209,5 +248,249 @@ def test_names_filtering_with_child_items() -> None:
     assert "Weight" in props_only
     # Should not include child item names
     assert "Child Item" not in props_only
+
+
+def test_baseline_version_access() -> None:
+    """Test accessing the latest version via baseline property."""
+    
+    t = _MockTransport()
+    c = _client_with_graphql_mock(t)
+    
+    b = c.browser
+    ws = b["uh2"]
+    prod = ws["Widget Pro"]
+    
+    # Access baseline (should return latest version, which is v3)
+    baseline = prod.baseline
+    assert baseline is not None
+    assert baseline._name == "v3"
+    assert baseline._id == "3"
+    assert baseline._level == "version"
+    
+    # Baseline should be accessible and work like a version node
+    assert hasattr(baseline, "list_items")
+
+
+def test_v_method_by_title() -> None:
+    """Test accessing versions by title using v() method."""
+    
+    t = _MockTransport()
+    c = _client_with_graphql_mock(t)
+    
+    b = c.browser
+    ws = b["uh2"]
+    prod = ws["Widget Pro"]
+    
+    # Access version by exact title
+    v1 = prod.v("version 1")
+    assert v1 is not None
+    assert v1._name == "v1"
+    assert v1._id == "1"
+    assert v1._level == "version"
+    
+    # Access version by different title
+    v2 = prod.v("version 2")
+    assert v2 is not None
+    assert v2._name == "v2"
+    assert v2._id == "2"
+    
+    # Access latest version by title
+    v3 = prod.v("version 3")
+    assert v3 is not None
+    assert v3._name == "v3"
+    assert v3._id == "3"
+    
+    # Test case-insensitive matching
+    v1_case = prod.v("VERSION 1")
+    assert v1_case is not None
+    assert v1_case._id == "1"
+    
+    # Test with whitespace
+    v2_space = prod.v("  version 2  ")
+    assert v2_space is not None
+    assert v2_space._id == "2"
+    
+    # Test error for non-existent version
+    with pytest.raises(ValueError, match="No version found"):
+        _ = prod.v("nonexistent version")
+
+
+def test_v_method_by_version_number() -> None:
+    """Test accessing versions by version number using v() method."""
+    
+    t = _MockTransport()
+    c = _client_with_graphql_mock(t)
+    
+    b = c.browser
+    ws = b["uh2"]
+    prod = ws["Widget Pro"]
+    
+    # Access version by number with "v" prefix
+    v1 = prod.v("v1")
+    assert v1 is not None
+    assert v1._id == "1"
+    
+    # Access version by number without prefix
+    v2 = prod.v("2")
+    assert v2 is not None
+    assert v2._id == "2"
+    
+    # Access latest version
+    v3 = prod.v("v3")
+    assert v3 is not None
+    assert v3._id == "3"
+
+
+def test_get_property_on_version() -> None:
+    """Test getting a property by readableId from a product version."""
+    
+    t = _MockTransport()
+    c = _client_with_graphql_mock(t)
+    
+    b = c.browser
+    ws = b["uh2"]
+    prod = ws["Widget Pro"]
+    
+    # Access version v1
+    v1 = prod.v1
+    
+    # Get property by readableId (searches all items in version, including child items)
+    mass_prop = v1.get_property("demo_property_mass")
+    
+    # Verify it returns a property wrapper with correct value
+    assert mass_prop is not None
+    assert mass_prop.value == 10.5
+    assert mass_prop.name == "demo_property_mass"  # name property returns readableId if available
+    assert mass_prop.category == "Mass"
+    assert mass_prop.unit == "kg"
+    
+    # Test accessing value directly
+    assert v1.get_property("demo_property_mass").value == 10.5
+    
+    # Test error for non-existent property
+    with pytest.raises(RuntimeError, match="not found"):
+        _ = v1.get_property("nonexistent_property")
+    
+    # Test that it works on product node (uses baseline)
+    # This should work now since get_property is available on product nodes
+    prod_mass = prod.get_property("demo_property_mass")
+    assert prod_mass is not None
+    assert prod_mass.value == 10.5
+
+
+def test_get_property_on_product_node() -> None:
+    """Test getting a property by readableId from a product node (uses baseline)."""
+    
+    t = _MockTransport()
+    c = _client_with_graphql_mock(t)
+    
+    b = c.browser
+    ws = b["uh2"]
+    prod = ws["Widget Pro"]
+    
+    # Get property from product node (should use baseline/latest version, which is v3)
+    # Since v3 now includes child items in the mock, this should work
+    mass_prop = prod.get_property("demo_property_mass")
+    
+    # Verify it returns a property wrapper with correct value
+    assert mass_prop is not None
+    assert mass_prop.value == 10.5
+    assert mass_prop.name == "demo_property_mass"
+    assert mass_prop.category == "Mass"
+    assert mass_prop.unit == "kg"
+
+
+def test_get_property_on_item_node() -> None:
+    """Test getting a property by readableId from an item node (searches recursively)."""
+    
+    t = _MockTransport()
+    c = _client_with_graphql_mock(t)
+    
+    b = c.browser
+    ws = b["uh2"]
+    prod = ws["Widget Pro"]
+    item = prod["Gadget A"]
+    
+    # Get property from item node (should search in item and sub-items)
+    # In our mock, demo_property_mass is in child item i2
+    mass_prop = item.get_property("demo_property_mass")
+    
+    # Verify it returns a property wrapper with correct value
+    assert mass_prop is not None
+    assert mass_prop.value == 10.5
+    assert mass_prop.name == "demo_property_mass"
+    assert mass_prop.category == "Mass"
+    assert mass_prop.unit == "kg"
+    
+    # Test error for non-existent property
+    with pytest.raises(RuntimeError, match="not found"):
+        _ = item.get_property("nonexistent_property")
+
+
+def test_get_property_on_item_node_with_version() -> None:
+    """Test getting a property by readableId from an item node in a versioned context."""
+    
+    t = _MockTransport()
+    c = _client_with_graphql_mock(t)
+    
+    b = c.browser
+    ws = b["uh2"]
+    prod = ws["Widget Pro"]
+    v1 = prod.v1
+    
+    # Load items for v1
+    v1._load_children()
+    item = v1._children_cache.get("gadget_a") or v1._children_cache.get("Gadget_A")
+    if not item:
+        # Try to get by name
+        for child in v1._children_cache.values():
+            if child._name == "Gadget A":
+                item = child
+                break
+    
+    # Get property from versioned item node (should search recursively in sub-items)
+    mass_prop = item.get_property("demo_property_mass")
+    
+    # Verify it returns a property wrapper
+    assert mass_prop is not None
+    assert mass_prop.value == 10.5
+
+
+def test_get_property_on_draft_version() -> None:
+    """Test getting a property by readableId from draft version."""
+    
+    t = _MockTransport()
+    c = _client_with_graphql_mock(t)
+    
+    b = c.browser
+    ws = b["uh2"]
+    prod = ws["Widget Pro"]
+    
+    # Access draft version
+    draft = prod.draft
+    
+    # Get property by readableId (searches all items including child items)
+    mass_prop = draft.get_property("demo_property_mass")
+    
+    # Verify it returns a property wrapper
+    assert mass_prop is not None
+    assert mass_prop.value == 10.5
+
+
+def test_baseline_and_v_in_dir() -> None:
+    """Test that baseline and v appear in __dir__ for product nodes."""
+    
+    t = _MockTransport()
+    c = _client_with_graphql_mock(t)
+    
+    b = c.browser
+    ws = b["uh2"]
+    prod = ws["Widget Pro"]
+    
+    # Check that baseline and v are in dir()
+    dir_items = dir(prod)
+    assert "baseline" in dir_items
+    assert "v" in dir_items
+    assert "draft" in dir_items
 
 

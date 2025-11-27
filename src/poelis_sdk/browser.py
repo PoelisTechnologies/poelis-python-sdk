@@ -59,11 +59,11 @@ class _Node:
             # Include property names directly on item for suggestions
             prop_keys = list(self._props_key_map().keys())
             keys.extend(prop_keys)
-            keys.extend(["list_items", "list_properties"])
+            keys.extend(["list_items", "list_properties", "get_property"])
         elif self._level == "product":
-            keys.extend(["list_items", "list_product_versions"])
+            keys.extend(["list_items", "list_product_versions", "baseline", "draft", "v", "get_property"])
         elif self._level == "version":
-            keys.append("list_items")
+            keys.extend(["list_items", "get_property"])
         elif self._level == "workspace":
             keys.append("list_products")
         elif self._level == "root":
@@ -153,6 +153,311 @@ class _Node:
             wrappers.append(_PropWrapper(pr))
         return _NodeList(wrappers, names)
 
+    def _get_property(self, readable_id: str) -> "_PropWrapper":
+        """Get a property by its readableId from this product version.
+        
+        Searches for a property with the given readableId across all items
+        in this product version. The readableId is unique within a product,
+        so this will return the property regardless of which item it belongs to.
+        
+        When called on a product node, it uses the baseline (latest version)
+        as the default.
+        
+        When called on an item node, it searches recursively through the item
+        and all its sub-items to find the property.
+        
+        Args:
+            readable_id: The readableId of the property to retrieve
+                (e.g., "demo_property_mass").
+        
+        Returns:
+            _PropWrapper: A wrapper object providing access to the property's
+                value, category, unit, and other attributes.
+        
+        Raises:
+            AttributeError: If called on a non-product, non-version, or non-item node.
+            RuntimeError: If the property cannot be found or if there's an
+                error querying the GraphQL API.
+        """
+        # If called on a product node, delegate to baseline (latest version)
+        if self._level == "product":
+            try:
+                page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
+                versions = getattr(page, "data", []) or []
+                if versions:
+                    latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
+                    version_number = getattr(latest_version, "version_number", None)
+                    if version_number is not None:
+                        # Create baseline version node and delegate to it
+                        baseline_node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
+                        baseline_node._cache_ttl = self._cache_ttl
+                        return baseline_node._get_property(readable_id)
+                # If no versions found, fall back to draft
+                draft_node = _Node(self._client, "version", self, None, "draft")
+                draft_node._cache_ttl = self._cache_ttl
+                return draft_node._get_property(readable_id)
+            except Exception as e:
+                # On error, fall back to draft
+                draft_node = _Node(self._client, "version", self, None, "draft")
+                draft_node._cache_ttl = self._cache_ttl
+                return draft_node._get_property(readable_id)
+        
+        # If called on an item node, search recursively through the item and its sub-items
+        if self._level == "item":
+            return self._get_property_from_item_tree(readable_id)
+        
+        if self._level != "version":
+            raise AttributeError("get_property() method is only available on product, version, and item nodes")
+        
+        # Get product_id from ancestor
+        anc = self
+        pid: Optional[str] = None
+        while anc is not None:
+            if anc._level == "product":
+                pid = anc._id
+                break
+            anc = anc._parent  # type: ignore[assignment]
+        
+        if not pid:
+            raise RuntimeError("Cannot determine product ID for version node")
+        
+        # Get version number (None for draft)
+        version_number: Optional[int] = None
+        if self._id is not None:
+            try:
+                version_number = int(self._id)
+            except (TypeError, ValueError):
+                version_number = None
+        
+        # Search for property by readableId
+        # Since searchProperties doesn't return readableId, we need to iterate through items
+        # and query their properties directly. Since readableId is unique per product,
+        # we only need to find it once.
+        
+        # Get all items in this product version
+        if version_number is not None:
+            items = self._client.versions.list_items(
+                product_id=pid,
+                version_number=version_number,
+                limit=1000,
+                offset=0,
+            )
+        else:
+            items = self._client.items.list_by_product(product_id=pid, limit=1000, offset=0)
+        
+        # Query properties for each item until we find the one with matching readableId
+        for item in items:
+            item_id = item.get("id")
+            if not item_id:
+                continue
+            
+            # Query properties for this item
+            if version_number is not None:
+                prop_query = (
+                    "query($iid: ID!, $version: VersionInput!) {\n"
+                    "  properties(itemId: $iid, version: $version) {\n"
+                    "    __typename\n"
+                    "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
+                    "    ... on TextProperty { id name readableId value parsedValue }\n"
+                    "    ... on DateProperty { id name readableId value }\n"
+                    "  }\n"
+                    "}"
+                )
+                prop_variables = {
+                    "iid": item_id,
+                    "version": {"productId": pid, "versionNumber": version_number},
+                }
+            else:
+                prop_query = (
+                    "query($iid: ID!) {\n"
+                    "  properties(itemId: $iid) {\n"
+                    "    __typename\n"
+                    "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
+                    "    ... on TextProperty { id name readableId value parsedValue }\n"
+                    "    ... on DateProperty { id name readableId value }\n"
+                    "  }\n"
+                    "}"
+                )
+                prop_variables = {"iid": item_id}
+            
+            try:
+                r = self._client._transport.graphql(prop_query, prop_variables)
+                r.raise_for_status()
+                data = r.json()
+                if "errors" in data:
+                    # Skip this item if there's an error
+                    continue
+                
+                props = data.get("data", {}).get("properties", []) or []
+                
+                # Look for property with matching readableId
+                for prop in props:
+                    if prop.get("readableId") == readable_id:
+                        return _PropWrapper(prop)
+            except Exception:
+                # Skip this item if there's an error
+                continue
+        
+        # If not found, raise an error
+        raise RuntimeError(
+            f"Property with readableId '{readable_id}' not found in product version "
+            f"{f'v{version_number}' if version_number is not None else 'draft'}"
+        )
+    
+    def _get_property_from_item_tree(self, readable_id: str) -> "_PropWrapper":
+        """Get a property by readableId from this item and all its sub-items recursively.
+        
+        Searches for a property with the given readableId starting from this item,
+        then recursively searching through all sub-items.
+        
+        Args:
+            readable_id: The readableId of the property to retrieve.
+        
+        Returns:
+            _PropWrapper: A wrapper object providing access to the property's
+                value, category, unit, and other attributes.
+        
+        Raises:
+            RuntimeError: If the property cannot be found.
+        """
+        # Get product_id and version_number from ancestors
+        anc = self
+        pid: Optional[str] = None
+        version_number: Optional[int] = None
+        
+        while anc is not None:
+            if anc._level == "product":
+                pid = anc._id
+            elif anc._level == "version":
+                if anc._id is not None:
+                    try:
+                        version_number = int(anc._id)
+                    except (TypeError, ValueError):
+                        version_number = None
+                else:
+                    version_number = None
+            elif anc._level == "item":
+                # Check if this item has a version_number attribute
+                item_version = getattr(anc, "_version_number", None)
+                if item_version is not None:
+                    version_number = item_version
+            anc = anc._parent  # type: ignore[assignment]
+        
+        if not pid:
+            raise RuntimeError("Cannot determine product ID for item node")
+        
+        # Recursively search through this item and all sub-items
+        return self._search_property_in_item_and_children(
+            self._id, readable_id, pid, version_number
+        )
+    
+    def _search_property_in_item_and_children(
+        self, item_id: Optional[str], readable_id: str, product_id: str, version_number: Optional[int]
+    ) -> "_PropWrapper":
+        """Recursively search for a property in an item and all its children.
+        
+        Args:
+            item_id: The ID of the item to search.
+            readable_id: The readableId of the property to find.
+            product_id: The product ID.
+            version_number: Optional version number (None for draft).
+        
+        Returns:
+            _PropWrapper: The found property.
+        
+        Raises:
+            RuntimeError: If the property is not found.
+        """
+        if not item_id:
+            raise RuntimeError(f"Property with readableId '{readable_id}' not found")
+        
+        # Query properties for this item
+        if version_number is not None:
+            prop_query = (
+                "query($iid: ID!, $version: VersionInput!) {\n"
+                "  properties(itemId: $iid, version: $version) {\n"
+                "    __typename\n"
+                "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
+                "    ... on TextProperty { id name readableId value parsedValue }\n"
+                "    ... on DateProperty { id name readableId value }\n"
+                "  }\n"
+                "}"
+            )
+            prop_variables = {
+                "iid": item_id,
+                "version": {"productId": product_id, "versionNumber": version_number},
+            }
+        else:
+            prop_query = (
+                "query($iid: ID!) {\n"
+                "  properties(itemId: $iid) {\n"
+                "    __typename\n"
+                "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
+                "    ... on TextProperty { id name readableId value parsedValue }\n"
+                "    ... on DateProperty { id name readableId value }\n"
+                "  }\n"
+                "}"
+            )
+            prop_variables = {"iid": item_id}
+        
+        try:
+            r = self._client._transport.graphql(prop_query, prop_variables)
+            r.raise_for_status()
+            data = r.json()
+            if "errors" not in data:
+                props = data.get("data", {}).get("properties", []) or []
+                
+                # Look for property with matching readableId in this item
+                for prop in props:
+                    if prop.get("readableId") == readable_id:
+                        return _PropWrapper(prop)
+        except Exception:
+            pass  # Continue to search children
+        
+        # If not found in this item, search in children
+        # Get child items
+        if version_number is not None:
+            # Get all items for this version and filter by parent
+            all_items = self._client.versions.list_items(
+                product_id=product_id,
+                version_number=version_number,
+                limit=1000,
+                offset=0,
+            )
+            child_items = [it for it in all_items if it.get("parentId") == item_id]
+        else:
+            # Query for child items using GraphQL
+            child_query = (
+                "query($pid: ID!, $parent: ID!, $limit: Int!, $offset: Int!) {\n"
+                "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name readableId productId parentId owner position }\n"
+                "}"
+            )
+            try:
+                r = self._client._transport.graphql(
+                    child_query, {"pid": product_id, "parent": item_id, "limit": 1000, "offset": 0}
+                )
+                r.raise_for_status()
+                data = r.json()
+                if "errors" in data:
+                    raise RuntimeError(f"Property with readableId '{readable_id}' not found")
+                child_items = data.get("data", {}).get("items", []) or []
+            except Exception:
+                raise RuntimeError(f"Property with readableId '{readable_id}' not found")
+        
+        # Recursively search in each child
+        for child_item in child_items:
+            child_id = child_item.get("id")
+            if child_id:
+                try:
+                    return self._search_property_in_item_and_children(
+                        child_id, readable_id, product_id, version_number
+                    )
+                except RuntimeError:
+                    continue  # Try next child
+        
+        # If not found in this item or any children, raise error
+        raise RuntimeError(f"Property with readableId '{readable_id}' not found in item tree")
+
     def _list_product_versions(self) -> "_NodeList":
         """Return product versions as a list-like object with `.names`.
 
@@ -190,6 +495,90 @@ class _Node:
 
         return _NodeList(items, names)
 
+    def _v(self, version_name: str) -> "_Node":
+        """Get a version node by its title/name.
+
+        Only meaningful for product-level nodes. Searches through available
+        versions to find one matching the given title/name.
+
+        Args:
+            version_name: The title or name of the version to retrieve
+                (e.g., "version 1", "v1", or exact title match).
+
+        Returns:
+            _Node: A version node for the matching version.
+
+        Raises:
+            AttributeError: If called on a non-product node.
+            ValueError: If no version matches the given name.
+        """
+        if self._level != "product":
+            raise AttributeError("v() method is only available on product nodes")
+
+        try:
+            page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
+            versions = getattr(page, "data", []) or []
+            
+            # Normalize the search term (case-insensitive, strip whitespace)
+            search_term = version_name.strip().lower()
+            
+            # Try to find a match by title first
+            for v in versions:
+                title = getattr(v, "title", None)
+                if title and title.strip().lower() == search_term:
+                    version_number = getattr(v, "version_number", None)
+                    if version_number is not None:
+                        node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
+                        node._cache_ttl = self._cache_ttl
+                        return node
+            
+            # If no exact title match, try partial match
+            for v in versions:
+                title = getattr(v, "title", None)
+                if title and search_term in title.strip().lower():
+                    version_number = getattr(v, "version_number", None)
+                    if version_number is not None:
+                        node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
+                        node._cache_ttl = self._cache_ttl
+                        return node
+            
+            # If still no match, try matching version number format (e.g., "v1", "1")
+            if search_term.startswith("v"):
+                try:
+                    version_num = int(search_term[1:])
+                    for v in versions:
+                        version_number = getattr(v, "version_number", None)
+                        if version_number == version_num:
+                            node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
+                            node._cache_ttl = self._cache_ttl
+                            return node
+                except ValueError:
+                    pass
+            else:
+                # Try as direct version number
+                try:
+                    version_num = int(search_term)
+                    for v in versions:
+                        version_number = getattr(v, "version_number", None)
+                        if version_number == version_num:
+                            node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
+                            node._cache_ttl = self._cache_ttl
+                            return node
+                except ValueError:
+                    pass
+            
+            # If no match found, raise an error
+            available_titles = [getattr(v, "title", f"v{getattr(v, 'version_number', '?')}") for v in versions]
+            raise ValueError(
+                f"No version found matching '{version_name}'. "
+                f"Available versions: {', '.join(available_titles)}"
+            )
+        except Exception as e:
+            if isinstance(e, ValueError):
+                raise
+            # On other errors, provide a helpful message
+            raise ValueError(f"Error retrieving versions: {e}")
+
     def _suggest(self) -> List[str]:
         """Return suggested attribute names for interactive usage.
 
@@ -200,11 +589,11 @@ class _Node:
         suggestions: List[str] = list(self._children_cache.keys())
         if self._level == "item":
             suggestions.extend(list(self._props_key_map().keys()))
-            suggestions.extend(["list_items", "list_properties"])
+            suggestions.extend(["list_items", "list_properties", "get_property"])
         elif self._level == "product":
-            suggestions.extend(["list_items", "list_product_versions"])
+            suggestions.extend(["list_items", "list_product_versions", "baseline", "draft", "v", "get_property"])
         elif self._level == "version":
-            suggestions.append("list_items")
+            suggestions.extend(["list_items", "get_property"])
         elif self._level == "workspace":
             suggestions.append("list_products")
         elif self._level == "root":
@@ -218,12 +607,33 @@ class _Node:
                 raise AttributeError("props")
             return _PropsNode(self)
         
-        # Version pseudo-children for product nodes (e.g., v4, draft)
+        # Version pseudo-children for product nodes (e.g., v4, draft, baseline)
         if self._level == "product":
             if attr == "draft":
                 node = _Node(self._client, "version", self, None, "draft")
                 node._cache_ttl = self._cache_ttl
                 return node
+            elif attr == "baseline":
+                # Return the latest version (highest version_number)
+                try:
+                    page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
+                    versions = getattr(page, "data", []) or []
+                    if versions:
+                        latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
+                        version_number = getattr(latest_version, "version_number", None)
+                        if version_number is not None:
+                            node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
+                            node._cache_ttl = self._cache_ttl
+                            return node
+                    # If no versions found, fall back to draft
+                    node = _Node(self._client, "version", self, None, "draft")
+                    node._cache_ttl = self._cache_ttl
+                    return node
+                except Exception:
+                    # On error, fall back to draft
+                    node = _Node(self._client, "version", self, None, "draft")
+                    node._cache_ttl = self._cache_ttl
+                    return node
             elif attr.startswith("v") and attr[1:].isdigit():
                 version_number = int(attr[1:])
                 node = _Node(self._client, "version", self, str(version_number), attr)
@@ -272,6 +682,10 @@ class _Node:
             if self._level == "product":
                 return MethodType(_Node._list_product_versions, self)
             raise AttributeError(attr)
+        if attr == "v":
+            if self._level == "product":
+                return MethodType(_Node._v, self)
+            raise AttributeError(attr)
         if attr == "list_items":
             if self._level in ("product", "item", "version"):
                 return MethodType(_Node._list_items, self)
@@ -279,6 +693,10 @@ class _Node:
         if attr == "list_properties":
             if self._level == "item":
                 return MethodType(_Node._list_properties, self)
+            raise AttributeError(attr)
+        if attr == "get_property":
+            if self._level in ("product", "version", "item"):
+                return MethodType(_Node._get_property, self)
             raise AttributeError(attr)
 
         # Expose properties as direct attributes on item level
