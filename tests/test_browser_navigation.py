@@ -67,7 +67,6 @@ class _MockTransport(httpx.BaseTransport):
             # Properties for item (both with and without version)
             if "properties(itemId:" in query:
                 item_id = vars.get("iid")
-                version = vars.get("version")
                 if item_id == "i1":
                     # Return properties for parent item (no demo_property_mass here)
                     # Note: "Color" and "Weight" use capitalized readableId to match existing tests
@@ -100,8 +99,6 @@ class _MockTransport(httpx.BaseTransport):
             # Versioned items
             if "items(productId:" in query and "version:" in query:
                 assert vars.get("pid") == "p1"
-                version = vars.get("version", {})
-                version_number = version.get("versionNumber") if isinstance(version, dict) else None
                 # Include both parent and child items for all versioned queries
                 data = {"data": {"items": [
                     {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "owner": "o", "position": 1},

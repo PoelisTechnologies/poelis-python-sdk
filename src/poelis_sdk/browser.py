@@ -196,7 +196,7 @@ class _Node:
                 draft_node = _Node(self._client, "version", self, None, "draft")
                 draft_node._cache_ttl = self._cache_ttl
                 return draft_node._get_property(readable_id)
-            except Exception as e:
+            except Exception:
                 # On error, fall back to draft
                 draft_node = _Node(self._client, "version", self, None, "draft")
                 draft_node._cache_ttl = self._cache_ttl
