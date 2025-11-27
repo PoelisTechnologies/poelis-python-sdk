@@ -271,8 +271,8 @@ def test_baseline_version_access() -> None:
     assert hasattr(baseline, "list_items")
 
 
-def test_v_method_by_title() -> None:
-    """Test accessing versions by title using v() method."""
+def test_version_method_by_title() -> None:
+    """Test accessing versions by title using version() method."""
     
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
@@ -282,41 +282,41 @@ def test_v_method_by_title() -> None:
     prod = ws["Widget Pro"]
     
     # Access version by exact title
-    v1 = prod.v("version 1")
+    v1 = prod.version("version 1")
     assert v1 is not None
     assert v1._name == "v1"
     assert v1._id == "1"
     assert v1._level == "version"
     
     # Access version by different title
-    v2 = prod.v("version 2")
+    v2 = prod.version("version 2")
     assert v2 is not None
     assert v2._name == "v2"
     assert v2._id == "2"
     
     # Access latest version by title
-    v3 = prod.v("version 3")
+    v3 = prod.version("version 3")
     assert v3 is not None
     assert v3._name == "v3"
     assert v3._id == "3"
     
     # Test case-insensitive matching
-    v1_case = prod.v("VERSION 1")
+    v1_case = prod.version("VERSION 1")
     assert v1_case is not None
     assert v1_case._id == "1"
     
     # Test with whitespace
-    v2_space = prod.v("  version 2  ")
+    v2_space = prod.version("  version 2  ")
     assert v2_space is not None
     assert v2_space._id == "2"
     
     # Test error for non-existent version
     with pytest.raises(ValueError, match="No version found"):
-        _ = prod.v("nonexistent version")
+        _ = prod.version("nonexistent version")
 
 
-def test_v_method_by_version_number() -> None:
-    """Test accessing versions by version number using v() method."""
+def test_version_method_by_version_number() -> None:
+    """Test accessing versions by version number using version() method."""
     
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
@@ -326,17 +326,17 @@ def test_v_method_by_version_number() -> None:
     prod = ws["Widget Pro"]
     
     # Access version by number with "v" prefix
-    v1 = prod.v("v1")
+    v1 = prod.version("v1")
     assert v1 is not None
     assert v1._id == "1"
     
     # Access version by number without prefix
-    v2 = prod.v("2")
+    v2 = prod.version("2")
     assert v2 is not None
     assert v2._id == "2"
     
     # Access latest version
-    v3 = prod.v("v3")
+    v3 = prod.version("v3")
     assert v3 is not None
     assert v3._id == "3"
 
@@ -477,8 +477,8 @@ def test_get_property_on_draft_version() -> None:
     assert mass_prop.value == 10.5
 
 
-def test_baseline_and_v_in_dir() -> None:
-    """Test that baseline and v appear in __dir__ for product nodes."""
+def test_baseline_and_version_in_dir() -> None:
+    """Test that baseline and version appear in __dir__ for product nodes."""
     
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
@@ -487,10 +487,10 @@ def test_baseline_and_v_in_dir() -> None:
     ws = b["uh2"]
     prod = ws["Widget Pro"]
     
-    # Check that baseline and v are in dir()
+    # Check that baseline and version are in dir()
     dir_items = dir(prod)
     assert "baseline" in dir_items
-    assert "v" in dir_items
+    assert "version" in dir_items
     assert "draft" in dir_items
 
 

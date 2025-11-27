@@ -61,7 +61,7 @@ class _Node:
             keys.extend(prop_keys)
             keys.extend(["list_items", "list_properties", "get_property"])
         elif self._level == "product":
-            keys.extend(["list_items", "list_product_versions", "baseline", "draft", "v", "get_property"])
+            keys.extend(["list_items", "list_product_versions", "baseline", "draft", "version", "get_property"])
         elif self._level == "version":
             keys.extend(["list_items", "get_property"])
         elif self._level == "workspace":
@@ -495,7 +495,7 @@ class _Node:
 
         return _NodeList(items, names)
 
-    def _v(self, version_name: str) -> "_Node":
+    def _version(self, version_name: str) -> "_Node":
         """Get a version node by its title/name.
 
         Only meaningful for product-level nodes. Searches through available
@@ -513,7 +513,7 @@ class _Node:
             ValueError: If no version matches the given name.
         """
         if self._level != "product":
-            raise AttributeError("v() method is only available on product nodes")
+            raise AttributeError("version() method is only available on product nodes")
 
         try:
             page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
@@ -591,7 +591,7 @@ class _Node:
             suggestions.extend(list(self._props_key_map().keys()))
             suggestions.extend(["list_items", "list_properties", "get_property"])
         elif self._level == "product":
-            suggestions.extend(["list_items", "list_product_versions", "baseline", "draft", "v", "get_property"])
+            suggestions.extend(["list_items", "list_product_versions", "baseline", "draft", "version", "get_property"])
         elif self._level == "version":
             suggestions.extend(["list_items", "get_property"])
         elif self._level == "workspace":
@@ -682,9 +682,9 @@ class _Node:
             if self._level == "product":
                 return MethodType(_Node._list_product_versions, self)
             raise AttributeError(attr)
-        if attr == "v":
+        if attr == "version":
             if self._level == "product":
-                return MethodType(_Node._v, self)
+                return MethodType(_Node._version, self)
             raise AttributeError(attr)
         if attr == "list_items":
             if self._level in ("product", "item", "version"):
