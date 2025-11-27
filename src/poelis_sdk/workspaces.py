@@ -22,7 +22,7 @@ class WorkspacesClient:
 
         query = (
             "query($limit: Int!, $offset: Int!) {\n"
-            "  workspaces(limit: $limit, offset: $offset) { id orgId name readableId projectLimit }\n"
+            "  workspaces(limit: $limit, offset: $offset) { id orgId name readableId }\n"
             "}"
         )
         resp = self._t.graphql(query=query, variables={"limit": int(limit), "offset": int(offset)})
@@ -47,7 +47,7 @@ class WorkspacesClient:
 
         query = (
             "query($id: ID!) {\n"
-            "  workspace(id: $id) { id orgId name readableId projectLimit }\n"
+            "  workspace(id: $id) { id orgId name readableId }\n"
             "}"
         )
         resp = self._t.graphql(query=query, variables={"id": workspace_id})

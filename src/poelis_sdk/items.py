@@ -8,20 +8,47 @@ from ._transport import Transport
 
 
 class ItemsClient:
-    """Client for item resources (prototype exposes listing iterator only)."""
+    """Client for draft item resources.
+
+    This client is intended for accessing the current draft view of items,
+    i.e., items that are not bound to a specific product version. Versioned
+    (snapshot) items for a given product version should be accessed via the
+    `VersionsClient`.
+    """
 
     def __init__(self, transport: Transport) -> None:
+        """Initialize the client with shared transport.
+
+        Args:
+            transport: Shared HTTP/GraphQL transport used by the SDK.
+        """
+
         self._t = transport
 
     def list_by_product(self, *, product_id: str, q: Optional[str] = None, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
-        """List items for a product via GraphQL with optional text filter.
-        
-        Returns only items that belong to the client's configured organization.
+        """List draft items for a product via GraphQL with optional text filter.
+
+        This method is intended to return the current draft state of items for
+        the given product (items without a bound product version). To retrieve
+        historical/versioned items, use `VersionsClient.list_items`.
+
+        Args:
+            product_id: Identifier of the parent product.
+            q: Optional free-text filter applied to item name/description.
+            limit: Maximum number of items to return.
+            offset: Offset for pagination.
+
+        Returns:
+            List of draft item dictionaries belonging to the client's
+            configured organization.
+
+        Raises:
+            RuntimeError: If the GraphQL response contains errors.
         """
 
         query = (
             "query($pid: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, q: $q, limit: $limit, offset: $offset) { id name readableId code description productId parentId owner position }\n"
+            "  items(productId: $pid, q: $q, limit: $limit, offset: $offset) { id name readableId productId parentId owner position }\n"
             "}"
         )
         variables = {"pid": product_id, "q": q, "limit": int(limit), "offset": int(offset)}
@@ -36,14 +63,26 @@ class ItemsClient:
         return items
 
     def get(self, item_id: str) -> Dict[str, Any]:
-        """Get a single item by id via GraphQL.
-        
-        Returns the item only if it belongs to the client's configured organization.
+        """Get a single draft item by identifier via GraphQL.
+
+        Returns the item only if it belongs to the client's configured
+        organization. The returned representation reflects the current draft
+        state, not a specific historical product version.
+
+        Args:
+            item_id: Identifier of the item to retrieve.
+
+        Returns:
+            Dictionary representing the draft item.
+
+        Raises:
+            RuntimeError: If the GraphQL response contains errors or the item
+                cannot be found.
         """
 
         query = (
             "query($id: ID!) {\n"
-            "  item(id: $id) { id name readableId code description productId parentId owner position }\n"
+            "  item(id: $id) { id name readableId productId parentId owner position }\n"
             "}"
         )
         resp = self._t.graphql(query=query, variables={"id": item_id})
@@ -59,7 +98,16 @@ class ItemsClient:
         return item
 
     def iter_all_by_product(self, *, product_id: str, q: Optional[str] = None, page_size: int = 100) -> Generator[dict, None, None]:
-        """Iterate items via GraphQL for a given product."""
+        """Iterate draft items via GraphQL for a given product.
+
+        Args:
+            product_id: Identifier of the parent product.
+            q: Optional free-text filter applied to item name/description.
+            page_size: Page size for each GraphQL request.
+
+        Yields:
+            Individual draft item dictionaries.
+        """
 
         offset = 0
         while True:

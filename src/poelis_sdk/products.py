@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Generator, Optional
 
 from ._transport import Transport
-from .models import PaginatedProducts, Product
+from .models import PaginatedProducts, PaginatedProductVersions, Product, ProductVersion
 
 if TYPE_CHECKING:
     from .workspaces import WorkspacesClient
@@ -32,7 +32,7 @@ class ProductsClient:
 
         query = (
             "query($ws: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) { id name readableId workspaceId code description }\n"
+            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) { id name readableId workspaceId }\n"
             "}"
         )
         variables = {"ws": workspace_id, "q": q, "limit": int(limit), "offset": int(offset)}
@@ -41,10 +41,47 @@ class ProductsClient:
         payload = resp.json()
         if "errors" in payload:
             raise RuntimeError(str(payload["errors"]))
-        
+
         products = payload.get("data", {}).get("products", [])
-        
+
         return PaginatedProducts(data=[Product(**r) for r in products], limit=limit, offset=offset)
+
+    def list_product_versions(self, *, product_id: str, limit: int = 50, offset: int = 0) -> PaginatedProductVersions:
+        """List versions for a given product.
+
+        Args:
+            product_id: Identifier of the product whose versions should be listed.
+            limit: Maximum number of versions to return (currently ignored by backend).
+            offset: Offset for pagination (currently ignored by backend).
+
+        Returns:
+            PaginatedProductVersions: Container with version data and pagination info.
+
+        Raises:
+            RuntimeError: If the GraphQL response contains errors.
+        """
+
+        query = (
+            "query($pid: ID!) {\n"
+            "  productVersions(productId: $pid) {\n"
+            "    productId\n"
+            "    versionNumber\n"
+            "    title\n"
+            "    description\n"
+            "    createdAt\n"
+            "  }\n"
+            "}"
+        )
+        variables = {"pid": product_id}
+        resp = self._t.graphql(query=query, variables=variables)
+        resp.raise_for_status()
+        payload = resp.json()
+        if "errors" in payload:
+            raise RuntimeError(str(payload["errors"]))
+
+        versions = payload.get("data", {}).get("productVersions", [])
+
+        return PaginatedProductVersions(data=[ProductVersion(**v) for v in versions], limit=limit, offset=offset)
 
     def iter_all_by_workspace(self, *, workspace_id: str, q: Optional[str] = None, page_size: int = 100, start_offset: int = 0) -> Generator[Product, None, None]:
         """Iterate products via GraphQL with offset pagination for a workspace."""

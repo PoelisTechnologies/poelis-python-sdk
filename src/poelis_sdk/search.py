@@ -18,7 +18,7 @@ class SearchClient:
 
         query = (
             "query($ws: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) { id name code description workspaceId }\n"
+            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) { id name workspaceId }\n"
             "}"
         )
         variables = {"ws": workspace_id, "q": q, "limit": int(limit), "offset": int(offset)}
@@ -35,7 +35,7 @@ class SearchClient:
 
         query = (
             "query($pid: ID!, $q: String, $parent: ID, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, q: $q, parentItemId: $parent, limit: $limit, offset: $offset) { id name code description productId parentId owner position }\n"
+            "  items(productId: $pid, q: $q, parentItemId: $parent, limit: $limit, offset: $offset) { id name productId parentId owner position }\n"
             "}"
         )
         variables = {"pid": product_id, "q": q, "parent": parent_item_id, "limit": int(limit), "offset": int(offset)}

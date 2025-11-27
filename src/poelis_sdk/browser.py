@@ -19,12 +19,13 @@ _AUTO_COMPLETER_INSTALLED: bool = False
 
 
 class _Node:
-    def __init__(self, client: Any, level: str, parent: Optional["_Node"], node_id: Optional[str], name: Optional[str]) -> None:
+    def __init__(self, client: Any, level: str, parent: Optional["_Node"], node_id: Optional[str], name: Optional[str], version_number: Optional[int] = None) -> None:
         self._client = client
         self._level = level
         self._parent = parent
         self._id = node_id
         self._name = name
+        self._version_number: Optional[int] = version_number  # Track version context for items
         self._children_cache: Dict[str, "_Node"] = {}
         self._props_cache: Optional[List[Dict[str, Any]]] = None
         # Performance optimization: cache metadata with TTL
@@ -60,6 +61,8 @@ class _Node:
             keys.extend(prop_keys)
             keys.extend(["list_items", "list_properties"])
         elif self._level == "product":
+            keys.extend(["list_items", "list_product_versions"])
+        elif self._level == "version":
             keys.append("list_items")
         elif self._level == "workspace":
             keys.append("list_products")
@@ -130,7 +133,7 @@ class _Node:
         return _NodeList(items, names)
 
     def _list_items(self) -> "_NodeList":
-        if self._level not in ("product", "item"):
+        if self._level not in ("product", "item", "version"):
             return _NodeList([], [])
         if self._is_children_cache_stale():
             self._load_children()
@@ -150,6 +153,43 @@ class _Node:
             wrappers.append(_PropWrapper(pr))
         return _NodeList(wrappers, names)
 
+    def _list_product_versions(self) -> "_NodeList":
+        """Return product versions as a list-like object with `.names`.
+
+        Only meaningful for product-level nodes; other levels return an empty
+        list. Includes a "draft" pseudo-version at the beginning for the current
+        working state, followed by versioned snapshots (v1, v2, ...).
+        """
+
+        if self._level != "product":
+            return _NodeList([], [])
+
+        items = []
+        names: List[str] = []
+
+        # Add draft pseudo-version at the beginning
+        draft_node = _Node(self._client, "version", self, None, "draft")
+        draft_node._cache_ttl = self._cache_ttl
+        items.append(draft_node)
+        names.append("draft")
+
+        # Add actual versioned snapshots from backend
+        try:
+            page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
+            for v in getattr(page, "data", []) or []:
+                version_number = getattr(v, "version_number", None)
+                if version_number is None:
+                    continue
+                name = f"v{version_number}"
+                node = _Node(self._client, "version", self, str(version_number), name)
+                node._cache_ttl = self._cache_ttl
+                items.append(node)
+                names.append(name)
+        except Exception:
+            pass  # If versions fail to load, still return draft
+
+        return _NodeList(items, names)
+
     def _suggest(self) -> List[str]:
         """Return suggested attribute names for interactive usage.
 
@@ -162,6 +202,8 @@ class _Node:
             suggestions.extend(list(self._props_key_map().keys()))
             suggestions.extend(["list_items", "list_properties"])
         elif self._level == "product":
+            suggestions.extend(["list_items", "list_product_versions"])
+        elif self._level == "version":
             suggestions.append("list_items")
         elif self._level == "workspace":
             suggestions.append("list_products")
@@ -175,6 +217,43 @@ class _Node:
             if self._level != "item":
                 raise AttributeError("props")
             return _PropsNode(self)
+        
+        # Version pseudo-children for product nodes (e.g., v4, draft)
+        if self._level == "product":
+            if attr == "draft":
+                node = _Node(self._client, "version", self, None, "draft")
+                node._cache_ttl = self._cache_ttl
+                return node
+            elif attr.startswith("v") and attr[1:].isdigit():
+                version_number = int(attr[1:])
+                node = _Node(self._client, "version", self, str(version_number), attr)
+                node._cache_ttl = self._cache_ttl
+                return node
+            else:
+                # For product nodes, default to latest version for item access
+                # First check if it's a list helper - those should work on product directly
+                if attr not in ("list_items", "list_product_versions"):
+                    # Try to get latest version and redirect to it
+                    try:
+                        page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
+                        versions = getattr(page, "data", []) or []
+                        if versions:
+                            latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
+                            version_number = getattr(latest_version, "version_number", None)
+                            if version_number is not None:
+                                # Create latest version node and try to get attr from it
+                                latest_node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
+                                latest_node._cache_ttl = self._cache_ttl
+                                # Load children for latest version node
+                                if latest_node._is_children_cache_stale():
+                                    latest_node._load_children()
+                                # Check if the attr exists in latest version's children
+                                if attr in latest_node._children_cache:
+                                    return latest_node._children_cache[attr]
+                                # If not found in latest version, fall through to check draft/default cache
+                    except Exception:
+                        pass  # Fall through to default behavior (draft)
+        
         if attr not in self._children_cache:
             if self._is_children_cache_stale():
                 self._load_children()
@@ -189,8 +268,12 @@ class _Node:
             if self._level == "workspace":
                 return MethodType(_Node._list_products, self)
             raise AttributeError(attr)
+        if attr == "list_product_versions":
+            if self._level == "product":
+                return MethodType(_Node._list_product_versions, self)
+            raise AttributeError(attr)
         if attr == "list_items":
-            if self._level in ("product", "item"):
+            if self._level in ("product", "item", "version"):
                 return MethodType(_Node._list_items, self)
             raise AttributeError(attr)
         if attr == "list_properties":
@@ -229,40 +312,96 @@ class _Node:
             self._props_cache = []
             self._props_loaded_at = time.time()
             return self._props_cache
+        
+        # Get version context if available
+        version_number = getattr(self, "_version_number", None)
+        # Get product_id from ancestor
+        anc = self
+        pid: Optional[str] = None
+        while anc is not None:
+            if anc._level == "product":
+                pid = anc._id
+                break
+            anc = anc._parent  # type: ignore[assignment]
+        
         # Try direct properties(itemId: ...) first; fallback to searchProperties
-        # Attempt 1: query with parsedValue support
-        q_parsed = (
-            "query($iid: ID!) {\n"
-            "  properties(itemId: $iid) {\n"
-            "    __typename\n"
-            "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
-            "    ... on TextProperty { id name readableId value parsedValue }\n"
-            "    ... on DateProperty { id name readableId value }\n"
-            "  }\n"
-            "}"
-        )
-        try:
-            r = self._client._transport.graphql(q_parsed, {"iid": self._id})
-            r.raise_for_status()
-            data = r.json()
-            if "errors" in data:
-                raise RuntimeError(data["errors"])  # try value-only shape
-            self._props_cache = data.get("data", {}).get("properties", []) or []
-            self._props_loaded_at = time.time()
-        except Exception:
-            # Attempt 2: value-only, legacy compatible
-            q_value_only = (
-                "query($iid: ID!) {\n"
-                "  properties(itemId: $iid) {\n"
+        # Attempt 1: query with parsedValue support and version if available
+        if version_number is not None and pid is not None:
+            q_parsed = (
+                "query($iid: ID!, $version: VersionInput!) {\n"
+                "  properties(itemId: $iid, version: $version) {\n"
                 "    __typename\n"
-                "    ... on NumericProperty { id name readableId category displayUnit value }\n"
-                "    ... on TextProperty { id name readableId value }\n"
+                "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
+                "    ... on TextProperty { id name readableId value parsedValue }\n"
                 "    ... on DateProperty { id name readableId value }\n"
                 "  }\n"
                 "}"
             )
+            variables = {"iid": self._id, "version": {"productId": pid, "versionNumber": version_number}}
+        else:
+            q_parsed = (
+                "query($iid: ID!) {\n"
+                "  properties(itemId: $iid) {\n"
+                "    __typename\n"
+                "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
+                "    ... on TextProperty { id name readableId value parsedValue }\n"
+                "    ... on DateProperty { id name readableId value }\n"
+                "  }\n"
+                "}"
+            )
+            variables = {"iid": self._id}
+        try:
+            r = self._client._transport.graphql(q_parsed, variables)
+            r.raise_for_status()
+            data = r.json()
+            if "errors" in data:
+                # If versioned query fails, check if it's a version-related error
+                errors = data["errors"]
+                if version_number is not None:
+                    error_msg = str(errors)
+                    # Check if the error suggests version isn't supported
+                    if "version" in error_msg.lower() and ("unknown" in error_msg.lower() or "cannot" in error_msg.lower()):
+                        # Properties API likely doesn't support version parameter yet
+                        # Fall through to try without version, but this means we'll get draft properties
+                        # TODO: Backend needs to add version support to properties API
+                        pass
+                    else:
+                        raise RuntimeError(data["errors"])  # Other errors should be raised
+                else:
+                    raise RuntimeError(data["errors"])  # Draft queries should raise on error
+            self._props_cache = data.get("data", {}).get("properties", []) or []
+            self._props_loaded_at = time.time()
+            return self._props_cache  # Return early if successful
+        except RuntimeError:
+            raise  # Re-raise RuntimeErrors
+        except Exception:
+            # Attempt 2: value-only, legacy compatible
+            if version_number is not None and pid is not None:
+                q_value_only = (
+                    "query($iid: ID!, $version: VersionInput!) {\n"
+                    "  properties(itemId: $iid, version: $version) {\n"
+                    "    __typename\n"
+                    "    ... on NumericProperty { id name readableId category displayUnit value }\n"
+                    "    ... on TextProperty { id name readableId value }\n"
+                    "    ... on DateProperty { id name readableId value }\n"
+                    "  }\n"
+                    "}"
+                )
+                variables = {"iid": self._id, "version": {"productId": pid, "versionNumber": version_number}}
+            else:
+                q_value_only = (
+                    "query($iid: ID!) {\n"
+                    "  properties(itemId: $iid) {\n"
+                    "    __typename\n"
+                    "    ... on NumericProperty { id name readableId category displayUnit value }\n"
+                    "    ... on TextProperty { id name readableId value }\n"
+                    "    ... on DateProperty { id name readableId value }\n"
+                    "  }\n"
+                    "}"
+                )
+                variables = {"iid": self._id}
             try:
-                r = self._client._transport.graphql(q_value_only, {"iid": self._id})
+                r = self._client._transport.graphql(q_value_only, variables)
                 r.raise_for_status()
                 data = r.json()
                 if "errors" in data:
@@ -343,12 +482,49 @@ class _Node:
                 child._cache_ttl = self._cache_ttl
                 self._children_cache[nm] = child
         elif self._level == "product":
+            # Fallback: load draft items (default behavior now handled in __getattr__)
+            # Direct access like ws.demo_product.demo_item will use latest version via __getattr__
             rows = self._client.items.list_by_product(product_id=self._id, limit=1000, offset=0)
             for it in rows:
                 if it.get("parentId") is None:
-                    display = it.get("readableId") or it.get("name") or str(it["id"]) 
+                    display = it.get("readableId") or it.get("name") or str(it["id"])
                     nm = _safe_key(display)
                     child = _Node(self._client, "item", self, it["id"], display)
+                    child._cache_ttl = self._cache_ttl
+                    self._children_cache[nm] = child
+        elif self._level == "version":
+            # Fetch top-level items for this specific product version (or draft if version_number is None).
+            anc = self
+            pid: Optional[str] = None
+            while anc is not None:
+                if anc._level == "product":
+                    pid = anc._id
+                    break
+                anc = anc._parent  # type: ignore[assignment]
+            if not pid:
+                return
+            try:
+                version_number = int(self._id) if self._id is not None else None
+            except (TypeError, ValueError):
+                version_number = None
+            
+            if version_number is None:
+                # Draft: load items without version number
+                rows = self._client.items.list_by_product(product_id=pid, limit=1000, offset=0)
+            else:
+                # Versioned: load items for specific version
+                rows = self._client.versions.list_items(
+                    product_id=pid,
+                    version_number=version_number,
+                    limit=1000,
+                    offset=0,
+                )
+            
+            for it in rows:
+                if it.get("parentId") is None:
+                    display = it.get("readableId") or it.get("name") or str(it["id"])
+                    nm = _safe_key(display)
+                    child = _Node(self._client, "item", self, it["id"], display, version_number=version_number)
                     child._cache_ttl = self._cache_ttl
                     self._children_cache[nm] = child
         elif self._level == "item":
@@ -362,24 +538,41 @@ class _Node:
                 anc = anc._parent  # type: ignore[assignment]
             if not pid:
                 return
-            q = (
-                "query($pid: ID!, $parent: ID!, $limit: Int!, $offset: Int!) {\n"
-                "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name readableId code description productId parentId owner position }\n"
-                "}"
-            )
-            r = self._client._transport.graphql(q, {"pid": pid, "parent": self._id, "limit": 1000, "offset": 0})
-            r.raise_for_status()
-            data = r.json()
-            if "errors" in data:
-                raise RuntimeError(data["errors"])  # surface
-            rows = data.get("data", {}).get("items", []) or []
+            
+            # Use version context if this item came from a version
+            version_number = getattr(self, "_version_number", None)
+            
+            if version_number is not None:
+                # Load child items from versioned API
+                all_items = self._client.versions.list_items(
+                    product_id=pid,
+                    version_number=version_number,
+                    limit=1000,
+                    offset=0,
+                )
+                # Filter to children of this item
+                rows = [it for it in all_items if it.get("parentId") == self._id]
+            else:
+                # Draft: use regular items query
+                q = (
+                    "query($pid: ID!, $parent: ID!, $limit: Int!, $offset: Int!) {\n"
+                    "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name readableId productId parentId owner position }\n"
+                    "}"
+                )
+                r = self._client._transport.graphql(q, {"pid": pid, "parent": self._id, "limit": 1000, "offset": 0})
+                r.raise_for_status()
+                data = r.json()
+                if "errors" in data:
+                    raise RuntimeError(data["errors"])  # surface
+                rows = data.get("data", {}).get("items", []) or []
+            
             for it2 in rows:
                 # Skip the current item (GraphQL returns parent + direct children)
                 if str(it2.get("id")) == str(self._id):
                     continue
                 display = it2.get("readableId") or it2.get("name") or str(it2["id"]) 
                 nm = _safe_key(display)
-                child = _Node(self._client, "item", self, it2["id"], display)
+                child = _Node(self._client, "item", self, it2["id"], display, version_number=version_number)
                 child._cache_ttl = self._cache_ttl
                 self._children_cache[nm] = child
         
@@ -596,8 +789,8 @@ class _PropWrapper:
             # Check if this is a numeric property and try to parse the string
             property_type = (p.get("__typename") or p.get("propertyType") or "").lower()
             is_numeric = property_type in ("numericproperty", "numeric")
-            # If it's a numeric property or if the value looks like a number, try to parse it
-            if isinstance(raw_value, str) and (is_numeric or self._looks_like_number(raw_value)):
+            # If it's a numeric property, try to parse the string as a number
+            if isinstance(raw_value, str) and is_numeric:
                 try:
                     # Try to parse as float first (handles decimals), then int
                     parsed = float(raw_value)
@@ -643,6 +836,15 @@ class _PropWrapper:
 
     @property
     def category(self) -> Optional[str]:
+        """Return the category for this property.
+        
+        Note: Category values are normalized/canonicalized by the backend.
+        Values may be upper-cased and some previously distinct categories
+        may have been merged into canonical forms.
+        
+        Returns:
+            Optional[str]: The category string, or None if not available.
+        """
         p = self._raw
         cat = p.get("category")
         return str(cat) if cat is not None else None

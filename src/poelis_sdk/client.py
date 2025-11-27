@@ -12,6 +12,7 @@ from .logging import quiet_logging
 from .products import ProductsClient
 from .search import SearchClient
 from .workspaces import WorkspacesClient
+from .versions import VersionsClient
 
 """Core client for the Poelis Python SDK.
 
@@ -78,6 +79,7 @@ class PoelisClient:
         self.workspaces = WorkspacesClient(self._transport)
         self.products = ProductsClient(self._transport, self.workspaces)
         self.items = ItemsClient(self._transport)
+        self.versions = VersionsClient(self._transport)
         self.search = SearchClient(self._transport)
         self.browser = Browser(self)
 
