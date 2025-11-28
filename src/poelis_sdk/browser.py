@@ -61,7 +61,9 @@ class _Node:
             keys.extend(prop_keys)
             keys.extend(["list_items", "list_properties", "get_property"])
         elif self._level == "product":
-            keys.extend(["list_items", "list_product_versions", "baseline", "draft", "version", "get_property"])
+            # At product level, show only items from baseline (latest version) + helper methods
+            # Version names (v1, v2, etc.) are accessible via __getattr__ but not shown in autocomplete
+            keys.extend(["list_items", "list_product_versions", "baseline", "draft", "get_version", "get_property"])
         elif self._level == "version":
             keys.extend(["list_items", "get_property"])
         elif self._level == "workspace":
@@ -480,6 +482,29 @@ class _Node:
         # If not found in this item or any children, raise error
         raise RuntimeError(f"Property with readableId '{readable_id}' not found in item tree")
 
+    def _get_version_names(self) -> List[str]:
+        """Get list of version names (v1, v2, etc.) for this product.
+        
+        Returns:
+            List[str]: List of version names like ['v1', 'v2', 'v3', ...]
+        """
+        if self._level != "product":
+            return []
+        
+        version_names: List[str] = []
+        try:
+            page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
+            versions_data = getattr(page, "data", []) or []
+            for v in versions_data:
+                version_number = getattr(v, "version_number", None)
+                if version_number is not None:
+                    version_name = f"v{version_number}"
+                    version_names.append(version_name)
+        except Exception:
+            pass  # If versions fail to load, return empty list
+        
+        return version_names
+
     def _list_product_versions(self) -> "_NodeList":
         """Return product versions as a list-like object with `.names`.
 
@@ -517,7 +542,7 @@ class _Node:
 
         return _NodeList(items, names)
 
-    def _version(self, version_name: str) -> "_Node":
+    def _get_version(self, version_name: str) -> "_Node":
         """Get a version node by its title/name.
 
         Only meaningful for product-level nodes. Searches through available
@@ -535,7 +560,7 @@ class _Node:
             ValueError: If no version matches the given name.
         """
         if self._level != "product":
-            raise AttributeError("version() method is only available on product nodes")
+            raise AttributeError("get_version() method is only available on product nodes")
 
         try:
             page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
@@ -613,7 +638,9 @@ class _Node:
             suggestions.extend(list(self._props_key_map().keys()))
             suggestions.extend(["list_items", "list_properties", "get_property"])
         elif self._level == "product":
-            suggestions.extend(["list_items", "list_product_versions", "baseline", "draft", "version", "get_property"])
+            # At product level, show only items from baseline (latest version) + helper methods
+            # Version names (v1, v2, etc.) are accessible via __getattr__ but not shown in autocomplete
+            suggestions.extend(["list_items", "list_product_versions", "baseline", "draft", "get_version", "get_property"])
         elif self._level == "version":
             suggestions.extend(["list_items", "get_property"])
         elif self._level == "workspace":
@@ -704,9 +731,9 @@ class _Node:
             if self._level == "product":
                 return MethodType(_Node._list_product_versions, self)
             raise AttributeError(attr)
-        if attr == "version":
+        if attr == "get_version":
             if self._level == "product":
-                return MethodType(_Node._version, self)
+                return MethodType(_Node._get_version, self)
             raise AttributeError(attr)
         if attr == "list_items":
             if self._level in ("product", "item", "version"):
@@ -922,16 +949,54 @@ class _Node:
                 child._cache_ttl = self._cache_ttl
                 self._children_cache[nm] = child
         elif self._level == "product":
-            # Fallback: load draft items (default behavior now handled in __getattr__)
-            # Direct access like ws.demo_product.demo_item will use latest version via __getattr__
-            rows = self._client.items.list_by_product(product_id=self._id, limit=1000, offset=0)
-            for it in rows:
-                if it.get("parentId") is None:
-                    display = it.get("readableId") or it.get("name") or str(it["id"])
-                    nm = _safe_key(display)
-                    child = _Node(self._client, "item", self, it["id"], display)
-                    child._cache_ttl = self._cache_ttl
-                    self._children_cache[nm] = child
+            # Load items from baseline (latest version) for autocomplete suggestions
+            # This ensures ws.demo_product. shows items from the latest version, not draft
+            # Clear cache first to ensure we always load fresh data from baseline
+            self._children_cache.clear()
+            
+            try:
+                page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
+                versions = getattr(page, "data", []) or []
+                if versions:
+                    # Get the latest version (highest version_number)
+                    latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
+                    version_number = getattr(latest_version, "version_number", None)
+                    if version_number is not None:
+                        # Load items from the latest version
+                        rows = self._client.versions.list_items(
+                            product_id=self._id,
+                            version_number=version_number,
+                            limit=1000,
+                            offset=0,
+                        )
+                        for it in rows:
+                            if it.get("parentId") is None:
+                                display = it.get("readableId") or it.get("name") or str(it["id"])
+                                nm = _safe_key(display)
+                                child = _Node(self._client, "item", self, it["id"], display, version_number=version_number)
+                                child._cache_ttl = self._cache_ttl
+                                self._children_cache[nm] = child
+                        # Mark cache as fresh after successful baseline load
+                        self._children_loaded_at = time.time()
+                        return  # Successfully loaded baseline items
+            except (AttributeError, KeyError, TypeError, ValueError):
+                # Only catch specific exceptions that might occur during data access
+                pass  # Fall through to draft if baseline loading fails
+            except Exception:
+                # For other exceptions (like network errors), still fall through to draft
+                pass
+            
+            # Fallback: load draft items if no versions exist or baseline loading failed
+            # Only load draft if we haven't already loaded baseline items
+            if not self._children_cache:
+                rows = self._client.items.list_by_product(product_id=self._id, limit=1000, offset=0)
+                for it in rows:
+                    if it.get("parentId") is None:
+                        display = it.get("readableId") or it.get("name") or str(it["id"])
+                        nm = _safe_key(display)
+                        child = _Node(self._client, "item", self, it["id"], display)
+                        child._cache_ttl = self._cache_ttl
+                        self._children_cache[nm] = child
         elif self._level == "version":
             # Fetch top-level items for this specific product version (or draft if version_number is None).
             anc = self
