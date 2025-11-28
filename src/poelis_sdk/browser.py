@@ -61,9 +61,11 @@ class _Node:
             keys.extend(prop_keys)
             keys.extend(["list_items", "list_properties", "get_property"])
         elif self._level == "product":
-            # At product level, show only items from baseline (latest version) + helper methods
-            # Version names (v1, v2, etc.) are accessible via __getattr__ but not shown in autocomplete
+            # At product level, show items from baseline (latest version) + helper methods + version names
             keys.extend(["list_items", "list_product_versions", "baseline", "draft", "get_version", "get_property"])
+            # Include version names (v1, v2, etc.) in autocomplete suggestions
+            version_names = self._get_version_names()
+            keys.extend(version_names)
         elif self._level == "version":
             keys.extend(["list_items", "get_property"])
         elif self._level == "workspace":
@@ -638,9 +640,11 @@ class _Node:
             suggestions.extend(list(self._props_key_map().keys()))
             suggestions.extend(["list_items", "list_properties", "get_property"])
         elif self._level == "product":
-            # At product level, show only items from baseline (latest version) + helper methods
-            # Version names (v1, v2, etc.) are accessible via __getattr__ but not shown in autocomplete
+            # At product level, show items from baseline (latest version) + helper methods + version names
             suggestions.extend(["list_items", "list_product_versions", "baseline", "draft", "get_version", "get_property"])
+            # Include version names (v1, v2, etc.) in autocomplete suggestions
+            version_names = self._get_version_names()
+            suggestions.extend(version_names)
         elif self._level == "version":
             suggestions.extend(["list_items", "get_property"])
         elif self._level == "workspace":
