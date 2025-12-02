@@ -210,6 +210,8 @@ __marimo__/
 
 # Others
 .cursor/
+tmp/
+
 # Allow GitHub workflows
 !/.github/
 !/.github/workflows/

@@ -32,26 +32,18 @@ class Transport:
     in the SDK planning document.
     """
 
-    def __init__(self, base_url: str, api_key: str, org_id: str, timeout_seconds: float) -> None:
+    def __init__(self, base_url: str, api_key: str, timeout_seconds: float) -> None:
         """Initialize the transport.
 
         Args:
             base_url: Base API URL.
             api_key: API key provided by backend to authenticate requests.
-            org_id: Organization id for tenant scoping.
             timeout_seconds: Request timeout in seconds.
         """
 
         self._client = httpx.Client(base_url=base_url, timeout=timeout_seconds)
         self._api_key = api_key
-        self._org_id = org_id
         self._timeout = timeout_seconds
-        # Auth mode is intentionally read from environment to keep the public
-        # constructor signature stable for tests and backwards-compatibility.
-        # Supported values:
-        # - "bearer" (default): Authorization: Bearer <api_key>
-        # - "api_key": X-API-Key/X-Poelis-Api-Key headers with no Authorization
-        self._auth_mode = os.environ.get("POELIS_AUTH_MODE", "api_key").strip().lower()
         
 
     def _headers(self, extra: Optional[Mapping[str, str]] = None) -> Dict[str, str]:
@@ -59,20 +51,8 @@ class Transport:
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
-        # Resolve auth mode with a safe fallback in case tests monkeypatch __init__
-        auth_mode = getattr(self, "_auth_mode", None) or os.environ.get("POELIS_AUTH_MODE", "api_key").strip().lower()
-        if auth_mode == "api_key":
-            # Some staging environments expect an API key header and reject Bearer
-            # Include common header variants for compatibility; backend may accept either.
-            headers["X-API-Key"] = self._api_key
-            headers["X-Poelis-Api-Key"] = self._api_key
-            # Additionally include Authorization with Api-Key scheme for services
-            # that only read credentials from Authorization.
-            headers["Authorization"] = f"Api-Key {self._api_key}"
-        else:
-            # Default: send API key as Bearer token
-            headers["Authorization"] = f"Bearer {self._api_key}"
-        headers["X-Poelis-Org"] = self._org_id
+        # Always send API key as Bearer token; backend derives org/workspace from key.
+        headers["Authorization"] = f"Bearer {self._api_key}"
         if extra:
             headers.update(dict(extra))
         return headers

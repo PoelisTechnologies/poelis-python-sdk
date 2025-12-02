@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from ._transport import Transport
-from .org_validation import filter_by_organization, validate_workspace_organization
 
 """Workspaces GraphQL client."""
 
@@ -15,10 +14,7 @@ class WorkspacesClient:
         self._t = transport
 
     def list(self, *, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
-        """List workspaces (implicitly scoped by org via auth).
-        
-        Returns only workspaces that belong to the client's configured organization.
-        """
+        """List workspaces (implicitly scoped by org via auth)."""
 
         query = (
             "query($limit: Int!, $offset: Int!) {\n"
@@ -32,18 +28,10 @@ class WorkspacesClient:
             raise RuntimeError(str(payload["errors"]))
         
         workspaces = payload.get("data", {}).get("workspaces", [])
-        
-        # Client-side organization filtering as backup protection
-        expected_org_id = self._t._org_id
-        filtered_workspaces = filter_by_organization(workspaces, expected_org_id, "workspaces")
-        
-        return filtered_workspaces
+        return workspaces
 
     def get(self, *, workspace_id: str) -> Optional[Dict[str, Any]]:
-        """Get a single workspace by id via GraphQL.
-        
-        Returns the workspace only if it belongs to the client's configured organization.
-        """
+        """Get a single workspace by id via GraphQL."""
 
         query = (
             "query($id: ID!) {\n"
@@ -57,13 +45,6 @@ class WorkspacesClient:
             raise RuntimeError(str(payload["errors"]))
         
         workspace = payload.get("data", {}).get("workspace")
-        if workspace is None:
-            return None
-        
-        # Validate that the workspace belongs to the configured organization
-        expected_org_id = self._t._org_id
-        validate_workspace_organization(workspace, expected_org_id)
-        
         return workspace
 
 

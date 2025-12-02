@@ -1116,8 +1116,7 @@ class Browser:
         return getattr(self._root, attr)
 
     def __repr__(self) -> str:  # pragma: no cover - notebook UX
-        org_id = self._root._client.org_id
-        org_context = get_organization_context_message(org_id) if org_id else "🔒 Organization: Not configured"
+        org_context = get_organization_context_message(None)
         return f"<browser root> ({org_context})"
 
     def __getitem__(self, key: str) -> Any:  # pragma: no cover - notebook UX

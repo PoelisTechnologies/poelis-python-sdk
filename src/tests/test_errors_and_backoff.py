@@ -27,16 +27,15 @@ class _SeqTransport(httpx.BaseTransport):
 def _make_client_with_transport(transport: httpx.BaseTransport) -> PoelisClient:
     from poelis_sdk.client import Transport as _T
 
-    def _init(self, base_url: str, api_key: str, org_id: str, timeout_seconds: float) -> None:  # type: ignore[no-redef]
+    def _init(self, base_url: str, api_key: str, timeout_seconds: float) -> None:  # type: ignore[no-redef]
         self._client = httpx.Client(base_url=base_url, transport=transport, timeout=timeout_seconds)
         self._api_key = api_key
-        self._org_id = org_id
         self._timeout = timeout_seconds
 
     orig = _T.__init__
     _T.__init__ = _init  # type: ignore[assignment]
     try:
-        return PoelisClient(base_url="http://example.com", api_key="k", org_id="o")
+        return PoelisClient(base_url="http://example.com", api_key="k")
     finally:
         _T.__init__ = orig  # type: ignore[assignment]
 

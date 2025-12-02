@@ -28,16 +28,15 @@ def test_search_endpoints(monkeypatch: "MonkeyPatch") -> None:
 
     t = _MockTransport()
 
-    def _init(self, base_url: str, api_key: str, org_id: str, timeout_seconds: float) -> None:  # type: ignore[no-redef]
+    def _init(self, base_url: str, api_key: str, timeout_seconds: float) -> None:  # type: ignore[no-redef]
         self._client = httpx.Client(base_url=base_url, transport=t, timeout=timeout_seconds)
         self._api_key = api_key
-        self._org_id = org_id
         self._timeout = timeout_seconds
 
     orig = _T.__init__
     _T.__init__ = _init  # type: ignore[assignment]
     try:
-        c = PoelisClient(base_url="http://localhost:8000", api_key="k", org_id="o")
+        c = PoelisClient(base_url="http://localhost:8000", api_key="k")
         assert c.search.products(q="abc")["hits"] == []
         assert c.search.items(q="abc")["hits"] == []
         assert c.search.properties(q="abc")["hits"] == []

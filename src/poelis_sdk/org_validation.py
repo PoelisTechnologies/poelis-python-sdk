@@ -128,16 +128,22 @@ def validate_item_organization(item: Dict[str, Any], expected_org_id: str) -> No
     validate_organization_id(item, expected_org_id, "item")
 
 
-def get_organization_context_message(org_id: str) -> str:
+def get_organization_context_message(org_id: Optional[str]) -> str:
     """Get a user-friendly message about the current organization context.
     
+    The SDK now uses user-bound API keys. Organization and workspace access
+    are derived on the server from the authenticated user behind the key.
+    
     Args:
-        org_id: The current organization ID.
+        org_id: Deprecated organization identifier (ignored).
         
     Returns:
-        A formatted message about the organization context.
+        A formatted message about the organization/key context.
     """
-    return f"🔒 Organization: {org_id}"
+    if org_id:
+        # Kept for backwards compatibility if callers still pass an ID.
+        return f"🔒 Organization (derived from key): {org_id}"
+    return "🔒 SDK key is user-bound; org and workspaces are derived from the key on the server"
 
 
 def format_organization_error(error: OrganizationValidationError) -> str:

@@ -48,7 +48,7 @@ class _MockTransport(httpx.BaseTransport):
 def test_auth_header_and_pagination(monkeypatch: "MonkeyPatch") -> None:
     """Verify auth headers exist and pagination iterates over all pages."""
 
-    client = PoelisClient(base_url="http://example.com", api_key="k", org_id="o")
+    client = PoelisClient(base_url="http://example.com", api_key="k")
 
     # Swap underlying httpx client with our mock transport
     from poelis_sdk.client import Transport as _T
@@ -56,25 +56,23 @@ def test_auth_header_and_pagination(monkeypatch: "MonkeyPatch") -> None:
     mt = _MockTransport()
     _orig_init = _T.__init__
 
-    def _init(self, base_url: str, api_key: str, org_id: str, timeout_seconds: float) -> None:  # type: ignore[no-redef]
+    def _init(self, base_url: str, api_key: str, timeout_seconds: float) -> None:  # type: ignore[no-redef]
         http_client = httpx.Client(base_url=base_url, transport=mt, timeout=timeout_seconds)
         self._client = http_client
         self._api_key = api_key
-        self._org_id = org_id
         self._timeout = timeout_seconds
 
     _T.__init__ = _init  # type: ignore[assignment]
     try:
         # Recreate client to apply monkeypatched transport
-        client = PoelisClient(base_url="http://example.com", api_key="k", org_id="o")
+        client = PoelisClient(base_url="http://example.com", api_key="k")
         results = list(client.products.iter_all(page_size=2))
         assert [p.id for p in results] == ["p1", "p2", "p3", "p4"]
         # Check headers on first request
         assert mt.requests, "no requests captured"
         first = mt.requests[0]
-        # Default auth mode is API key headers and Authorization: Api-Key
-        assert first.headers.get("X-API-Key") == "k" or first.headers.get("X-Poelis-Api-Key") == "k"
-        assert first.headers.get("Authorization") == "Api-Key k"
+        # Default auth mode is Authorization: Bearer
+        assert first.headers.get("Authorization") == "Bearer k"
         assert first.headers.get("Accept") == "application/json"
     finally:
         _T.__init__ = _orig_init  # type: ignore[assignment]

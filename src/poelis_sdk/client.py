@@ -25,17 +25,15 @@ future async parity.
 
 class ClientConfig(BaseModel):
     """Configuration for `PoelisClient`.
-
+    
     Attributes:
         base_url: Base URL of the Poelis API.
         api_key: API key used for authentication.
-        org_id: Organization id for multi-tenancy scoping.
         timeout_seconds: Request timeout in seconds.
     """
 
     base_url: HttpUrl = Field(default="https://poelis-be-py-753618215333.europe-west1.run.app")
     api_key: str = Field(min_length=1)
-    org_id: str = Field(min_length=1)
     timeout_seconds: float = 30.0
 
 
@@ -47,14 +45,14 @@ class PoelisClient:
     resource accessors to unblock incremental development.
     """
 
-    def __init__(self, api_key: str, org_id: str, base_url: str = "https://poelis-be-py-753618215333.europe-west1.run.app", timeout_seconds: float = 30.0) -> None:
+    def __init__(self, api_key: str, base_url: str = "https://poelis-be-py-753618215333.europe-west1.run.app", timeout_seconds: float = 30.0, org_id: Optional[str] = None) -> None:
         """Initialize the client with API endpoint and credentials.
 
         Args:
             api_key: API key for API authentication.
-            org_id: Tenant organization id to scope requests.
             base_url: Base URL of the Poelis API. Defaults to production.
             timeout_seconds: Network timeout in seconds.
+            org_id: Deprecated, ignored parameter kept for backwards compatibility.
         """
 
         # Configure quiet logging by default for production use
@@ -63,7 +61,6 @@ class PoelisClient:
         self._config = ClientConfig(
             base_url=base_url,
             api_key=api_key,
-            org_id=org_id,
             timeout_seconds=timeout_seconds,
         )
 
@@ -71,7 +68,6 @@ class PoelisClient:
         self._transport = Transport(
             base_url=str(self._config.base_url),
             api_key=self._config.api_key,
-            org_id=self._config.org_id,
             timeout_seconds=self._config.timeout_seconds,
         )
 
@@ -90,19 +86,15 @@ class PoelisClient:
         Expected variables:
         - POELIS_BASE_URL (optional, defaults to managed GCP endpoint)
         - POELIS_API_KEY
-        - POELIS_ORG_ID
         """
 
         base_url = os.environ.get("POELIS_BASE_URL", "https://poelis-be-py-753618215333.europe-west1.run.app")
         api_key = os.environ.get("POELIS_API_KEY")
-        org_id = os.environ.get("POELIS_ORG_ID")
 
         if not api_key:
             raise ValueError("POELIS_API_KEY must be set")
-        if not org_id:
-            raise ValueError("POELIS_ORG_ID must be set")
 
-        return cls(api_key=api_key, org_id=org_id, base_url=base_url)
+        return cls(api_key=api_key, base_url=base_url)
 
     @property
     def base_url(self) -> str:
@@ -112,9 +104,15 @@ class PoelisClient:
 
     @property
     def org_id(self) -> Optional[str]:
-        """Return the configured organization id if any."""
+        """Return the configured organization id if any.
+        
+        Note:
+            This property is deprecated and always returns ``None``. The backend
+            now derives organization and workspace access from the API key
+            itself, so explicit org selection on the client is no longer used.
+        """
 
-        return self._config.org_id
+        return None
 
 
 class _Deprecated:  # pragma: no cover
