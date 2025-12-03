@@ -9,14 +9,12 @@ from __future__ import annotations
 import warnings
 from typing import TYPE_CHECKING, Any
 
-import pytest
 
 from poelis_sdk import PoelisClient
 from poelis_sdk.change_tracker import PropertyChangeTracker, PropertyValueChangedWarning
 
 if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
-    from pytest_mock.plugin import MockerFixture
+    pass
 
 
 def test_change_tracker_baseline_recording() -> None:
@@ -233,7 +231,6 @@ def test_property_wrapper_no_change_detection() -> None:
 def test_property_wrapper_versioned_property_skipped(tmp_path: Any) -> None:
     """Test that versioned properties are not tracked (they're immutable)."""
     from poelis_sdk.browser import _PropWrapper
-    import os
     
     # Use temporary baseline file to avoid persistence between tests
     baseline_file = str(tmp_path / "test_baseline.json")
@@ -265,7 +262,6 @@ def test_property_wrapper_versioned_property_skipped(tmp_path: Any) -> None:
 def test_property_wrapper_missing_id(tmp_path: Any) -> None:
     """Test that properties without IDs are handled gracefully."""
     from poelis_sdk.browser import _PropWrapper
-    import os
     
     # Use temporary baseline file to avoid persistence between tests
     baseline_file = str(tmp_path / "test_baseline.json")
@@ -295,8 +291,6 @@ def test_property_wrapper_missing_id(tmp_path: Any) -> None:
 
 def test_persistent_baseline_storage(tmp_path: Any) -> None:
     """Test that baselines can be saved and loaded from a file."""
-    import json
-    import os
     
     baseline_file = str(tmp_path / "baselines.json")
     
