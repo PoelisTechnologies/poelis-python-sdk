@@ -1,0 +1,14 @@
+{
+  "baselines": {
+    "prop1": {
+      "value": 150.0,
+      "name": "Price",
+      "first_accessed_at": 1764778693.876765,
+      "updated_at": null,
+      "updated_by": null
+    }
+  },
+  "accessed_items": {},
+  "accessed_properties": {},
+  "last_updated": 1764778693.8768158
+}

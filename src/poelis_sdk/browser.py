@@ -40,6 +40,47 @@ class _Node:
             path.append(cur._name)
             cur = cur._parent
         return f"<{self._level}:{'.'.join(reversed(path)) or '*'}>"
+    
+    def _build_path(self, attr: str) -> Optional[str]:
+        """Build a path string for tracking items/properties.
+        
+        Args:
+            attr: Attribute name being accessed.
+        
+        Returns:
+            Optional[str]: Path string like "workspace.product.item" or "workspace.product.item.property", None if invalid.
+        """
+        if self._level == "root":
+            return None  # Root level doesn't have a path
+        
+        path_parts = []
+        cur: Optional[_Node] = self
+        
+        # Build path from current node up to root
+        while cur is not None and cur._level != "root":
+            if cur._name:
+                path_parts.append(cur._name)
+            cur = cur._parent
+        
+        # Reverse to get root-to-current order
+        path_parts.reverse()
+        
+        # Add the attribute being accessed
+        if attr:
+            path_parts.append(attr)
+        
+        return ".".join(path_parts) if path_parts else None
+
+    def __str__(self) -> str:  # pragma: no cover - notebook UX
+        """Return the display name of this node for string conversion.
+        
+        This allows items to be printed directly and show just their name,
+        while repr() still shows the full path for debugging.
+        
+        Returns:
+            str: The human-friendly display name, or empty string if unknown.
+        """
+        return self._name or ""
 
     @property
     def name(self) -> Optional[str]:
@@ -176,7 +217,7 @@ class _Node:
         for i, pr in enumerate(props):
             display = pr.get("readableId") or pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
             names.append(str(display))
-            wrappers.append(_PropWrapper(pr))
+            wrappers.append(_PropWrapper(pr, client=self._client))
         return _NodeList(wrappers, names)
 
     def _get_property(self, readable_id: str) -> "_PropWrapper":
@@ -319,7 +360,7 @@ class _Node:
                 # Look for property with matching readableId
                 for prop in props:
                     if prop.get("readableId") == readable_id:
-                        return _PropWrapper(prop)
+                        return _PropWrapper(prop, client=self._client)
             except Exception:
                 # Skip this item if there's an error
                 continue
@@ -721,7 +762,20 @@ class _Node:
             if self._is_children_cache_stale():
                 self._load_children()
         if attr in self._children_cache:
-            return self._children_cache[attr]
+            child = self._children_cache[attr]
+            # Track accessed items for deletion detection
+            if self._client is not None:
+                try:
+                    change_tracker = getattr(self._client, "_change_tracker", None)
+                    if change_tracker is not None and change_tracker.is_enabled():
+                        item_path = self._build_path(attr)
+                        if item_path:
+                            child_name = getattr(child, "_name", attr) or attr
+                            child_id = getattr(child, "_id", None)
+                            change_tracker.record_accessed_item(item_path, child_name, child_id)
+                except Exception:
+                    pass  # Silently ignore tracking errors
+            return child
         # Dynamically expose list helpers only where meaningful
         if attr == "list_workspaces":
             if self._level == "root":
@@ -756,7 +810,47 @@ class _Node:
         if self._level == "item":
             pk = self._props_key_map()
             if attr in pk:
-                return pk[attr]
+                prop_wrapper = pk[attr]
+                # Track accessed properties for deletion detection
+                if self._client is not None:
+                    try:
+                        change_tracker = getattr(self._client, "_change_tracker", None)
+                        if change_tracker is not None and change_tracker.is_enabled():
+                            property_path = self._build_path(attr)
+                            if property_path:
+                                prop_name = (
+                                    getattr(prop_wrapper, "_raw", {}).get("readableId")
+                                    or getattr(prop_wrapper, "_raw", {}).get("name")
+                                    or attr
+                                )
+                                prop_id = getattr(prop_wrapper, "_raw", {}).get("id")
+                                change_tracker.record_accessed_property(property_path, prop_name, prop_id)
+                    except Exception:
+                        pass  # Silently ignore tracking errors
+                return prop_wrapper
+            
+            # Check if property was previously accessed (deletion detection)
+            if self._client is not None:
+                try:
+                    change_tracker = getattr(self._client, "_change_tracker", None)
+                    if change_tracker is not None and change_tracker.is_enabled():
+                        property_path = self._build_path(attr)
+                        if property_path:
+                            change_tracker.warn_if_deleted(property_path=property_path)
+                except Exception:
+                    pass  # Silently ignore tracking errors
+        
+        # Check if item was previously accessed (deletion detection)
+        if self._client is not None:
+            try:
+                change_tracker = getattr(self._client, "_change_tracker", None)
+                if change_tracker is not None and change_tracker.is_enabled():
+                    item_path = self._build_path(attr)
+                    if item_path:
+                        change_tracker.warn_if_deleted(item_path=item_path)
+            except Exception:
+                pass  # Silently ignore tracking errors
+        
         raise AttributeError(attr)
 
     def __getitem__(self, key: str) -> "_Node":
@@ -795,30 +889,45 @@ class _Node:
                 break
             anc = anc._parent  # type: ignore[assignment]
         
-        # Try direct properties(itemId: ...) first; fallback to searchProperties
+        # Check if change detection is enabled - if so, use sdkProperties to get updatedAt/updatedBy
+        use_sdk_properties = False
+        try:
+            change_tracker = getattr(self._client, "_change_tracker", None)
+            if change_tracker is not None and change_tracker.is_enabled():
+                use_sdk_properties = True
+        except Exception:
+            pass  # Silently ignore errors
+        
+        # Try direct properties(itemId: ...) or sdkProperties(...) first; fallback to searchProperties
         # Attempt 1: query with parsedValue support and version if available
+        query_name = "sdkProperties" if use_sdk_properties else "properties"
+        property_type_prefix = "Sdk" if use_sdk_properties else ""
+        
         if version_number is not None and pid is not None:
+            # Note: sdkProperties may not support version parameter yet, but we try it
+            updated_fields = " updatedAt updatedBy" if use_sdk_properties else ""
             q_parsed = (
-                "query($iid: ID!, $version: VersionInput!) {\n"
-                "  properties(itemId: $iid, version: $version) {\n"
-                "    __typename\n"
-                "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
-                "    ... on TextProperty { id name readableId value parsedValue }\n"
-                "    ... on DateProperty { id name readableId value }\n"
-                "  }\n"
-                "}"
+                f"query($iid: ID!, $version: VersionInput!) {{\n"
+                f"  {query_name}(itemId: $iid, version: $version) {{\n"
+                f"    __typename\n"
+                f"    ... on {property_type_prefix}NumericProperty {{ id name readableId category displayUnit value parsedValue{updated_fields} }}\n"
+                f"    ... on {property_type_prefix}TextProperty {{ id name readableId value parsedValue{updated_fields} }}\n"
+                f"    ... on {property_type_prefix}DateProperty {{ id name readableId value{updated_fields} }}\n"
+                f"  }}\n"
+                f"}}"
             )
             variables = {"iid": self._id, "version": {"productId": pid, "versionNumber": version_number}}
         else:
+            updated_fields = " updatedAt updatedBy" if use_sdk_properties else ""
             q_parsed = (
-                "query($iid: ID!) {\n"
-                "  properties(itemId: $iid) {\n"
-                "    __typename\n"
-                "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
-                "    ... on TextProperty { id name readableId value parsedValue }\n"
-                "    ... on DateProperty { id name readableId value }\n"
-                "  }\n"
-                "}"
+                f"query($iid: ID!) {{\n"
+                f"  {query_name}(itemId: $iid) {{\n"
+                f"    __typename\n"
+                f"    ... on {property_type_prefix}NumericProperty {{ id name readableId category displayUnit value parsedValue{updated_fields} }}\n"
+                f"    ... on {property_type_prefix}TextProperty {{ id name readableId value parsedValue{updated_fields} }}\n"
+                f"    ... on {property_type_prefix}DateProperty {{ id name readableId value{updated_fields} }}\n"
+                f"  }}\n"
+                f"}}"
             )
             variables = {"iid": self._id}
         try:
@@ -826,91 +935,136 @@ class _Node:
             r.raise_for_status()
             data = r.json()
             if "errors" in data:
-                # If versioned query fails, check if it's a version-related error
-                errors = data["errors"]
-                if version_number is not None:
-                    error_msg = str(errors)
-                    # Check if the error suggests version isn't supported
-                    if "version" in error_msg.lower() and ("unknown" in error_msg.lower() or "cannot" in error_msg.lower()):
-                        # Properties API likely doesn't support version parameter yet
-                        # Fall through to try without version, but this means we'll get draft properties
-                        # TODO: Backend needs to add version support to properties API
-                        pass
-                    else:
-                        raise RuntimeError(data["errors"])  # Other errors should be raised
+                # If sdkProperties query fails, fall back to regular properties query
+                if use_sdk_properties:
+                    # sdkProperties might not be available or might not support version parameter
+                    # Fall through to try regular properties query
+                    pass
                 else:
-                    raise RuntimeError(data["errors"])  # Draft queries should raise on error
-            self._props_cache = data.get("data", {}).get("properties", []) or []
-            self._props_loaded_at = time.time()
-            return self._props_cache  # Return early if successful
-        except RuntimeError:
-            raise  # Re-raise RuntimeErrors
-        except Exception:
-            # Attempt 2: value-only, legacy compatible
-            if version_number is not None and pid is not None:
-                q_value_only = (
-                    "query($iid: ID!, $version: VersionInput!) {\n"
-                    "  properties(itemId: $iid, version: $version) {\n"
-                    "    __typename\n"
-                    "    ... on NumericProperty { id name readableId category displayUnit value }\n"
-                    "    ... on TextProperty { id name readableId value }\n"
-                    "    ... on DateProperty { id name readableId value }\n"
-                    "  }\n"
-                    "}"
-                )
-                variables = {"iid": self._id, "version": {"productId": pid, "versionNumber": version_number}}
+                    # If versioned query fails, check if it's a version-related error
+                    errors = data["errors"]
+                    if version_number is not None:
+                        error_msg = str(errors)
+                        # Check if the error suggests version isn't supported
+                        if "version" in error_msg.lower() and ("unknown" in error_msg.lower() or "cannot" in error_msg.lower()):
+                            # Properties API likely doesn't support version parameter yet
+                            # Fall through to try without version, but this means we'll get draft properties
+                            # TODO: Backend needs to add version support to properties API
+                            pass
+                        else:
+                            raise RuntimeError(data["errors"])  # Other errors should be raised
+                    else:
+                        raise RuntimeError(data["errors"])  # Draft queries should raise on error
             else:
-                q_value_only = (
-                    "query($iid: ID!) {\n"
-                    "  properties(itemId: $iid) {\n"
-                    "    __typename\n"
-                    "    ... on NumericProperty { id name readableId category displayUnit value }\n"
-                    "    ... on TextProperty { id name readableId value }\n"
-                    "    ... on DateProperty { id name readableId value }\n"
-                    "  }\n"
-                    "}"
-                )
-                variables = {"iid": self._id}
-            try:
-                r = self._client._transport.graphql(q_value_only, variables)
-                r.raise_for_status()
-                data = r.json()
-                if "errors" in data:
-                    raise RuntimeError(data["errors"])  # trigger fallback to search
-                self._props_cache = data.get("data", {}).get("properties", []) or []
+                # Handle both properties and sdkProperties responses
+                props_data = data.get("data", {}).get(query_name, []) or []
+                self._props_cache = props_data
                 self._props_loaded_at = time.time()
-            except Exception:
-                # Fallback to searchProperties
-                q2_parsed = (
-                    "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
-                    "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-                    "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value parsedValue owner }\n"
-                    "  }\n"
-                    "}"
-                )
-                try:
-                    r2 = self._client._transport.graphql(q2_parsed, {"iid": self._id, "limit": 100, "offset": 0})
-                    r2.raise_for_status()
-                    data2 = r2.json()
-                    if "errors" in data2:
-                        raise RuntimeError(data2["errors"])  # try minimal
-                    self._props_cache = data2.get("data", {}).get("searchProperties", {}).get("hits", []) or []
-                    self._props_loaded_at = time.time()
-                except Exception:
-                    q2_min = (
-                        "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
-                        "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-                        "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value owner }\n"
+                return self._props_cache  # Return early if successful
+        except RuntimeError:
+            if not use_sdk_properties:
+                raise  # Re-raise RuntimeErrors for regular properties queries
+            # For sdkProperties, fall through to try regular properties query
+        except Exception:
+            if not use_sdk_properties:
+                raise  # Re-raise other exceptions for regular properties queries
+            # For sdkProperties, fall through to try regular properties query
+        
+        # If sdkProperties failed, try regular properties query as fallback
+        if use_sdk_properties:
+            try:
+                # Fallback to regular properties query (sdkProperties might not be available or might not support version)
+                if version_number is not None and pid is not None:
+                    q_value_only = (
+                        "query($iid: ID!, $version: VersionInput!) {\n"
+                        "  properties(itemId: $iid, version: $version) {\n"
+                        "    __typename\n"
+                        "    ... on NumericProperty { id name readableId category displayUnit value }\n"
+                        "    ... on TextProperty { id name readableId value }\n"
+                        "    ... on DateProperty { id name readableId value }\n"
                         "  }\n"
                         "}"
                     )
-                    r3 = self._client._transport.graphql(q2_min, {"iid": self._id, "limit": 100, "offset": 0})
-                    r3.raise_for_status()
-                    data3 = r3.json()
-                    if "errors" in data3:
-                        raise RuntimeError(data3["errors"])  # propagate
-                    self._props_cache = data3.get("data", {}).get("searchProperties", {}).get("hits", []) or []
+                    variables = {"iid": self._id, "version": {"productId": pid, "versionNumber": version_number}}
+                else:
+                    q_value_only = (
+                        "query($iid: ID!) {\n"
+                        "  properties(itemId: $iid) {\n"
+                        "    __typename\n"
+                        "    ... on NumericProperty { id name readableId category displayUnit value }\n"
+                        "    ... on TextProperty { id name readableId value }\n"
+                        "    ... on DateProperty { id name readableId value }\n"
+                        "  }\n"
+                        "}"
+                    )
+                    variables = {"iid": self._id}
+                try:
+                    r = self._client._transport.graphql(q_value_only, variables)
+                    r.raise_for_status()
+                    data = r.json()
+                    if "errors" in data:
+                        # If versioned query fails, check if it's a version-related error
+                        errors = data["errors"]
+                        if version_number is not None:
+                            error_msg = str(errors)
+                            # Check if the error suggests version isn't supported
+                            if "version" in error_msg.lower() and ("unknown" in error_msg.lower() or "cannot" in error_msg.lower()):
+                                # Properties API likely doesn't support version parameter yet
+                                # Fall through to try without version, but this means we'll get draft properties
+                                pass
+                            else:
+                                raise RuntimeError(data["errors"])  # Other errors should be raised
+                        else:
+                            raise RuntimeError(data["errors"])  # Draft queries should raise on error
+                    self._props_cache = data.get("data", {}).get("properties", []) or []
                     self._props_loaded_at = time.time()
+                    return self._props_cache
+                except RuntimeError:
+                    raise  # Re-raise RuntimeErrors
+                except Exception:
+                    # If all else fails, try searchProperties as last resort
+                    pass
+            except Exception:
+                # If fallback also fails, continue to searchProperties
+                pass
+        
+        # Attempt 3: searchProperties as last resort (doesn't support version or updatedAt/updatedBy)
+        try:
+            # Fallback to searchProperties
+            q2_parsed = (
+                "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
+                "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
+                "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value parsedValue owner }\n"
+                "  }\n"
+                "}"
+            )
+            try:
+                r2 = self._client._transport.graphql(q2_parsed, {"iid": self._id, "limit": 100, "offset": 0})
+                r2.raise_for_status()
+                data2 = r2.json()
+                if "errors" in data2:
+                    raise RuntimeError(data2["errors"])  # try minimal
+                self._props_cache = data2.get("data", {}).get("searchProperties", {}).get("hits", []) or []
+                self._props_loaded_at = time.time()
+            except Exception:
+                q2_min = (
+                    "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
+                    "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
+                    "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value owner }\n"
+                    "  }\n"
+                    "}"
+                )
+                r3 = self._client._transport.graphql(q2_min, {"iid": self._id, "limit": 100, "offset": 0})
+                r3.raise_for_status()
+                data3 = r3.json()
+                if "errors" in data3:
+                    raise RuntimeError(data3["errors"])  # propagate
+                self._props_cache = data3.get("data", {}).get("searchProperties", {}).get("hits", []) or []
+                self._props_loaded_at = time.time()
+        except Exception:
+            # If all queries fail, return empty list
+            self._props_cache = []
+            self._props_loaded_at = time.time()
         return self._props_cache
 
     def _props_key_map(self) -> Dict[str, Dict[str, Any]]:
@@ -932,7 +1086,7 @@ class _Node:
             else:
                 used_names[safe] = 0
                 
-            out[safe] = _PropWrapper(pr)
+            out[safe] = _PropWrapper(pr, client=self._client)
         return out
 
     def _load_children(self) -> None:
@@ -1192,7 +1346,7 @@ class _PropsNode:
             else:
                 used_names[safe] = 0
                 
-            self._children_cache[safe] = _PropWrapper(pr)
+            self._children_cache[safe] = _PropWrapper(pr, client=self._item._client)
             names_list.append(display)
         self._names = names_list
         self._loaded_at = time.time()
@@ -1206,7 +1360,36 @@ class _PropsNode:
     def __getattr__(self, attr: str) -> Any:
         self._ensure_loaded()
         if attr in self._children_cache:
-            return self._children_cache[attr]
+            prop_wrapper = self._children_cache[attr]
+            # Track accessed properties for deletion detection
+            if self._item._client is not None:
+                try:
+                    change_tracker = getattr(self._item._client, "_change_tracker", None)
+                    if change_tracker is not None and change_tracker.is_enabled():
+                        property_path = self._item._build_path(attr)
+                        if property_path:
+                            prop_name = (
+                                getattr(prop_wrapper, "_raw", {}).get("readableId")
+                                or getattr(prop_wrapper, "_raw", {}).get("name")
+                                or attr
+                            )
+                            prop_id = getattr(prop_wrapper, "_raw", {}).get("id")
+                            change_tracker.record_accessed_property(property_path, prop_name, prop_id)
+                except Exception:
+                    pass  # Silently ignore tracking errors
+            return prop_wrapper
+        
+        # Check if property was previously accessed (deletion detection)
+        if self._item._client is not None:
+            try:
+                change_tracker = getattr(self._item._client, "_change_tracker", None)
+                if change_tracker is not None and change_tracker.is_enabled():
+                    property_path = self._item._build_path(attr)
+                    if property_path:
+                        change_tracker.warn_if_deleted(property_path=property_path)
+            except Exception:
+                pass  # Silently ignore tracking errors
+        
         raise AttributeError(attr)
 
     def __getitem__(self, key: str) -> Any:
@@ -1263,11 +1446,22 @@ class _PropWrapper:
     Normalizes different property result shapes (union vs search) into `.value`.
     """
 
-    def __init__(self, prop: Dict[str, Any]) -> None:
-        self._raw = prop
+    def __init__(self, prop: Dict[str, Any], client: Any = None) -> None:
+        """Initialize property wrapper.
 
-    @property
-    def value(self) -> Any:  # type: ignore[override]
+        Args:
+            prop: Property dictionary from GraphQL.
+            client: Optional PoelisClient instance for change tracking.
+        """
+        self._raw = prop
+        self._client = client
+
+    def _get_property_value(self) -> Any:
+        """Extract and parse the property value from raw data.
+
+        Returns:
+            Any: The parsed property value.
+        """
         p = self._raw
         # Use parsedValue if available and not None (new backend feature)
         if "parsedValue" in p:
@@ -1309,6 +1503,48 @@ class _PropWrapper:
                     return raw_value
             return raw_value
         return None
+
+    @property
+    def value(self) -> Any:  # type: ignore[override]
+        """Get the property value, with change detection if enabled.
+
+        Returns:
+            Any: The property value.
+        """
+        current_value = self._get_property_value()
+
+        # Check for changes if client is available and change detection is enabled
+        if self._client is not None:
+            try:
+                change_tracker = getattr(self._client, "_change_tracker", None)
+                if change_tracker is not None and change_tracker.is_enabled():
+                    # Skip tracking for versioned properties (they're immutable)
+                    # Versioned properties have productVersionNumber set
+                    if self._raw.get("productVersionNumber") is not None:
+                        return current_value
+                    
+                    # Get property ID for tracking
+                    property_id = self._raw.get("id")
+                    if property_id:
+                        # Get property name for warning message
+                        prop_name = (
+                            self._raw.get("readableId")
+                            or self._raw.get("name")
+                            or self._raw.get("id")
+                        )
+                        # Get updatedAt and updatedBy if available (from sdkProperties)
+                        updated_at = self._raw.get("updatedAt")
+                        updated_by = self._raw.get("updatedBy")
+                        # Check and warn if changed
+                        change_tracker.warn_if_changed(
+                            property_id, current_value, name=prop_name,
+                            updated_at=updated_at, updated_by=updated_by
+                        )
+            except Exception:
+                # Silently ignore errors in change tracking to avoid breaking property access
+                pass
+
+        return current_value
     
     def _parse_nested_value(self, value: Any) -> Any:
         """Recursively parse nested lists/arrays that might contain string numbers."""
@@ -1385,6 +1621,17 @@ class _PropWrapper:
     def __repr__(self) -> str:  # pragma: no cover - notebook UX
         name = self._raw.get("readableId") or self._raw.get("name") or self._raw.get("id")
         return f"<property {name}: {self.value}>"
+
+    def __str__(self) -> str:  # pragma: no cover - notebook UX
+        """Return the display name for this property for string conversion.
+
+        This allows printing a property object directly (e.g., ``print(prop)``)
+        and seeing its human-friendly name instead of the full representation.
+
+        Returns:
+            str: The best-effort display name, or an empty string if unknown.
+        """
+        return self.name or ""
 
 
 

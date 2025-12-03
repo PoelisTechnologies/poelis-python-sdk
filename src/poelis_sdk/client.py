@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field, HttpUrl
 
 from ._transport import Transport
 from .browser import Browser
+from .change_tracker import PropertyChangeTracker
 from .items import ItemsClient
 from .logging import quiet_logging
 from .products import ProductsClient
@@ -45,7 +46,16 @@ class PoelisClient:
     resource accessors to unblock incremental development.
     """
 
-    def __init__(self, api_key: str, base_url: str = "https://poelis-be-py-753618215333.europe-west1.run.app", timeout_seconds: float = 30.0, org_id: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        base_url: str = "https://poelis-be-py-753618215333.europe-west1.run.app",
+        timeout_seconds: float = 30.0,
+        org_id: Optional[str] = None,
+        enable_change_detection: bool = True,
+        baseline_file: Optional[str] = None,
+        log_file: Optional[str] = None,
+    ) -> None:
         """Initialize the client with API endpoint and credentials.
 
         Args:
@@ -53,6 +63,18 @@ class PoelisClient:
             base_url: Base URL of the Poelis API. Defaults to production.
             timeout_seconds: Network timeout in seconds.
             org_id: Deprecated, ignored parameter kept for backwards compatibility.
+            enable_change_detection: If True, enables automatic warnings when property
+                values change between accesses. When True, defaults to using
+                `.poelis/baseline.json` for baseline_file and `poelis_changes.log` for
+                log_file if not explicitly provided. Defaults to False.
+            baseline_file: Optional path to JSON file for persistent baseline storage.
+                If provided, property baselines will be saved and loaded between script runs.
+                If enable_change_detection is True and this is None, defaults to
+                `.poelis/baseline.json`. Defaults to None (in-memory only).
+            log_file: Optional path to log file for recording property changes.
+                Changes will be appended to this file. If enable_change_detection is True
+                and this is None, defaults to `poelis_changes.log`. Defaults to None
+                (no file logging).
         """
 
         # Configure quiet logging by default for production use
@@ -69,6 +91,20 @@ class PoelisClient:
             base_url=str(self._config.base_url),
             api_key=self._config.api_key,
             timeout_seconds=self._config.timeout_seconds,
+        )
+
+        # Auto-configure baseline_file and log_file if change detection is enabled
+        if enable_change_detection:
+            if baseline_file is None:
+                baseline_file = ".poelis/baseline.json"
+            if log_file is None:
+                log_file = "poelis_changes.log"
+
+        # Property change tracking
+        self._change_tracker = PropertyChangeTracker(
+            enabled=enable_change_detection,
+            baseline_file=baseline_file,
+            log_file=log_file,
         )
 
         # Resource clients
@@ -113,6 +149,53 @@ class PoelisClient:
         """
 
         return None
+
+    @property
+    def enable_change_detection(self) -> bool:
+        """Get whether property change detection is enabled.
+
+        Returns:
+            bool: True if change detection is enabled, False otherwise.
+        """
+        return self._change_tracker.is_enabled()
+
+    @enable_change_detection.setter
+    def enable_change_detection(self, value: bool) -> None:
+        """Enable or disable property change detection.
+
+        Args:
+            value: True to enable, False to disable.
+        """
+        if value:
+            self._change_tracker.enable()
+        else:
+            self._change_tracker.disable()
+
+    def clear_property_baselines(self) -> None:
+        """Clear all recorded property baseline values.
+
+        This resets the change tracking state, so all properties will be
+        treated as new on their next access.
+        """
+        self._change_tracker.clear_baselines()
+
+    def get_changed_properties(self) -> Dict[str, Dict[str, Any]]:
+        """Get information about properties that have changed.
+
+        Returns:
+            Dict[str, Dict[str, Any]]: Dictionary mapping property_id to change info.
+                Currently returns empty dict as change tracking is per-access.
+        """
+        return self._change_tracker.get_changed_properties()
+
+    def write_change_log(self) -> None:
+        """Write all changes detected in this session to the log file.
+        
+        This should be called at the end of a script run to ensure all changes
+        are logged, even if warnings were suppressed. If no log file is configured,
+        this method does nothing.
+        """
+        self._change_tracker.write_change_log()
 
 
 class _Deprecated:  # pragma: no cover

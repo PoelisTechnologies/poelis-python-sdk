@@ -80,6 +80,11 @@ item_category = item.some_property.category  # Access property categories direct
 item_unit = item.some_property.unit  # Access property units directly
 ```
 
+## Property Change Detection
+
+The SDK can automatically warn you when property values change between script/notebook runs. This is useful when you're using property values for calculations and want to be notified if a colleague changes them in the webapp.
+
+
 ## License
 
 MIT
