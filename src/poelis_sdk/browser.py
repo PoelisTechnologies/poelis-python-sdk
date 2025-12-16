@@ -19,13 +19,25 @@ _AUTO_COMPLETER_INSTALLED: bool = False
 
 
 class _Node:
-    def __init__(self, client: Any, level: str, parent: Optional["_Node"], node_id: Optional[str], name: Optional[str], version_number: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        client: Any,
+        level: str,
+        parent: Optional["_Node"],
+        node_id: Optional[str],
+        name: Optional[str],
+        version_number: Optional[int] = None,
+        baseline_version_number: Optional[int] = None,
+    ) -> None:
         self._client = client
         self._level = level
         self._parent = parent
         self._id = node_id
         self._name = name
         self._version_number: Optional[int] = version_number  # Track version context for items
+        # For product nodes, track the configured baseline version number (if any).
+        # When set, this should be preferred over "latest version" for baseline semantics.
+        self._baseline_version_number: Optional[int] = baseline_version_number
         self._children_cache: Dict[str, "_Node"] = {}
         self._props_cache: Optional[List[Dict[str, Any]]] = None
         # Performance optimization: cache metadata with TTL
@@ -180,19 +192,25 @@ class _Node:
     def _list_items(self) -> "_NodeList":
         if self._level not in ("product", "item", "version"):
             return _NodeList([], [])
-        # If called on a product node, delegate to baseline (latest version)
+        # If called on a product node, delegate to baseline version:
+        # - Prefer the configured baseline_version_number if available
+        # - Otherwise use the latest version (highest version_number)
         if self._level == "product":
             try:
-                page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
-                versions = getattr(page, "data", []) or []
-                if versions:
-                    latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
-                    version_number = getattr(latest_version, "version_number", None)
-                    if version_number is not None:
-                        # Create baseline version node and delegate to it
-                        baseline_node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
-                        baseline_node._cache_ttl = self._cache_ttl
-                        return baseline_node._list_items()
+                # First, try to use configured baseline_version_number from the product model
+                version_number: Optional[int] = getattr(self, "_baseline_version_number", None)
+                if version_number is None:
+                    # Fallback to latest version from backend if no baseline is configured
+                    page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
+                    versions = getattr(page, "data", []) or []
+                    if versions:
+                        latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
+                        version_number = getattr(latest_version, "version_number", None)
+                if version_number is not None:
+                    # Create baseline version node and delegate to it
+                    baseline_node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
+                    baseline_node._cache_ttl = self._cache_ttl
+                    return baseline_node._list_items()
                 # If no versions found, fall back to draft
                 draft_node = _Node(self._client, "version", self, None, "draft")
                 draft_node._cache_ttl = self._cache_ttl
@@ -246,19 +264,23 @@ class _Node:
             RuntimeError: If the property cannot be found or if there's an
                 error querying the GraphQL API.
         """
-        # If called on a product node, delegate to baseline (latest version)
+        # If called on a product node, delegate to baseline version (configured baseline or latest).
         if self._level == "product":
             try:
-                page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
-                versions = getattr(page, "data", []) or []
-                if versions:
-                    latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
-                    version_number = getattr(latest_version, "version_number", None)
-                    if version_number is not None:
-                        # Create baseline version node and delegate to it
-                        baseline_node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
-                        baseline_node._cache_ttl = self._cache_ttl
-                        return baseline_node._get_property(readable_id)
+                # First, try to use configured baseline_version_number from the product model
+                version_number: Optional[int] = getattr(self, "_baseline_version_number", None)
+                if version_number is None:
+                    # Fallback to latest version from backend if no baseline is configured
+                    page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
+                    versions = getattr(page, "data", []) or []
+                    if versions:
+                        latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
+                        version_number = getattr(latest_version, "version_number", None)
+                if version_number is not None:
+                    # Create baseline version node and delegate to it
+                    baseline_node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
+                    baseline_node._cache_ttl = self._cache_ttl
+                    return baseline_node._get_property(readable_id)
                 # If no versions found, fall back to draft
                 draft_node = _Node(self._client, "version", self, None, "draft")
                 draft_node._cache_ttl = self._cache_ttl
@@ -300,6 +322,17 @@ class _Node:
         # Since searchProperties doesn't return readableId, we need to iterate through items
         # and query their properties directly. Since readableId is unique per product,
         # we only need to find it once.
+        #
+        # When change detection is enabled, we prefer sdkProperties so that we get
+        # updatedAt/updatedBy metadata for draft properties (and potentially versions).
+        use_sdk_properties = False
+        try:
+            change_tracker = getattr(self._client, "_change_tracker", None)
+            if change_tracker is not None and change_tracker.is_enabled():
+                use_sdk_properties = True
+        except Exception:
+            # If anything goes wrong determining this, fall back to regular properties.
+            use_sdk_properties = False
         
         # Get all items in this product version
         if version_number is not None:
@@ -312,23 +345,29 @@ class _Node:
         else:
             items = self._client.items.list_by_product(product_id=pid, limit=1000, offset=0)
         
-        # Query properties for each item until we find the one with matching readableId
+        # Query properties for each item until we find the one with matching readableId.
         for item in items:
             item_id = item.get("id")
             if not item_id:
                 continue
-            
-            # Query properties for this item
+
+            # Query properties for this item. Prefer sdkProperties when change
+            # detection is enabled so we also get updatedAt/updatedBy metadata.
+            query_name = "sdkProperties" if use_sdk_properties else "properties"
+            property_type_prefix = "Sdk" if use_sdk_properties else ""
+
+            # First try the richer parsedValue + updatedAt/updatedBy shape.
+            updated_fields = " updatedAt updatedBy" if use_sdk_properties else ""
             if version_number is not None:
                 prop_query = (
-                    "query($iid: ID!, $version: VersionInput!) {\n"
-                    "  properties(itemId: $iid, version: $version) {\n"
-                    "    __typename\n"
-                    "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
-                    "    ... on TextProperty { id name readableId value parsedValue }\n"
-                    "    ... on DateProperty { id name readableId value }\n"
-                    "  }\n"
-                    "}"
+                    f"query($iid: ID!, $version: VersionInput!) {{\n"
+                    f"  {query_name}(itemId: $iid, version: $version) {{\n"
+                    f"    __typename\n"
+                    f"    ... on {property_type_prefix}NumericProperty {{ id name readableId category displayUnit value parsedValue{updated_fields} }}\n"
+                    f"    ... on {property_type_prefix}TextProperty {{ id name readableId value parsedValue{updated_fields} }}\n"
+                    f"    ... on {property_type_prefix}DateProperty {{ id name readableId value{updated_fields} }}\n"
+                    f"  }}\n"
+                    f"}}"
                 )
                 prop_variables = {
                     "iid": item_id,
@@ -336,31 +375,95 @@ class _Node:
                 }
             else:
                 prop_query = (
-                    "query($iid: ID!) {\n"
-                    "  properties(itemId: $iid) {\n"
-                    "    __typename\n"
-                    "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
-                    "    ... on TextProperty { id name readableId value parsedValue }\n"
-                    "    ... on DateProperty { id name readableId value }\n"
-                    "  }\n"
-                    "}"
+                    f"query($iid: ID!) {{\n"
+                    f"  {query_name}(itemId: $iid) {{\n"
+                    f"    __typename\n"
+                    f"    ... on {property_type_prefix}NumericProperty {{ id name readableId category displayUnit value parsedValue{updated_fields} }}\n"
+                    f"    ... on {property_type_prefix}TextProperty {{ id name readableId value parsedValue{updated_fields} }}\n"
+                    f"    ... on {property_type_prefix}DateProperty {{ id name readableId value{updated_fields} }}\n"
+                    f"  }}\n"
+                    f"}}"
                 )
                 prop_variables = {"iid": item_id}
-            
+
             try:
                 r = self._client._transport.graphql(prop_query, prop_variables)
                 r.raise_for_status()
                 data = r.json()
                 if "errors" in data:
-                    # Skip this item if there's an error
-                    continue
-                
-                props = data.get("data", {}).get("properties", []) or []
-                
+                    # If sdkProperties is not available or doesn't support the
+                    # given parameters, fall back to the legacy properties API.
+                    if use_sdk_properties:
+                        # Fallback: plain properties without parsedValue/updatedAt/updatedBy.
+                        if version_number is not None:
+                            fallback_query = (
+                                "query($iid: ID!, $version: VersionInput!) {\n"
+                                "  properties(itemId: $iid, version: $version) {\n"
+                                "    __typename\n"
+                                "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
+                                "    ... on TextProperty { id name readableId value parsedValue }\n"
+                                "    ... on DateProperty { id name readableId value }\n"
+                                "  }\n"
+                                "}"
+                            )
+                            fallback_vars = {
+                                "iid": item_id,
+                                "version": {"productId": pid, "versionNumber": version_number},
+                            }
+                        else:
+                            fallback_query = (
+                                "query($iid: ID!) {\n"
+                                "  properties(itemId: $iid) {\n"
+                                "    __typename\n"
+                                "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
+                                "    ... on TextProperty { id name readableId value parsedValue }\n"
+                                "    ... on DateProperty { id name readableId value }\n"
+                                "  }\n"
+                                "}"
+                            )
+                            fallback_vars = {"iid": item_id}
+
+                        try:
+                            r_fb = self._client._transport.graphql(fallback_query, fallback_vars)
+                            r_fb.raise_for_status()
+                            data = r_fb.json()
+                            if "errors" in data:
+                                continue
+                        except Exception:
+                            # Skip this item if fallback also fails
+                            continue
+                    else:
+                        # If we were already using properties, skip this item on error.
+                        continue
+
+                props = data.get("data", {}).get(query_name, []) or []
+                # When falling back to properties, the field name is "properties"
+                if not props:
+                    props = data.get("data", {}).get("properties", []) or []
+
                 # Look for property with matching readableId
                 for prop in props:
                     if prop.get("readableId") == readable_id:
-                        return _PropWrapper(prop, client=self._client)
+                        wrapper = _PropWrapper(prop, client=self._client)
+                        # Track accessed property for deletion/change detection
+                        if self._client is not None:
+                            try:
+                                change_tracker2 = getattr(self._client, "_change_tracker", None)
+                                if change_tracker2 is not None and change_tracker2.is_enabled():
+                                    property_path = self._build_path(readable_id)
+                                    if property_path:
+                                        prop_name = (
+                                            prop.get("readableId")
+                                            or prop.get("name")
+                                            or readable_id
+                                        )
+                                        prop_id = prop.get("id")
+                                        change_tracker2.record_accessed_property(
+                                            property_path, prop_name, prop_id
+                                        )
+                            except Exception:
+                                pass  # Silently ignore tracking errors
+                        return wrapper
             except Exception:
                 # Skip this item if there's an error
                 continue
@@ -438,17 +541,30 @@ class _Node:
         if not item_id:
             raise RuntimeError(f"Property with readableId '{readable_id}' not found")
         
-        # Query properties for this item
+        # Query properties for this item. Prefer sdkProperties when change
+        # detection is enabled so we also get updatedAt/updatedBy metadata.
+        use_sdk_properties = False
+        try:
+            change_tracker = getattr(self._client, "_change_tracker", None)
+            if change_tracker is not None and change_tracker.is_enabled():
+                use_sdk_properties = True
+        except Exception:
+            use_sdk_properties = False
+
+        query_name = "sdkProperties" if use_sdk_properties else "properties"
+        property_type_prefix = "Sdk" if use_sdk_properties else ""
+
+        updated_fields = " updatedAt updatedBy" if use_sdk_properties else ""
         if version_number is not None:
             prop_query = (
-                "query($iid: ID!, $version: VersionInput!) {\n"
-                "  properties(itemId: $iid, version: $version) {\n"
-                "    __typename\n"
-                "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
-                "    ... on TextProperty { id name readableId value parsedValue }\n"
-                "    ... on DateProperty { id name readableId value }\n"
-                "  }\n"
-                "}"
+                f"query($iid: ID!, $version: VersionInput!) {{\n"
+                f"  {query_name}(itemId: $iid, version: $version) {{\n"
+                f"    __typename\n"
+                f"    ... on {property_type_prefix}NumericProperty {{ id name readableId category displayUnit value parsedValue{updated_fields} }}\n"
+                f"    ... on {property_type_prefix}TextProperty {{ id name readableId value parsedValue{updated_fields} }}\n"
+                f"    ... on {property_type_prefix}DateProperty {{ id name readableId value{updated_fields} }}\n"
+                f"  }}\n"
+                f"}}"
             )
             prop_variables = {
                 "iid": item_id,
@@ -456,14 +572,14 @@ class _Node:
             }
         else:
             prop_query = (
-                "query($iid: ID!) {\n"
-                "  properties(itemId: $iid) {\n"
-                "    __typename\n"
-                "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
-                "    ... on TextProperty { id name readableId value parsedValue }\n"
-                "    ... on DateProperty { id name readableId value }\n"
-                "  }\n"
-                "}"
+                f"query($iid: ID!) {{\n"
+                f"  {query_name}(itemId: $iid) {{\n"
+                f"    __typename\n"
+                f"    ... on {property_type_prefix}NumericProperty {{ id name readableId category displayUnit value parsedValue{updated_fields} }}\n"
+                f"    ... on {property_type_prefix}TextProperty {{ id name readableId value parsedValue{updated_fields} }}\n"
+                f"    ... on {property_type_prefix}DateProperty {{ id name readableId value{updated_fields} }}\n"
+                f"  }}\n"
+                f"}}"
             )
             prop_variables = {"iid": item_id}
         
@@ -471,13 +587,77 @@ class _Node:
             r = self._client._transport.graphql(prop_query, prop_variables)
             r.raise_for_status()
             data = r.json()
-            if "errors" not in data:
+            if "errors" in data:
+                # If sdkProperties is not available or doesn't support the
+                # given parameters, fall back to the legacy properties API.
+                if use_sdk_properties:
+                    if version_number is not None:
+                        fallback_query = (
+                            "query($iid: ID!, $version: VersionInput!) {\n"
+                            "  properties(itemId: $iid, version: $version) {\n"
+                            "    __typename\n"
+                            "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
+                            "    ... on TextProperty { id name readableId value parsedValue }\n"
+                            "    ... on DateProperty { id name readableId value }\n"
+                            "  }\n"
+                            "}"
+                        )
+                        fallback_vars = {
+                            "iid": item_id,
+                            "version": {"productId": product_id, "versionNumber": version_number},
+                        }
+                    else:
+                        fallback_query = (
+                            "query($iid: ID!) {\n"
+                            "  properties(itemId: $iid) {\n"
+                            "    __typename\n"
+                            "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
+                            "    ... on TextProperty { id name readableId value parsedValue }\n"
+                            "    ... on DateProperty { id name readableId value }\n"
+                            "  }\n"
+                            "}"
+                        )
+                        fallback_vars = {"iid": item_id}
+
+                    try:
+                        r_fb = self._client._transport.graphql(fallback_query, fallback_vars)
+                        r_fb.raise_for_status()
+                        data = r_fb.json()
+                        if "errors" in data:
+                            raise RuntimeError(data["errors"])
+                    except Exception:
+                        # If fallback also fails, treat as no properties for this item.
+                        data = {"data": {}}
+                else:
+                    raise RuntimeError(data["errors"])
+
+            props = data.get("data", {}).get(query_name, []) or []
+            if not props:
                 props = data.get("data", {}).get("properties", []) or []
-                
-                # Look for property with matching readableId in this item
-                for prop in props:
-                    if prop.get("readableId") == readable_id:
-                        return _PropWrapper(prop)
+
+            # Look for property with matching readableId in this item
+            for prop in props:
+                if prop.get("readableId") == readable_id:
+                    wrapper = _PropWrapper(prop, client=self._client)
+                    # Track accessed property for deletion/change detection
+                    if self._client is not None:
+                        try:
+                            change_tracker2 = getattr(self._client, "_change_tracker", None)
+                            if change_tracker2 is not None and change_tracker2.is_enabled():
+                                property_path = self._build_path(readable_id)
+                                if property_path:
+                                    prop_name = (
+                                        prop.get("readableId")
+                                        or prop.get("name")
+                                        or readable_id
+                                    )
+                                    prop_id = prop.get("id")
+                                    change_tracker2.record_accessed_property(
+                                        property_path, prop_name, prop_id
+                                    )
+                        except Exception:
+                            pass  # Silently ignore tracking errors
+                    return wrapper
         except Exception:
             pass  # Continue to search children
         
@@ -708,17 +888,21 @@ class _Node:
                 node._cache_ttl = self._cache_ttl
                 return node
             elif attr == "baseline":
-                # Return the latest version (highest version_number)
+                # Return the configured baseline version if available, otherwise latest.
                 try:
-                    page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
-                    versions = getattr(page, "data", []) or []
-                    if versions:
-                        latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
-                        version_number = getattr(latest_version, "version_number", None)
-                        if version_number is not None:
-                            node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
-                            node._cache_ttl = self._cache_ttl
-                            return node
+                    # Prefer configured baseline_version_number from the product model
+                    version_number: Optional[int] = getattr(self, "_baseline_version_number", None)
+                    if version_number is None:
+                        # Fallback to latest version from backend if no baseline is configured
+                        page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
+                        versions = getattr(page, "data", []) or []
+                        if versions:
+                            latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
+                            version_number = getattr(latest_version, "version_number", None)
+                    if version_number is not None:
+                        node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
+                        node._cache_ttl = self._cache_ttl
+                        return node
                     # If no versions found, fall back to draft
                     node = _Node(self._client, "version", self, None, "draft")
                     node._cache_ttl = self._cache_ttl
@@ -734,27 +918,32 @@ class _Node:
                 node._cache_ttl = self._cache_ttl
                 return node
             else:
-                # For product nodes, default to latest version for item access
+                # For product nodes, default to baseline version for item access:
+                # - Prefer configured baseline_version_number if available
+                # - Otherwise use latest version from backend
                 # First check if it's a list helper - those should work on product directly
                 if attr not in ("list_items", "list_product_versions"):
                     # Try to get latest version and redirect to it
                     try:
-                        page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
-                        versions = getattr(page, "data", []) or []
-                        if versions:
-                            latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
-                            version_number = getattr(latest_version, "version_number", None)
-                            if version_number is not None:
-                                # Create latest version node and try to get attr from it
-                                latest_node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
-                                latest_node._cache_ttl = self._cache_ttl
-                                # Load children for latest version node
-                                if latest_node._is_children_cache_stale():
-                                    latest_node._load_children()
-                                # Check if the attr exists in latest version's children
-                                if attr in latest_node._children_cache:
-                                    return latest_node._children_cache[attr]
-                                # If not found in latest version, fall through to check draft/default cache
+                        # Prefer configured baseline version if available
+                        version_number: Optional[int] = getattr(self, "_baseline_version_number", None)
+                        if version_number is None:
+                            page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
+                            versions = getattr(page, "data", []) or []
+                            if versions:
+                                latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
+                                version_number = getattr(latest_version, "version_number", None)
+                        if version_number is not None:
+                            # Create baseline/latest version node and try to get attr from it
+                            latest_node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
+                            latest_node._cache_ttl = self._cache_ttl
+                            # Load children for that version node
+                            if latest_node._is_children_cache_stale():
+                                latest_node._load_children()
+                            # Check if the attr exists in that version's children
+                            if attr in latest_node._children_cache:
+                                return latest_node._children_cache[attr]
+                            # If not found in that version, fall through to check draft/default cache
                     except Exception:
                         pass  # Fall through to default behavior (draft)
         
@@ -1103,40 +1292,53 @@ class _Node:
             for p in page.data:
                 display = p.readableId or p.name or str(p.id)
                 nm = _safe_key(display)
-                child = _Node(self._client, "product", self, p.id, display)
+                # Propagate baseline_version_number from Product model onto product node
+                child = _Node(
+                    self._client,
+                    "product",
+                    self,
+                    p.id,
+                    display,
+                    baseline_version_number=getattr(p, "baseline_version_number", None),
+                )
                 child._cache_ttl = self._cache_ttl
                 self._children_cache[nm] = child
         elif self._level == "product":
-            # Load items from baseline (latest version) for autocomplete suggestions
-            # This ensures ws.demo_product. shows items from the latest version, not draft
+            # Load items from baseline version for autocomplete suggestions.
+            # Baseline semantics:
+            # - Prefer configured baseline_version_number from the product model
+            # - Otherwise, use latest version (highest version_number)
             # Clear cache first to ensure we always load fresh data from baseline
             self._children_cache.clear()
             
             try:
-                page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
-                versions = getattr(page, "data", []) or []
-                if versions:
-                    # Get the latest version (highest version_number)
-                    latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
-                    version_number = getattr(latest_version, "version_number", None)
-                    if version_number is not None:
-                        # Load items from the latest version
-                        rows = self._client.versions.list_items(
-                            product_id=self._id,
-                            version_number=version_number,
-                            limit=1000,
-                            offset=0,
-                        )
-                        for it in rows:
-                            if it.get("parentId") is None:
-                                display = it.get("readableId") or it.get("name") or str(it["id"])
-                                nm = _safe_key(display)
-                                child = _Node(self._client, "item", self, it["id"], display, version_number=version_number)
-                                child._cache_ttl = self._cache_ttl
-                                self._children_cache[nm] = child
-                        # Mark cache as fresh after successful baseline load
-                        self._children_loaded_at = time.time()
-                        return  # Successfully loaded baseline items
+                # Prefer configured baseline version if available
+                version_number: Optional[int] = getattr(self, "_baseline_version_number", None)
+                if version_number is None:
+                    page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
+                    versions = getattr(page, "data", []) or []
+                    if versions:
+                        # Get the latest version (highest version_number)
+                        latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
+                        version_number = getattr(latest_version, "version_number", None)
+                if version_number is not None:
+                    # Load items from the chosen baseline/latest version
+                    rows = self._client.versions.list_items(
+                        product_id=self._id,
+                        version_number=version_number,
+                        limit=1000,
+                        offset=0,
+                    )
+                    for it in rows:
+                        if it.get("parentId") is None:
+                            display = it.get("readableId") or it.get("name") or str(it["id"])
+                            nm = _safe_key(display)
+                            child = _Node(self._client, "item", self, it["id"], display, version_number=version_number)
+                            child._cache_ttl = self._cache_ttl
+                            self._children_cache[nm] = child
+                    # Mark cache as fresh after successful baseline load
+                    self._children_loaded_at = time.time()
+                    return  # Successfully loaded baseline items
             except (AttributeError, KeyError, TypeError, ValueError):
                 # Only catch specific exceptions that might occur during data access
                 pass  # Fall through to draft if baseline loading fails
@@ -1513,7 +1715,9 @@ class _PropWrapper:
         """
         current_value = self._get_property_value()
 
-        # Check for changes if client is available and change detection is enabled
+        # Check for backend-side changes if client is available and change
+        # detection is enabled. This compares the current value to the
+        # persisted baseline across runs.
         if self._client is not None:
             try:
                 change_tracker = getattr(self._client, "_change_tracker", None)
@@ -1522,7 +1726,7 @@ class _PropWrapper:
                     # Versioned properties have productVersionNumber set
                     if self._raw.get("productVersionNumber") is not None:
                         return current_value
-                    
+
                     # Get property ID for tracking
                     property_id = self._raw.get("id")
                     if property_id:
@@ -1535,16 +1739,69 @@ class _PropWrapper:
                         # Get updatedAt and updatedBy if available (from sdkProperties)
                         updated_at = self._raw.get("updatedAt")
                         updated_by = self._raw.get("updatedBy")
-                        # Check and warn if changed
+                        # Check and warn if changed; path will be inferred from
+                        # previously recorded accessed_properties when possible.
                         change_tracker.warn_if_changed(
-                            property_id, current_value, name=prop_name,
-                            updated_at=updated_at, updated_by=updated_by
+                            property_id=property_id,
+                            current_value=current_value,
+                            name=prop_name,
+                            updated_at=updated_at,
+                            updated_by=updated_by,
                         )
             except Exception:
                 # Silently ignore errors in change tracking to avoid breaking property access
                 pass
 
         return current_value
+
+    @value.setter
+    def value(self, new_value: Any) -> None:
+        """Set the property value and emit a local change warning if enabled.
+
+        This is primarily intended for notebook/script usage, e.g.::
+
+            mass = ws.demo_product.draft.get_property("demo_property_mass")
+            mass.value = 123.4
+
+        The setter updates the in-memory value and asks the ``PropertyChangeTracker``
+        to emit a warning and log entry for this local edit. It does not push the
+        change back to the Poelis backend.
+        """
+        old_value = self._get_property_value()
+
+        # If the value did not actually change, do nothing.
+        if old_value == new_value:
+            return
+
+        # Update the raw payload with the new value. We prefer the canonical
+        # "value" field when present; for legacy shapes we still populate it so
+        # subsequent reads see the edited value.
+        try:
+            self._raw["value"] = new_value
+        except Exception:
+            # If raw is not a standard dict-like, best-effort: ignore.
+            pass
+
+        # Emit a local edit warning through the change tracker when available.
+        if self._client is not None:
+            try:
+                change_tracker = getattr(self._client, "_change_tracker", None)
+                if change_tracker is not None and change_tracker.is_enabled():
+                    property_id = self._raw.get("id")
+                    prop_name = (
+                        self._raw.get("readableId")
+                        or self._raw.get("name")
+                        or self._raw.get("id")
+                    )
+                    change_tracker.warn_on_local_edit(
+                        property_id=property_id,
+                        old_value=old_value,
+                        new_value=new_value,
+                        name=prop_name,
+                    )
+            except Exception:
+                # Silently ignore tracking errors; setting the value itself should not fail.
+                pass
     
     def _parse_nested_value(self, value: Any) -> Any:
         """Recursively parse nested lists/arrays that might contain string numbers."""

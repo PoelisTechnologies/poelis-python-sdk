@@ -51,8 +51,8 @@ class PropertyChangeTracker:
                 If None, changes are only logged via warnings. Defaults to None.
         """
         self._enabled = enabled
+        # Key: property_id, Value: {value, name, first_accessed_at, updated_at, updated_by}
         self._baselines: Dict[str, Dict[str, Any]] = {}
-        # Key: property_id, Value: {value, name, first_accessed_at}
         self._accessed_items: Dict[str, Dict[str, Any]] = {}
         # Key: item_path (e.g., "workspace.product.item"), Value: {name, first_accessed_at, item_id}
         self._accessed_properties: Dict[str, Dict[str, Any]] = {}
@@ -440,14 +440,26 @@ class PropertyChangeTracker:
         if not self._enabled:
             return
         
+        now = time.time()
         if property_path not in self._accessed_properties:
             self._accessed_properties[property_path] = {
                 "name": property_name,
                 "property_id": property_id,
-                "first_accessed_at": time.time(),
+                "first_accessed_at": now,
             }
-            if self._baseline_file:
-                self._save_baselines()
+        else:
+            # Keep metadata reasonably fresh if the same path is accessed again.
+            # Do not overwrite an existing property_id with None.
+            existing = self._accessed_properties[property_path]
+            if property_id is not None and existing.get("property_id") is None:
+                existing["property_id"] = property_id
+            # Always keep the earliest first_accessed_at so time deltas remain meaningful.
+            if "first_accessed_at" not in existing:
+                existing["first_accessed_at"] = now
+
+        # Save baselines to file if persistent storage is enabled
+        if self._baseline_file:
+            self._save_baselines()
     
     def check_item_deleted(self, item_path: str) -> Optional[Dict[str, Any]]:
         """Check if an item that was previously accessed has been deleted.

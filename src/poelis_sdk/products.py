@@ -32,7 +32,13 @@ class ProductsClient:
 
         query = (
             "query($ws: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) { id name readableId workspaceId }\n"
+            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) {\n"
+            "    id\n"
+            "    name\n"
+            "    readableId\n"
+            "    workspaceId\n"
+            "    baselineVersionNumber\n"
+            "  }\n"
             "}"
         )
         variables = {"ws": workspace_id, "q": q, "limit": int(limit), "offset": int(offset)}
@@ -82,6 +88,47 @@ class ProductsClient:
         versions = payload.get("data", {}).get("productVersions", [])
 
         return PaginatedProductVersions(data=[ProductVersion(**v) for v in versions], limit=limit, offset=offset)
+
+    def set_product_baseline_version(self, *, product_id: str, version_number: int) -> Product:
+        """Set the baseline version for a product.
+
+        This wraps the ``setProductBaselineVersion`` GraphQL mutation and returns
+        the updated :class:`Product` including its ``baseline_version_number``.
+
+        Args:
+            product_id: Identifier of the product whose baseline should be updated.
+            version_number: Version number to mark as baseline.
+
+        Returns:
+            Product: The updated product with the new baseline version number.
+
+        Raises:
+            RuntimeError: If the GraphQL response contains errors.
+        """
+
+        query = (
+            "mutation SetBaseline($productId: ID!, $versionNumber: Int!) {\n"
+            "  setProductBaselineVersion(productId: $productId, versionNumber: $versionNumber) {\n"
+            "    id\n"
+            "    name\n"
+            "    readableId\n"
+            "    workspaceId\n"
+            "    baselineVersionNumber\n"
+            "  }\n"
+            "}"
+        )
+        variables = {"productId": product_id, "versionNumber": int(version_number)}
+        resp = self._t.graphql(query=query, variables=variables)
+        resp.raise_for_status()
+        payload = resp.json()
+        if "errors" in payload:
+            raise RuntimeError(str(payload["errors"]))
+
+        product_data = payload.get("data", {}).get("setProductBaselineVersion")
+        if product_data is None:
+            raise RuntimeError("Malformed GraphQL response: missing 'setProductBaselineVersion' field")
+
+        return Product(**product_data)
 
     def iter_all_by_workspace(self, *, workspace_id: str, q: Optional[str] = None, page_size: int = 100, start_offset: int = 0) -> Generator[Product, None, None]:
         """Iterate products via GraphQL with offset pagination for a workspace."""

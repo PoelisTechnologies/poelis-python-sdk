@@ -16,6 +16,10 @@ class Product(BaseModel):
     name: str = Field(min_length=1)
     readableId: Optional[str] = None
     workspaceId: Optional[str] = None
+    baseline_version_number: Optional[int] = Field(
+        alias="baselineVersionNumber",
+        default=None,
+    )
     code: Optional[str] = None
     description: Optional[str] = None
 

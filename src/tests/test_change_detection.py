@@ -14,7 +14,11 @@ from poelis_sdk import PoelisClient
 from poelis_sdk.change_tracker import PropertyChangeTracker, PropertyValueChangedWarning
 
 if TYPE_CHECKING:
-    pass
+    from _pytest.capture import CaptureFixture
+    from _pytest.fixtures import FixtureRequest
+    from _pytest.logging import LogCaptureFixture
+    from _pytest.monkeypatch import MonkeyPatch
+    from pytest_mock.plugin import MockerFixture
 
 
 def test_change_tracker_baseline_recording() -> None:

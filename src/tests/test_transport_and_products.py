@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
 
 import httpx
 
@@ -18,6 +18,25 @@ class _MockTransport(httpx.BaseTransport):
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:  # type: ignore[override]
         self.requests.append(request)
+        if request.url.path == "/graphql":
+            # Minimal GraphQL mock: handle SetBaseline mutation
+            body = request.content.decode()
+            if "SetBaseline" in body and "setProductBaselineVersion" in body:
+                return httpx.Response(
+                    200,
+                    json={
+                        "data": {
+                            "setProductBaselineVersion": {
+                                "id": "p1",
+                                "name": "Prod 1",
+                                "readableId": "P-1",
+                                "workspaceId": "w1",
+                                "baselineVersionNumber": 5,
+                            }
+                        }
+                    },
+                )
+            return httpx.Response(200, json={"data": {}})
         if request.url.path == "/v1/products":
             qs = request.url.params
             limit = int(qs.get("limit", 100))
@@ -26,13 +45,13 @@ class _MockTransport(httpx.BaseTransport):
             data = []
             if offset == 0:
                 data = [
-                    {"id": "p1", "name": "Prod 1", "workspace_id": "w1"},
-                    {"id": "p2", "name": "Prod 2", "workspace_id": "w1"},
+                    {"id": "p1", "name": "Prod 1", "workspace_id": "w1", "baseline_version_number": 1},
+                    {"id": "p2", "name": "Prod 2", "workspace_id": "w1", "baseline_version_number": None},
                 ]
             elif offset == 2:
                 data = [
-                    {"id": "p3", "name": "Prod 3", "workspace_id": "w1"},
-                    {"id": "p4", "name": "Prod 4", "workspace_id": "w1"},
+                    {"id": "p3", "name": "Prod 3", "workspace_id": "w1", "baseline_version_number": 3},
+                    {"id": "p4", "name": "Prod 4", "workspace_id": "w1", "baseline_version_number": None},
                 ]
             else:
                 data = []
@@ -68,12 +87,20 @@ def test_auth_header_and_pagination(monkeypatch: "MonkeyPatch") -> None:
         client = PoelisClient(base_url="http://example.com", api_key="k")
         results = list(client.products.iter_all(page_size=2))
         assert [p.id for p in results] == ["p1", "p2", "p3", "p4"]
+        # Baseline version numbers are exposed on the Product model
+        assert [p.baseline_version_number for p in results] == [1, None, 3, None]
         # Check headers on first request
         assert mt.requests, "no requests captured"
         first = mt.requests[0]
         # Default auth mode is Authorization: Bearer
         assert first.headers.get("Authorization") == "Bearer k"
         assert first.headers.get("Accept") == "application/json"
+
+        # Verify that the baseline mutation helper issues a GraphQL request and parses the response
+        updated = client.products.set_product_baseline_version(product_id="p1", version_number=5)
+        assert updated.id == "p1"
+        assert updated.baseline_version_number == 5
+        assert updated.readableId == "P-1"
     finally:
         _T.__init__ = _orig_init  # type: ignore[assignment]
 

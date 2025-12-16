@@ -112,7 +112,7 @@ class _MockTransport(httpx.BaseTransport):
         return httpx.Response(404)
 
 
-def _client_with_graphql_mock(t: httpx.BaseTransport) -> PoelisClient:
+def _client_with_graphql_mock(t: httpx.BaseTransport, **client_kwargs: Any) -> PoelisClient:
     from poelis_sdk.client import Transport as _T
 
     def _init(self, base_url: str, api_key: str, org_id: str, timeout_seconds: float) -> None:  # type: ignore[no-redef]
@@ -125,7 +125,7 @@ def _client_with_graphql_mock(t: httpx.BaseTransport) -> PoelisClient:
     orig = _T.__init__
     _T.__init__ = _init  # type: ignore[assignment]
     try:
-        return PoelisClient(base_url="http://example.com", api_key="k", org_id="o")
+        return PoelisClient(base_url="http://example.com", api_key="k", org_id="o", **client_kwargs)
     finally:
         _T.__init__ = orig  # type: ignore[assignment]
 
@@ -479,6 +479,61 @@ def test_baseline_and_version_in_dir() -> None:
     
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
+
+
+def test_change_tracking_with_get_property_records_id_and_path(tmp_path: Any) -> None:
+    """Ensure get_property() integrates with PropertyChangeTracker (ID + path).
+
+    This simulates the notebook usage pattern:
+
+        prod = ws.demo_product
+        mass = prod.get_property("demo_property_mass")
+        print(mass.value)
+
+    and verifies that:
+    - A baseline is recorded keyed by property_id.
+    - An accessed_properties entry is created with a property_path pointing to that ID.
+    """
+    from poelis_sdk.change_tracker import PropertyChangeTracker
+
+    baseline_file = str(tmp_path / "baseline.json")
+
+    t = _MockTransport()
+    c = _client_with_graphql_mock(
+        t,
+        enable_change_detection=True,
+        baseline_file=baseline_file,
+        log_file=str(tmp_path / "changes.log"),
+    )
+
+    # Sanity: change tracker is enabled and uses the expected baseline file.
+    tracker: PropertyChangeTracker = c._change_tracker  # type: ignore[attr-defined]
+    assert tracker.is_enabled() is True
+    assert tracker._baseline_file == baseline_file
+
+    b = c.browser
+    ws = b["uh2"]
+    prod = ws["Widget Pro"]
+
+    # Access property via get_property at product level and read its value.
+    mass_prop = prod.get_property("demo_property_mass")
+    value = mass_prop.value
+    assert value == 10.5
+
+    # After the first access, a baseline should exist keyed by the property ID,
+    # and accessed_properties should contain a path mapped back to that ID.
+    baselines = tracker._baselines
+    accessed_props = tracker._accessed_properties
+
+    # There should be exactly one baseline entry.
+    assert len(baselines) == 1
+    property_id = next(iter(baselines.keys()))
+    baseline_entry = baselines[property_id]
+    assert baseline_entry["value"] == 10.5
+
+    # There should be at least one accessed_properties entry that references this ID.
+    assert accessed_props
+    assert any(info.get("property_id") == property_id for info in accessed_props.values())
     
     b = c.browser
     ws = b["uh2"]
