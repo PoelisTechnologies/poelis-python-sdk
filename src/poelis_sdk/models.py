@@ -4,13 +4,15 @@ from typing import Any, List, Optional, Union
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 """Pydantic models for SDK resources."""
 
 
 class Product(BaseModel):
     """Product resource representation."""
+
+    model_config = ConfigDict(populate_by_name=True)
 
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
@@ -40,6 +42,8 @@ class ProductVersion(BaseModel):
         org_id: Optional identifier of the owning organization (not in GraphQL schema yet).
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     product_id: str = Field(alias="productId", min_length=1)
     version_number: int = Field(alias="versionNumber")
     title: str = Field(min_length=1)
@@ -68,6 +72,8 @@ class PaginatedProductVersions(BaseModel):
 
 class PropertyValue(BaseModel):
     """Base class for property values with typed access."""
+
+    model_config = ConfigDict(populate_by_name=True)
     
     raw_value: str = Field(alias="value")
     parsed_value: Optional[Any] = Field(alias="parsedValue", default=None)
@@ -85,6 +91,8 @@ class NumericProperty(BaseModel):
     Categories are normalized server-side (upper-cased, deduplicated) and
     may differ from the original input values.
     """
+
+    model_config = ConfigDict(populate_by_name=True)
     
     id: str = Field(min_length=1)
     product_id: Optional[str] = Field(alias="productId", default=None)
@@ -107,6 +115,8 @@ class NumericProperty(BaseModel):
 
 class TextProperty(BaseModel):
     """Text property representation."""
+
+    model_config = ConfigDict(populate_by_name=True)
     
     id: str = Field(min_length=1)
     product_id: Optional[str] = Field(alias="productId", default=None)
@@ -127,6 +137,8 @@ class TextProperty(BaseModel):
 
 class DateProperty(BaseModel):
     """Date property representation."""
+
+    model_config = ConfigDict(populate_by_name=True)
     
     id: str = Field(min_length=1)
     product_id: Optional[str] = Field(alias="productId", default=None)
@@ -147,6 +159,8 @@ class DateProperty(BaseModel):
 
 class PropertySearchResult(BaseModel):
     """Property search result with unified fields across all property types."""
+
+    model_config = ConfigDict(populate_by_name=True)
     
     id: str = Field(min_length=1)
     workspace_id: str = Field(alias="workspaceId", min_length=1)
@@ -172,6 +186,8 @@ class PropertySearchResult(BaseModel):
 
 class PropertySearchResponse(BaseModel):
     """Response for property search queries."""
+
+    model_config = ConfigDict(populate_by_name=True)
     
     query: str
     hits: List[PropertySearchResult]

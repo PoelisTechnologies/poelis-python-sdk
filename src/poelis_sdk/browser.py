@@ -947,9 +947,10 @@ class _Node:
                     except Exception:
                         pass  # Fall through to default behavior (draft)
         
-        if attr not in self._children_cache:
-            if self._is_children_cache_stale():
-                self._load_children()
+        # Always check if cache is stale before accessing children
+        # This ensures we pick up backend changes (like baseline_version_number updates)
+        if self._is_children_cache_stale():
+            self._load_children()
         if attr in self._children_cache:
             child = self._children_cache[attr]
             # Track accessed items for deletion detection
