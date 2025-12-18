@@ -478,7 +478,7 @@ def test_baseline_and_version_in_dir() -> None:
     """Test that baseline and version appear in __dir__ for product nodes."""
     
     t = _MockTransport()
-    c = _client_with_graphql_mock(t)
+    _client_with_graphql_mock(t)
 
 
 def test_change_tracking_with_get_property_records_id_and_path(tmp_path: Any) -> None:

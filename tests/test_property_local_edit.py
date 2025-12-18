@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Tests for local in-session property edits and change tracking."""
+
+from __future__ import annotations
 
 from typing import Any, Optional
 
