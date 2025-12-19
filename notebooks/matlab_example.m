@@ -67,38 +67,32 @@ fprintf('\n');
 
 fprintf('=== Example 4: Exploring Available Nodes ===\n');
 
-% List workspaces (root level)
-workspaces_py = pm.list_children();
-workspaces = string(cell(workspaces_py));
-if ~isempty(workspaces)
-    workspace_name = workspaces(1);  % Use first workspace
-    fprintf('Exploring workspace: %s\n', workspace_name);
-    
-    % List products in workspace
-    products_py = pm.list_children(char(workspace_name));
-    products = string(cell(products_py));
-    fprintf('Products of workspace %s: %s\n', workspace_name, strjoin(products, ', '));
-    
-    if ~isempty(products)
-        product_name = products(1);  % Use first product
-        full_product_path = [char(workspace_name), '.', char(product_name)];
-        
-        % List items in product
-        items_py = pm.list_children(full_product_path);
-        items = string(cell(items_py));
-        fprintf('Items of product %s: %s\n', product_name, strjoin(items, ', '));
+% Replace with your actual workspace, product, and item names
+workspace_name = 'demo_workspace';
+product_name = 'demo_product';
+item_name = 'demo_item';
 
-        if ~isempty(items)
-            item_name = items(1);  % Use first item
-            full_item_path = [full_product_path, '.', item_name];
-            
-            % List properties of item
-            properties_py = pm.list_properties(full_item_path);
-            properties = string(cell(properties_py));
-            fprintf('Properties of item %s: %s\n', item_name, strjoin(properties, ', '));
-        end
-    end
-end
+% List products in workspace
+fprintf('Listing products in workspace: %s\n', workspace_name);
+products_py = pm.list_children(char(workspace_name));
+products = string(cell(products_py));
+fprintf('Products: %s\n', strjoin(products, ', '));
+fprintf('\n');
+
+% List items in product (path automatically resolves through baseline)
+fprintf('Listing items in product: %s.%s\n', workspace_name, product_name);
+item_path = [char(workspace_name), '.', char(product_name)];
+items_py = pm.list_children(item_path);
+items = string(cell(items_py));
+fprintf('Items: %s\n', strjoin(items, ', '));
+fprintf('\n');
+
+% List properties of a specific item (path automatically resolves through baseline)
+fprintf('Listing properties of item: %s.%s.%s\n', workspace_name, product_name, item_name);
+full_item_path = [char(workspace_name), '.', char(product_name), '.', char(item_name)];
+properties_py = pm.list_properties(char(full_item_path));
+properties = string(cell(properties_py));
+fprintf('Properties: %s\n', strjoin(properties, ', '));
 fprintf('\n');
 
 %% Example 5: Working with Versioned Products

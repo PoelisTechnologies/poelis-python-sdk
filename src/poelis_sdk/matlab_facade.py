@@ -170,12 +170,31 @@ class PoelisMatlab:
                         # Fall back to getattr
                         obj = getattr(obj, name)
                 except (KeyError, AttributeError):
-                    # Provide helpful error message
-                    partial_path = ".".join(parts[:i+1])
-                    raise AttributeError(
-                        f"Path '{path}' failed: node '{name}' not found at '{partial_path}'. "
-                        f"Available nodes can be listed using list_children() method."
-                    ) from None
+                    # If we're at a product node and access failed, try through baseline automatically
+                    # This allows paths like "workspace.product.item" to work without specifying "baseline"
+                    if hasattr(obj, "_level") and obj._level == "product" and not is_version_like:
+                        try:
+                            # Try accessing through baseline version
+                            baseline = getattr(obj, "baseline")
+                            # Now try to access the item from baseline
+                            if hasattr(baseline, "__getitem__"):
+                                obj = baseline[name]
+                            else:
+                                obj = getattr(baseline, name)
+                        except (KeyError, AttributeError):
+                            # If baseline access also fails, raise the original error
+                            partial_path = ".".join(parts[:i+1])
+                            raise AttributeError(
+                                f"Path '{path}' failed: node '{name}' not found at '{partial_path}'. "
+                                f"Available nodes can be listed using list_children() method."
+                            ) from None
+                    else:
+                        # Provide helpful error message
+                        partial_path = ".".join(parts[:i+1])
+                        raise AttributeError(
+                            f"Path '{path}' failed: node '{name}' not found at '{partial_path}'. "
+                            f"Available nodes can be listed using list_children() method."
+                        ) from None
     
     def get_property(self, path: str) -> dict[str, Any]:
         """Get property information including value, unit, category, and name.
@@ -260,12 +279,27 @@ class PoelisMatlab:
                         # Fall back to getattr
                         obj = getattr(obj, name)
                 except (KeyError, AttributeError):
-                    # Provide helpful error message
-                    partial_path = ".".join(parts[:i+1])
-                    raise AttributeError(
-                        f"Path '{path}' failed: node '{name}' not found at '{partial_path}'. "
-                        f"Available nodes can be listed using list_children() method."
-                    ) from None
+                    # If we're at a product node and access failed, try through baseline automatically
+                    if hasattr(obj, "_level") and obj._level == "product" and not is_version_like:
+                        try:
+                            baseline = getattr(obj, "baseline")
+                            if hasattr(baseline, "__getitem__"):
+                                obj = baseline[name]
+                            else:
+                                obj = getattr(baseline, name)
+                        except (KeyError, AttributeError):
+                            partial_path = ".".join(parts[:i+1])
+                            raise AttributeError(
+                                f"Path '{path}' failed: node '{name}' not found at '{partial_path}'. "
+                                f"Available nodes can be listed using list_children() method."
+                            ) from None
+                    else:
+                        # Provide helpful error message
+                        partial_path = ".".join(parts[:i+1])
+                        raise AttributeError(
+                            f"Path '{path}' failed: node '{name}' not found at '{partial_path}'. "
+                            f"Available nodes can be listed using list_children() method."
+                        ) from None
     
     def list_children(self, path: str = "") -> list[str]:
         """List child node names at the given path.
@@ -313,10 +347,24 @@ class PoelisMatlab:
                     else:
                         obj = getattr(obj, name)
                 except (KeyError, AttributeError):
-                    raise AttributeError(
-                        f"Path '{path}' failed: node '{name}' not found. "
-                        f"Cannot list children of non-existent node."
-                    ) from None
+                    # If we're at a product node and access failed, try through baseline automatically
+                    if hasattr(obj, "_level") and obj._level == "product" and not is_version_like:
+                        try:
+                            baseline = getattr(obj, "baseline")
+                            if hasattr(baseline, "__getitem__"):
+                                obj = baseline[name]
+                            else:
+                                obj = getattr(baseline, name)
+                        except (KeyError, AttributeError):
+                            raise AttributeError(
+                                f"Path '{path}' failed: node '{name}' not found. "
+                                f"Cannot list children of non-existent node."
+                            ) from None
+                    else:
+                        raise AttributeError(
+                            f"Path '{path}' failed: node '{name}' not found. "
+                            f"Cannot list children of non-existent node."
+                        ) from None
         
         # Get children using _suggest() if available, otherwise use __dir__()
         if hasattr(obj, "_suggest"):
@@ -381,10 +429,24 @@ class PoelisMatlab:
                 else:
                     obj = getattr(obj, name)
             except (KeyError, AttributeError):
-                raise AttributeError(
-                    f"Path '{path}' failed: node '{name}' not found. "
-                    f"Cannot list properties of non-existent node."
-                ) from None
+                # If we're at a product node and access failed, try through baseline automatically
+                if hasattr(obj, "_level") and obj._level == "product" and not is_version_like:
+                    try:
+                        baseline = getattr(obj, "baseline")
+                        if hasattr(baseline, "__getitem__"):
+                            obj = baseline[name]
+                        else:
+                            obj = getattr(baseline, name)
+                    except (KeyError, AttributeError):
+                        raise AttributeError(
+                            f"Path '{path}' failed: node '{name}' not found. "
+                            f"Cannot list properties of non-existent node."
+                        ) from None
+                else:
+                    raise AttributeError(
+                        f"Path '{path}' failed: node '{name}' not found. "
+                        f"Cannot list properties of non-existent node."
+                    ) from None
         
         # Check if list_properties method is available
         if not hasattr(obj, "list_properties"):
