@@ -291,8 +291,10 @@ def test_list_children_root() -> None:
     
     children = pm.list_children()
     
-    assert isinstance(children, tuple)
-    assert "uh2" in children
+    assert isinstance(children, dict)
+    # Check that values contain the expected workspace
+    children_values = list(children.values())
+    assert "uh2" in children_values
 
 
 def test_list_children_workspace() -> None:
@@ -305,9 +307,10 @@ def test_list_children_workspace() -> None:
     
     children = pm.list_children("uh2")
     
-    assert isinstance(children, tuple)
+    assert isinstance(children, dict)
     # Node names are converted to safe keys (spaces become underscores)
-    assert "Widget_Pro" in children
+    children_values = list(children.values())
+    assert "Widget_Pro" in children_values
 
 
 def test_list_children_nonexistent_path() -> None:
@@ -332,9 +335,10 @@ def test_list_properties() -> None:
     
     properties = pm.list_properties("uh2.Widget_Pro.Gadget_A")
     
-    assert isinstance(properties, tuple)
-    assert "demo_property_mass" in properties
-    assert "Color" in properties
+    assert isinstance(properties, dict)
+    properties_values = list(properties.values())
+    assert "demo_property_mass" in properties_values
+    assert "Color" in properties_values
 
 
 def test_list_properties_empty_path() -> None:

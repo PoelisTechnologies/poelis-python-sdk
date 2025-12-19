@@ -22,9 +22,11 @@ fprintf('✓ Poelis MATLAB facade initialized\n\n');
 
 %% Example 1: List Available Workspaces
 % Get a list of all workspaces you have access to
+% Note: list_children() returns a dict, so we need to extract values
 
 fprintf('=== Example 1: Listing Workspaces ===\n');
-workspaces = cell(pm.list_children());
+workspaces_dict = pm.list_children();
+workspaces = cell(py.list(workspaces_dict.values()));
 fprintf('Available workspaces:\n');
 for i = 1:length(workspaces)
     fprintf('  - %s\n', workspaces{i});
@@ -90,13 +92,15 @@ fprintf('\n');
 fprintf('=== Example 4: Exploring Available Nodes ===\n');
 try
     % List workspaces (root level)
-    workspaces = cell(pm.list_children());
+    workspaces_dict = pm.list_children();
+    workspaces = cell(py.list(workspaces_dict.values()));
     if ~isempty(workspaces)
         workspace_name = workspaces{1};  % Use first workspace
         fprintf('Exploring workspace: %s\n', workspace_name);
         
         % List products in workspace
-        products = cell(pm.list_children(workspace_name));
+        products_dict = pm.list_children(workspace_name);
+        products = cell(py.list(products_dict.values()));
         fprintf('  Products: %s\n', strjoin(products, ', '));
         
         if ~isempty(products)
@@ -104,7 +108,8 @@ try
             full_product_path = [workspace_name, '.', product_name];
             
             % List items in product
-            items = cell(pm.list_children(full_product_path));
+            items_dict = pm.list_children(full_product_path);
+            items = cell(py.list(items_dict.values()));
             fprintf('  Items: %s\n', strjoin(items, ', '));
         end
     end
@@ -121,8 +126,9 @@ try
     % Path to an item (adjust to match your data)
     item_path = 'demo_workspace.demo_product.demo_item';
     
-    % List all properties
-    properties = cell(pm.list_properties(item_path));
+    % List all properties (returns dict, extract values)
+    properties_dict = pm.list_properties(item_path);
+    properties = cell(py.list(properties_dict.values()));
     
     fprintf('Properties available at: %s\n', item_path);
     for i = 1:length(properties)

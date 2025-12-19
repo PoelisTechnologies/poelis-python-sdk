@@ -204,7 +204,7 @@ class PoelisMatlab:
             result[path_str] = self.get(path_str)
         return result
     
-    def list_children(self, path: str = "") -> tuple[str, ...]:
+    def list_children(self, path: str = "") -> dict[str, str]:
         """List child node names at the given path.
         
         Args:
@@ -212,16 +212,17 @@ class PoelisMatlab:
                 If empty, lists workspaces at the root level.
         
         Returns:
-            Tuple of child node names (as strings) that can be accessed from this path.
-            Returns a tuple instead of a list for better MATLAB compatibility.
+            Dictionary mapping numeric string keys ('0', '1', '2', ...) to child node names.
+            This format works better with MATLAB's cell() conversion.
+            In MATLAB, use: children = cell(pm.list_children().values())
         
         Raises:
             AttributeError: If the path doesn't exist.
         
         Example:
             >>> pm = PoelisMatlab(api_key="test")
-            >>> workspaces = pm.list_children()  # List workspaces
-            >>> products = pm.list_children("workspace")  # List products in workspace
+            >>> workspaces = pm.list_children()  # Returns dict
+            >>> # In MATLAB: workspaces = cell(py.list(pm.list_children().values()))
         """
         # Start from browser root
         obj = self.client.browser
@@ -250,17 +251,16 @@ class PoelisMatlab:
                 "list_items", "list_properties", "list_workspaces", "list_products",
                 "list_product_versions", "get_property", "get_version", "props"
             }
-            children = [s for s in suggestions if s not in method_names]
-            # Return as tuple for better MATLAB compatibility
-            return tuple(sorted(children))
+            children = sorted([s for s in suggestions if s not in method_names])
         else:
             # Fallback to __dir__() and filter out private attributes
             all_attrs = dir(obj)
-            children = [attr for attr in all_attrs if not attr.startswith("_")]
-            # Return as tuple for better MATLAB compatibility
-            return tuple(sorted(children))
+            children = sorted([attr for attr in all_attrs if not attr.startswith("_")])
+        
+        # Return as dict with numeric string keys for MATLAB compatibility
+        return {str(i): child for i, child in enumerate(children)}
     
-    def list_properties(self, path: str) -> tuple[str, ...]:
+    def list_properties(self, path: str) -> dict[str, str]:
         """List property names available at the given path.
         
         Args:
@@ -268,8 +268,9 @@ class PoelisMatlab:
                 The path should end at a node that supports properties.
         
         Returns:
-            Tuple of property names (readableIds) available at this path.
-            Returns a tuple instead of a list for better MATLAB compatibility.
+            Dictionary mapping numeric string keys ('0', '1', '2', ...) to property names.
+            This format works better with MATLAB's cell() conversion.
+            In MATLAB, use: properties = cell(pm.list_properties(path).values())
         
         Raises:
             AttributeError: If the path doesn't exist.
@@ -278,7 +279,7 @@ class PoelisMatlab:
         Example:
             >>> pm = PoelisMatlab(api_key="test")
             >>> props = pm.list_properties("workspace.product.item")
-            >>> print(props)  # ('property1', 'property2', ...)
+            >>> # In MATLAB: props = cell(py.list(pm.list_properties(path).values()))
         """
         if not path or not path.strip():
             raise ValueError("Path cannot be empty for list_properties")
@@ -311,11 +312,13 @@ class PoelisMatlab:
             prop_list = obj.list_properties()
             # prop_list is a _NodeList with a .names property
             if hasattr(prop_list, "names"):
-                # Return as tuple for better MATLAB compatibility
-                return tuple(prop_list.names)
+                properties = list(prop_list.names)
             else:
                 # Fallback: try to iterate and extract names
-                return tuple(str(item) for item in prop_list)
+                properties = [str(item) for item in prop_list]
+            
+            # Return as dict with numeric string keys for MATLAB compatibility
+            return {str(i): prop for i, prop in enumerate(properties)}
         except Exception as e:
             raise RuntimeError(
                 f"Error listing properties at path '{path}': {str(e)}"
