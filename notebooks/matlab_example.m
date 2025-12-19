@@ -41,10 +41,10 @@ fprintf('\n');
 fprintf('=== Example 2: Getting a Property Value ===\n');
 try
     % Example path - adjust to match your actual workspace/product/item/property names
-    path = 'demo_workspace.demo_product.demo_item.mass_property';
+    path = 'demo_workspace.demo_product.demo_item.demo_sub_item.demo_property_mass';
     
     % Get the property value (returns Python float/int/str)
-    value = pm.get(path);
+    value = pm.get_value(path);
     
     % Convert to MATLAB double (for numeric values)
     numeric_value = double(value);
@@ -60,14 +60,15 @@ fprintf('\n');
 
 %% Example 3: Get Multiple Properties at Once
 % Use get_many() to fetch multiple properties efficiently
+% Note: MATLAB cell arrays work directly with get_many()
 
 fprintf('=== Example 3: Getting Multiple Properties ===\n');
 try
-    % Define multiple property paths
+    % Define multiple property paths as MATLAB cell array
     paths = {
-        'demo_workspace.demo_product.demo_item.mass_property';
-        'demo_workspace.demo_product.demo_item.color_property';
-        'demo_workspace.demo_product.demo_item.weight_property'
+        'demo_workspace.demo_product.demo_item.demo_sub_item.demo_property_mass';
+        'demo_workspace.demo_product.demo_item.prop_1';
+        'demo_workspace.demo_product.demo_item.prop_2'
     };
     
     % Get all values at once
@@ -75,13 +76,35 @@ try
     
     % Extract individual values
     % Note: Dictionary keys in MATLAB use curly braces
-    mass = double(values_dict{'demo_workspace.demo_product.demo_item.mass_property'});
-    color = char(values_dict{'demo_workspace.demo_product.demo_item.color_property'});
-    weight = double(values_dict{'demo_workspace.demo_product.demo_item.weight_property'});
+    mass = double(values_dict{'demo_workspace.demo_product.demo_item.demo_sub_item.demo_property_mass'});
+    color = char(values_dict{'demo_workspace.demo_product.demo_item.prop_1'});
+    weight = double(values_dict{'demo_workspace.demo_product.demo_item.prop_2'});
     
-    fprintf('Mass: %.2f kg\n', mass);
+    fprintf('Mass: %.2f\n', mass);
     fprintf('Color: %s\n', color);
-    fprintf('Weight: %.2f kg\n', weight);
+    fprintf('Weight: %.2f\n', weight);
+catch ME
+    fprintf('Error: %s\n', ME.message);
+end
+fprintf('\n');
+
+%% Example 3b: Get Property Information (Value, Unit, Category)
+% Use get_property() to get property metadata along with the value
+
+fprintf('=== Example 3b: Getting Property Information ===\n');
+try
+    % Get property info including value, unit, category, and name
+    info = pm.get_property('demo_workspace.demo_product.demo_item.demo_sub_item.demo_property_mass');
+    
+    % Extract information from the dictionary
+    value = double(info{'value'});
+    unit = char(info{'unit'});
+    category = char(info{'category'});
+    name = char(info{'name'});
+    
+    fprintf('Property: %s\n', name);
+    fprintf('Value: %.2f %s\n', value, unit);
+    fprintf('Category: %s\n', category);
 catch ME
     fprintf('Error: %s\n', ME.message);
 end
@@ -147,18 +170,18 @@ fprintf('\n');
 fprintf('=== Example 6: Accessing Versioned Properties ===\n');
 try
     % Access property from a specific version (v1, v2, etc.)
-    version_path = 'demo_workspace.demo_product.v1.demo_item.mass_property';
-    value_v1 = double(pm.get(version_path));
+    version_path = 'demo_workspace.demo_product.v1.demo_item.demo_sub_item.demo_property_mass';
+    value_v1 = double(pm.get_value(version_path));
     fprintf('Version 1 value: %.2f\n', value_v1);
     
     % Access property from baseline version
-    baseline_path = 'demo_workspace.demo_product.baseline.demo_item.mass_property';
-    value_baseline = double(pm.get(baseline_path));
+    baseline_path = 'demo_workspace.demo_product.baseline.demo_item.demo_sub_item.demo_property_mass';
+    value_baseline = double(pm.get_value(baseline_path));
     fprintf('Baseline value: %.2f\n', value_baseline);
     
     % Access property from draft (current working version)
-    draft_path = 'demo_workspace.demo_product.draft.demo_item.mass_property';
-    value_draft = double(pm.get(draft_path));
+    draft_path = 'demo_workspace.demo_product.draft.demo_item.demo_sub_item.demo_property_mass';
+    value_draft = double(pm.get_value(draft_path));
     fprintf('Draft value: %.2f\n', value_draft);
 catch ME
     fprintf('Error: %s\n', ME.message);
@@ -172,7 +195,7 @@ fprintf('\n');
 fprintf('=== Example 7: Error Handling ===\n');
 try
     % Try to access a non-existent property
-    pm.get('nonexistent.workspace.product.property');
+    pm.get_value('nonexistent.workspace.product.property');
 catch ME
     fprintf('Caught expected error:\n');
     fprintf('  Type: %s\n', class(ME));
@@ -186,14 +209,14 @@ fprintf('\n');
 fprintf('=== Example 8: Type Conversion ===\n');
 try
     % Numeric properties return Python float/int
-    numeric_path = 'demo_workspace.demo_product.demo_item.mass_property';
-    numeric_value = pm.get(numeric_path);
+    numeric_path = 'demo_workspace.demo_product.demo_item.demo_sub_item.demo_property_mass';
+    numeric_value = pm.get_value(numeric_path);
     fprintf('Numeric value (Python type): %s\n', class(numeric_value));
     fprintf('Converted to MATLAB double: %.2f\n', double(numeric_value));
     
     % String properties return Python str
-    string_path = 'demo_workspace.demo_product.demo_item.color_property';
-    string_value = pm.get(string_path);
+    string_path = 'demo_workspace.demo_product.demo_item.prop_1';
+    string_value = pm.get_value(string_path);
     fprintf('String value (Python type): %s\n', class(string_value));
     fprintf('Converted to MATLAB char: %s\n', char(string_value));
     
@@ -208,7 +231,7 @@ fprintf('\n');
 
 fprintf('=== Summary ===\n');
 fprintf('The PoelisMatlab facade provides:\n');
-fprintf('  - Simple path-based API: pm.get("workspace.product.item.property")\n');
+fprintf('  - Simple path-based API: pm.get_value("workspace.product.item.property")\n');
 fprintf('  - Batch operations: pm.get_many([path1, path2, ...])\n');
 fprintf('  - Exploration: pm.list_children(path), pm.list_properties(path)\n');
 fprintf('  - MATLAB-compatible types: all values are native Python types\n');

@@ -188,16 +188,16 @@ def test_get_empty_path() -> None:
     """Test that empty path raises ValueError."""
     pm = PoelisMatlab(api_key="test-key")
     with pytest.raises(ValueError, match="Path cannot be empty"):
-        pm.get("")
+        pm.get_value("")
     with pytest.raises(ValueError, match="Path cannot be empty"):
-        pm.get("   ")
+        pm.get_value("   ")
 
 
 def test_get_invalid_path() -> None:
     """Test that invalid path structure raises ValueError."""
     pm = PoelisMatlab(api_key="test-key")
     with pytest.raises(ValueError, match="no valid components"):
-        pm.get("   .   .   ")
+        pm.get_value("   .   .   ")
 
 
 def test_get_property_value() -> None:
@@ -210,7 +210,7 @@ def test_get_property_value() -> None:
     pm.client = client
     
     # Get property value (using safe keys with underscores)
-    value = pm.get("uh2.Widget_Pro.Gadget_A.demo_property_mass")
+    value = pm.get_value("uh2.Widget_Pro.Gadget_A.demo_property_mass")
     
     # Verify it's a native Python type
     assert isinstance(value, (int, float))
@@ -225,7 +225,7 @@ def test_get_property_text_value() -> None:
     pm = PoelisMatlab.__new__(PoelisMatlab)
     pm.client = client
     
-    value = pm.get("uh2.Widget_Pro.Gadget_A.Color")
+    value = pm.get_value("uh2.Widget_Pro.Gadget_A.Color")
     
     assert isinstance(value, str)
     assert value == "Red"
@@ -240,7 +240,7 @@ def test_get_nonexistent_node() -> None:
     pm.client = client
     
     with pytest.raises(AttributeError, match="node 'Nonexistent' not found"):
-        pm.get("uh2.Nonexistent.property")
+        pm.get_value("uh2.Nonexistent.property")
 
 
 def test_get_nonexistent_property() -> None:
@@ -252,7 +252,7 @@ def test_get_nonexistent_property() -> None:
     pm.client = client
     
     with pytest.raises(RuntimeError, match="Property 'nonexistent' not found"):
-        pm.get("uh2.Widget_Pro.Gadget_A.nonexistent")
+        pm.get_value("uh2.Widget_Pro.Gadget_A.nonexistent")
 
 
 def test_get_many() -> None:
@@ -364,7 +364,7 @@ def test_type_compatibility_numeric() -> None:
     pm = PoelisMatlab.__new__(PoelisMatlab)
     pm.client = client
     
-    value = pm.get("uh2.Widget_Pro.Gadget_A.demo_property_mass")
+    value = pm.get_value("uh2.Widget_Pro.Gadget_A.demo_property_mass")
     
     # Verify it's a native type, not a custom object
     assert isinstance(value, (int, float))
@@ -381,7 +381,7 @@ def test_type_compatibility_string() -> None:
     pm = PoelisMatlab.__new__(PoelisMatlab)
     pm.client = client
     
-    value = pm.get("uh2.Widget_Pro.Gadget_A.Color")
+    value = pm.get_value("uh2.Widget_Pro.Gadget_A.Color")
     
     assert isinstance(value, str)
     assert not hasattr(value, "__dict__") or not any(

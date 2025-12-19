@@ -59,11 +59,11 @@ class PoelisMatlab:
     
     Example usage from Python:
         pm = PoelisMatlab(api_key="your-api-key")
-        value = pm.get("workspace.product.property")
+        value = pm.get_value("workspace.product.property")
     
     Example usage from MATLAB:
         pm = py.poelis_sdk.PoelisMatlab('your-api-key');
-        value = double(pm.get('workspace.product.property'));
+        value = double(pm.get_value('workspace.product.property'));
     """
     
     def __init__(
@@ -85,7 +85,7 @@ class PoelisMatlab:
             timeout_seconds=timeout_seconds,
         )
     
-    def get(self, path: str) -> Any:
+    def get_value(self, path: str) -> Any:
         """Get a property value by dot-separated path.
         
         Resolves a path starting from the browser root, navigating through
@@ -108,7 +108,7 @@ class PoelisMatlab:
         
         Example:
             >>> pm = PoelisMatlab(api_key="test")
-            >>> value = pm.get("demo_workspace.demo_product.demo_property_mass")
+            >>> value = pm.get_value("demo_workspace.demo_product.demo_property_mass")
             >>> print(value)  # e.g., 10.5
         """
         if not path or not path.strip():
@@ -177,6 +177,96 @@ class PoelisMatlab:
                         f"Available nodes can be listed using list_children() method."
                     ) from None
     
+    def get_property(self, path: str) -> dict[str, Any]:
+        """Get property information including value, unit, category, and name.
+        
+        Args:
+            path: Dot-separated path to the property, e.g., 
+                "workspace.product.item.property"
+        
+        Returns:
+            Dictionary with keys: 'value', 'unit', 'category', 'name'.
+            All values are MATLAB-compatible types.
+        
+        Raises:
+            ValueError: If path is empty or invalid.
+            AttributeError: If an intermediate node doesn't exist.
+            RuntimeError: If the property cannot be found.
+        
+        Example:
+            >>> pm = PoelisMatlab(api_key="test")
+            >>> info = pm.get_property("workspace.product.item.property")
+            >>> print(info)  # {'value': 10.5, 'unit': 'kg', 'category': 'Mass', 'name': 'mass_property'}
+        """
+        if not path or not path.strip():
+            raise ValueError("Path cannot be empty")
+        
+        # Split path into components
+        parts = [p.strip() for p in path.split(".") if p.strip()]
+        if not parts:
+            raise ValueError(f"Invalid path: '{path}' (no valid components after splitting)")
+        
+        # Start from browser root
+        obj = self.client.browser
+        
+        # Navigate through intermediate nodes
+        for i, name in enumerate(parts):
+            is_last = i == len(parts) - 1
+            
+            if is_last:
+                # Last element: must be a property
+                if not hasattr(obj, "get_property"):
+                    raise RuntimeError(
+                        f"Path '{path}' failed: node '{parts[i-1] if i > 0 else 'root'}' "
+                        f"does not support property access. get_property() is only available "
+                        f"on product, version, or item nodes."
+                    )
+                
+                # Get the property
+                try:
+                    prop = obj.get_property(name)
+                    # Extract all property information
+                    info: dict[str, Any] = {
+                        "value": _ensure_matlab_compatible(prop.value),
+                        "unit": _ensure_matlab_compatible(prop.unit) if hasattr(prop, "unit") else None,
+                        "category": _ensure_matlab_compatible(prop.category) if hasattr(prop, "category") else None,
+                        "name": _ensure_matlab_compatible(prop.name) if hasattr(prop, "name") else None,
+                    }
+                    return info
+                except RuntimeError as e:
+                    raise RuntimeError(
+                        f"Property '{name}' not found at path '{path}'. "
+                        f"Original error: {str(e)}"
+                    ) from e
+            else:
+                # Intermediate node: try getattr first for version nodes (v1, v2, baseline, draft),
+                # then try __getitem__ (handles display names with spaces),
+                # then fall back to getattr again (for safe keys)
+                try:
+                    # Version nodes and special nodes (baseline, draft) are accessed via __getattr__
+                    # Check if this looks like a version node or special node
+                    is_version_like = (
+                        name in ("baseline", "draft") or
+                        (name.startswith("v") and len(name) > 1 and name[1:].isdigit())
+                    )
+                    
+                    if is_version_like:
+                        # Try getattr first for version nodes
+                        obj = getattr(obj, name)
+                    elif hasattr(obj, "__getitem__"):
+                        # Try __getitem__ for display names with spaces
+                        obj = obj[name]
+                    else:
+                        # Fall back to getattr
+                        obj = getattr(obj, name)
+                except (KeyError, AttributeError):
+                    # Provide helpful error message
+                    partial_path = ".".join(parts[:i+1])
+                    raise AttributeError(
+                        f"Path '{path}' failed: node '{name}' not found at '{partial_path}'. "
+                        f"Available nodes can be listed using list_children() method."
+                    ) from None
+    
     def get_many(self, paths: Any) -> dict[str, Any]:
         """Get multiple property values by their paths.
         
@@ -201,20 +291,52 @@ class PoelisMatlab:
             ... ])
             >>> print(values)  # {'workspace.product.property1': 10.5, ...}
         """
-        # Convert to list if needed (handles MATLAB cell arrays and Python lists/tuples)
-        if hasattr(paths, '__iter__') and not isinstance(paths, (str, bytes)):
-            path_list = list(paths)
-        else:
-            raise ValueError("Paths must be a list, tuple, or iterable of strings")
+        # Handle MATLAB cell arrays - convert to Python list
+        path_list: list[str] = []
+        
+        # Convert MATLAB cell arrays or Python iterables to a list of strings
+        try:
+            # Try to iterate directly (works for Python lists/tuples)
+            for item in paths:
+                # Convert item to string (handles MATLAB char arrays and Python strings)
+                if isinstance(item, str):
+                    path_str = item
+                elif hasattr(item, 'char'):
+                    # MATLAB char array - convert to string
+                    try:
+                        path_str = str(item.char())
+                    except Exception:
+                        path_str = str(item)
+                else:
+                    path_str = str(item)
+                path_list.append(path_str)
+        except (TypeError, AttributeError) as e:
+            # If direct iteration fails, try to convert to list first
+            try:
+                # For MATLAB cell arrays, we might need to use py.list()
+                if hasattr(paths, '__len__'):
+                    # Try to access by index
+                    for i in range(len(paths)):  # type: ignore[arg-type]
+                        try:
+                            item = paths[i]  # type: ignore[index]
+                            path_str = str(item) if not isinstance(item, str) else item
+                            path_list.append(path_str)
+                        except (TypeError, KeyError, IndexError):
+                            break
+                else:
+                    raise ValueError("Paths must be a list, tuple, or iterable of strings") from e
+            except Exception as e2:
+                raise ValueError(
+                    f"Paths must be a list, tuple, or iterable of strings. "
+                    f"Got: {type(paths)}. Error: {str(e2)}"
+                ) from e2
         
         if not path_list:
             raise ValueError("Paths list cannot be empty")
         
         result: dict[str, Any] = {}
-        for path in path_list:
-            # Convert path to string if it's not already (handles MATLAB char arrays)
-            path_str = str(path) if not isinstance(path, str) else path
-            result[path_str] = self.get(path_str)
+        for path_str in path_list:
+            result[path_str] = self.get_value(path_str)
         return result
     
     def list_children(self, path: str = "") -> list[str]:
