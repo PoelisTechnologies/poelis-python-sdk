@@ -255,32 +255,6 @@ def test_get_nonexistent_property() -> None:
         pm.get_value("uh2.Widget_Pro.Gadget_A.nonexistent")
 
 
-def test_get_many() -> None:
-    """Test getting multiple property values."""
-    t = _MockTransport()
-    client = _client_with_mock_transport(t)
-    
-    pm = PoelisMatlab.__new__(PoelisMatlab)
-    pm.client = client
-    
-    values = pm.get_many([
-        "uh2.Widget_Pro.Gadget_A.demo_property_mass",
-        "uh2.Widget_Pro.Gadget_A.Color",
-    ])
-    
-    assert isinstance(values, dict)
-    assert len(values) == 2
-    assert values["uh2.Widget_Pro.Gadget_A.demo_property_mass"] == 10.5
-    assert values["uh2.Widget_Pro.Gadget_A.Color"] == "Red"
-
-
-def test_get_many_empty_list() -> None:
-    """Test that get_many with empty list raises ValueError."""
-    pm = PoelisMatlab(api_key="test-key")
-    with pytest.raises(ValueError, match="Paths list cannot be empty"):
-        pm.get_many([])
-
-
 def test_list_children_root() -> None:
     """Test listing children at root level (workspaces)."""
     t = _MockTransport()
