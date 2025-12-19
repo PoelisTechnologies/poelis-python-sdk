@@ -272,7 +272,8 @@ class PoelisMatlab:
         
         Args:
             paths: List or tuple of dot-separated paths to properties.
-                Can be a Python list/tuple or MATLAB cell array.
+                Can be a Python list/tuple. For MATLAB cell arrays, convert first:
+                paths = py.list({'path1', 'path2', 'path3'});
         
         Returns:
             Dictionary mapping each path to its value. If a path fails, the error
@@ -283,20 +284,25 @@ class PoelisMatlab:
             AttributeError: If an intermediate node doesn't exist.
             RuntimeError: If a property cannot be found.
         
-        Example:
+        Example (Python):
             >>> pm = PoelisMatlab(api_key="test")
             >>> values = pm.get_many([
             ...     "workspace.product.property1",
             ...     "workspace.product.property2"
             ... ])
             >>> print(values)  # {'workspace.product.property1': 10.5, ...}
+        
+        Example (MATLAB):
+            paths = {'path1', 'path2', 'path3'};
+            paths_py = py.list(paths);
+            values = pm.get_many(paths_py);
         """
-        # Handle MATLAB cell arrays - convert to Python list
+        # Handle MATLAB cell arrays and Python iterables - convert to Python list
         path_list: list[str] = []
         
-        # Convert MATLAB cell arrays or Python iterables to a list of strings
+        # Convert to list of strings
         try:
-            # Try to iterate directly (works for Python lists/tuples)
+            # Try direct iteration first (works for Python lists/tuples and py.list objects)
             for item in paths:
                 # Convert item to string (handles MATLAB char arrays and Python strings)
                 if isinstance(item, str):
@@ -311,25 +317,12 @@ class PoelisMatlab:
                     path_str = str(item)
                 path_list.append(path_str)
         except (TypeError, AttributeError) as e:
-            # If direct iteration fails, try to convert to list first
-            try:
-                # For MATLAB cell arrays, we might need to use py.list()
-                if hasattr(paths, '__len__'):
-                    # Try to access by index
-                    for i in range(len(paths)):  # type: ignore[arg-type]
-                        try:
-                            item = paths[i]  # type: ignore[index]
-                            path_str = str(item) if not isinstance(item, str) else item
-                            path_list.append(path_str)
-                        except (TypeError, KeyError, IndexError):
-                            break
-                else:
-                    raise ValueError("Paths must be a list, tuple, or iterable of strings") from e
-            except Exception as e2:
-                raise ValueError(
-                    f"Paths must be a list, tuple, or iterable of strings. "
-                    f"Got: {type(paths)}. Error: {str(e2)}"
-                ) from e2
+            raise ValueError(
+                f"Paths must be a list, tuple, or iterable of strings. "
+                f"Got: {type(paths)}. Error: {str(e)}. "
+                f"In MATLAB, convert cell array to Python list first: "
+                f"paths_py = py.list({{'path1', 'path2'}}); pm.get_many(paths_py);"
+            ) from e
         
         if not path_list:
             raise ValueError("Paths list cannot be empty")

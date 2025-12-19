@@ -60,7 +60,7 @@ fprintf('\n');
 
 %% Example 3: Get Multiple Properties at Once
 % Use get_many() to fetch multiple properties efficiently
-% Note: MATLAB cell arrays work directly with get_many()
+% Note: MATLAB cell arrays must be converted to Python list using py.list()
 
 fprintf('=== Example 3: Getting Multiple Properties ===\n');
 try
@@ -71,8 +71,11 @@ try
         'demo_workspace.demo_product.demo_item.prop_2'
     };
     
+    % Convert MATLAB cell array to Python list
+    paths_py = py.list(paths);
+    
     % Get all values at once
-    values_dict = pm.get_many(paths);
+    values_dict = pm.get_many(paths_py);
     
     % Extract individual values
     % Note: Dictionary keys in MATLAB use curly braces
