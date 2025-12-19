@@ -8,8 +8,18 @@ from importlib import metadata
 
 from .client import PoelisClient
 from .logging import configure_logging, debug_logging, get_logger, quiet_logging, verbose_logging
+from .matlab_facade import PoelisMatlab
 
-__all__ = ["PoelisClient", "__version__", "configure_logging", "quiet_logging", "verbose_logging", "debug_logging", "get_logger"]
+__all__ = [
+    "PoelisClient",
+    "PoelisMatlab",
+    "__version__",
+    "configure_logging",
+    "quiet_logging",
+    "verbose_logging",
+    "debug_logging",
+    "get_logger",
+]
 
 def _resolve_version() -> str:
     """Return installed package version or a dev fallback.
