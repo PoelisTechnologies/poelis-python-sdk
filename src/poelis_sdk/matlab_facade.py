@@ -204,7 +204,7 @@ class PoelisMatlab:
             result[path_str] = self.get(path_str)
         return result
     
-    def list_children(self, path: str = "") -> dict[str, str]:
+    def list_children(self, path: str = "") -> list[str]:
         """List child node names at the given path.
         
         Args:
@@ -212,17 +212,22 @@ class PoelisMatlab:
                 If empty, lists workspaces at the root level.
         
         Returns:
-            Dictionary mapping numeric string keys ('0', '1', '2', ...) to child node names.
-            This format works better with MATLAB's cell() conversion.
-            In MATLAB, use: children = cell(pm.list_children().values())
+            List of child node names (as strings).
+            In MATLAB, access using Python indexing: children = pm.list_children();
+            then use children{i} for i = 0:length(children)-1, or convert with:
+            cellArray = cell(children); strArray = string(cellArray);
         
         Raises:
             AttributeError: If the path doesn't exist.
         
         Example:
             >>> pm = PoelisMatlab(api_key="test")
-            >>> workspaces = pm.list_children()  # Returns dict
-            >>> # In MATLAB: workspaces = cell(py.list(pm.list_children().values()))
+            >>> workspaces = pm.list_children()  # Returns list
+            >>> # In MATLAB: 
+            >>> #   children = pm.list_children();
+            >>> #   for i = 0:length(children)-1
+            >>> #       name = char(children{i});
+            >>> #   end
         """
         # Start from browser root
         obj = self.client.browser
@@ -257,10 +262,10 @@ class PoelisMatlab:
             all_attrs = dir(obj)
             children = sorted([attr for attr in all_attrs if not attr.startswith("_")])
         
-        # Return as dict with numeric string keys for MATLAB compatibility
-        return {str(i): child for i, child in enumerate(children)}
+        # Return as list - MATLAB users should use Python indexing or string() conversion
+        return children
     
-    def list_properties(self, path: str) -> dict[str, str]:
+    def list_properties(self, path: str) -> list[str]:
         """List property names available at the given path.
         
         Args:
@@ -268,9 +273,9 @@ class PoelisMatlab:
                 The path should end at a node that supports properties.
         
         Returns:
-            Dictionary mapping numeric string keys ('0', '1', '2', ...) to property names.
-            This format works better with MATLAB's cell() conversion.
-            In MATLAB, use: properties = cell(pm.list_properties(path).values())
+            List of property names (readableIds) available at this path.
+            In MATLAB, access using Python indexing or convert with:
+            cellArray = cell(properties); strArray = string(cellArray);
         
         Raises:
             AttributeError: If the path doesn't exist.
@@ -279,7 +284,9 @@ class PoelisMatlab:
         Example:
             >>> pm = PoelisMatlab(api_key="test")
             >>> props = pm.list_properties("workspace.product.item")
-            >>> # In MATLAB: props = cell(py.list(pm.list_properties(path).values()))
+            >>> # In MATLAB: 
+            >>> #   props = pm.list_properties(path);
+            >>> #   strArray = string(cell(props));
         """
         if not path or not path.strip():
             raise ValueError("Path cannot be empty for list_properties")
@@ -317,8 +324,8 @@ class PoelisMatlab:
                 # Fallback: try to iterate and extract names
                 properties = [str(item) for item in prop_list]
             
-            # Return as dict with numeric string keys for MATLAB compatibility
-            return {str(i): prop for i, prop in enumerate(properties)}
+            # Return as list - MATLAB users should use string() conversion
+            return properties
         except Exception as e:
             raise RuntimeError(
                 f"Error listing properties at path '{path}': {str(e)}"

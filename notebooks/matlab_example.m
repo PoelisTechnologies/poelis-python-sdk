@@ -22,14 +22,15 @@ fprintf('✓ Poelis MATLAB facade initialized\n\n');
 
 %% Example 1: List Available Workspaces
 % Get a list of all workspaces you have access to
-% Note: list_children() returns a dict, so we need to extract values
+% Note: Use string() conversion to properly handle Python lists in MATLAB
 
 fprintf('=== Example 1: Listing Workspaces ===\n');
-workspaces_dict = pm.list_children();
-workspaces = cell(py.list(workspaces_dict.values()));
+workspaces_py = pm.list_children();
+% Convert Python list to MATLAB string array (this prevents character-by-character iteration)
+workspaces = string(cell(workspaces_py));
 fprintf('Available workspaces:\n');
 for i = 1:length(workspaces)
-    fprintf('  - %s\n', workspaces{i});
+    fprintf('  - %s\n', workspaces(i));
 end
 fprintf('\n');
 
@@ -92,24 +93,24 @@ fprintf('\n');
 fprintf('=== Example 4: Exploring Available Nodes ===\n');
 try
     % List workspaces (root level)
-    workspaces_dict = pm.list_children();
-    workspaces = cell(py.list(workspaces_dict.values()));
+    workspaces_py = pm.list_children();
+    workspaces = string(cell(workspaces_py));
     if ~isempty(workspaces)
-        workspace_name = workspaces{1};  % Use first workspace
+        workspace_name = workspaces(1);  % Use first workspace
         fprintf('Exploring workspace: %s\n', workspace_name);
         
         % List products in workspace
-        products_dict = pm.list_children(workspace_name);
-        products = cell(py.list(products_dict.values()));
+        products_py = pm.list_children(char(workspace_name));
+        products = string(cell(products_py));
         fprintf('  Products: %s\n', strjoin(products, ', '));
         
         if ~isempty(products)
-            product_name = products{1};  % Use first product
-            full_product_path = [workspace_name, '.', product_name];
+            product_name = products(1);  % Use first product
+            full_product_path = [char(workspace_name), '.', char(product_name)];
             
             % List items in product
-            items_dict = pm.list_children(full_product_path);
-            items = cell(py.list(items_dict.values()));
+            items_py = pm.list_children(full_product_path);
+            items = string(cell(items_py));
             fprintf('  Items: %s\n', strjoin(items, ', '));
         end
     end
@@ -126,13 +127,13 @@ try
     % Path to an item (adjust to match your data)
     item_path = 'demo_workspace.demo_product.demo_item';
     
-    % List all properties (returns dict, extract values)
-    properties_dict = pm.list_properties(item_path);
-    properties = cell(py.list(properties_dict.values()));
+    % List all properties (use string() conversion for proper handling)
+    properties_py = pm.list_properties(item_path);
+    properties = string(cell(properties_py));
     
     fprintf('Properties available at: %s\n', item_path);
     for i = 1:length(properties)
-        fprintf('  - %s\n', properties{i});
+        fprintf('  - %s\n', properties(i));
     end
 catch ME
     fprintf('Error: %s\n', ME.message);
