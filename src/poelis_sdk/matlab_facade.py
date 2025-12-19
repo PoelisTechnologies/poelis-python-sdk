@@ -164,11 +164,12 @@ class PoelisMatlab:
                         f"Available nodes can be listed using list_children() method."
                     ) from None
     
-    def get_many(self, paths: list[str]) -> dict[str, Any]:
+    def get_many(self, paths: Any) -> dict[str, Any]:
         """Get multiple property values by their paths.
         
         Args:
-            paths: List of dot-separated paths to properties.
+            paths: List or tuple of dot-separated paths to properties.
+                Can be a Python list/tuple or MATLAB cell array.
         
         Returns:
             Dictionary mapping each path to its value. If a path fails, the error
@@ -187,15 +188,23 @@ class PoelisMatlab:
             ... ])
             >>> print(values)  # {'workspace.product.property1': 10.5, ...}
         """
-        if not paths:
+        # Convert to list if needed (handles MATLAB cell arrays and Python lists/tuples)
+        if hasattr(paths, '__iter__') and not isinstance(paths, (str, bytes)):
+            path_list = list(paths)
+        else:
+            raise ValueError("Paths must be a list, tuple, or iterable of strings")
+        
+        if not path_list:
             raise ValueError("Paths list cannot be empty")
         
         result: dict[str, Any] = {}
-        for path in paths:
-            result[path] = self.get(path)
+        for path in path_list:
+            # Convert path to string if it's not already (handles MATLAB char arrays)
+            path_str = str(path) if not isinstance(path, str) else path
+            result[path_str] = self.get(path_str)
         return result
     
-    def list_children(self, path: str = "") -> list[str]:
+    def list_children(self, path: str = "") -> tuple[str, ...]:
         """List child node names at the given path.
         
         Args:
@@ -203,7 +212,8 @@ class PoelisMatlab:
                 If empty, lists workspaces at the root level.
         
         Returns:
-            List of child node names (as strings) that can be accessed from this path.
+            Tuple of child node names (as strings) that can be accessed from this path.
+            Returns a tuple instead of a list for better MATLAB compatibility.
         
         Raises:
             AttributeError: If the path doesn't exist.
@@ -241,14 +251,16 @@ class PoelisMatlab:
                 "list_product_versions", "get_property", "get_version", "props"
             }
             children = [s for s in suggestions if s not in method_names]
-            return sorted(children)
+            # Return as tuple for better MATLAB compatibility
+            return tuple(sorted(children))
         else:
             # Fallback to __dir__() and filter out private attributes
             all_attrs = dir(obj)
             children = [attr for attr in all_attrs if not attr.startswith("_")]
-            return sorted(children)
+            # Return as tuple for better MATLAB compatibility
+            return tuple(sorted(children))
     
-    def list_properties(self, path: str) -> list[str]:
+    def list_properties(self, path: str) -> tuple[str, ...]:
         """List property names available at the given path.
         
         Args:
@@ -256,7 +268,8 @@ class PoelisMatlab:
                 The path should end at a node that supports properties.
         
         Returns:
-            List of property names (readableIds) available at this path.
+            Tuple of property names (readableIds) available at this path.
+            Returns a tuple instead of a list for better MATLAB compatibility.
         
         Raises:
             AttributeError: If the path doesn't exist.
@@ -265,7 +278,7 @@ class PoelisMatlab:
         Example:
             >>> pm = PoelisMatlab(api_key="test")
             >>> props = pm.list_properties("workspace.product.item")
-            >>> print(props)  # ['property1', 'property2', ...]
+            >>> print(props)  # ('property1', 'property2', ...)
         """
         if not path or not path.strip():
             raise ValueError("Path cannot be empty for list_properties")
@@ -298,10 +311,11 @@ class PoelisMatlab:
             prop_list = obj.list_properties()
             # prop_list is a _NodeList with a .names property
             if hasattr(prop_list, "names"):
-                return list(prop_list.names)
+                # Return as tuple for better MATLAB compatibility
+                return tuple(prop_list.names)
             else:
                 # Fallback: try to iterate and extract names
-                return [str(item) for item in prop_list]
+                return tuple(str(item) for item in prop_list)
         except Exception as e:
             raise RuntimeError(
                 f"Error listing properties at path '{path}': {str(e)}"

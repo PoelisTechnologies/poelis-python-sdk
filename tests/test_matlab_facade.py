@@ -291,7 +291,7 @@ def test_list_children_root() -> None:
     
     children = pm.list_children()
     
-    assert isinstance(children, list)
+    assert isinstance(children, tuple)
     assert "uh2" in children
 
 
@@ -305,7 +305,7 @@ def test_list_children_workspace() -> None:
     
     children = pm.list_children("uh2")
     
-    assert isinstance(children, list)
+    assert isinstance(children, tuple)
     # Node names are converted to safe keys (spaces become underscores)
     assert "Widget_Pro" in children
 
@@ -332,7 +332,7 @@ def test_list_properties() -> None:
     
     properties = pm.list_properties("uh2.Widget_Pro.Gadget_A")
     
-    assert isinstance(properties, list)
+    assert isinstance(properties, tuple)
     assert "demo_property_mass" in properties
     assert "Color" in properties
 
