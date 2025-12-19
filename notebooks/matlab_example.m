@@ -1,27 +1,25 @@
 %% Poelis SDK - MATLAB Integration Example
 % This script demonstrates how to use the Poelis Python SDK from MATLAB
 
-%% Summary
-
-fprintf('=== Summary ===\n');
-fprintf('The PoelisMatlab facade provides:\n');
-fprintf('  - Simple path-based API: pm.get_value("workspace.product.item.property")\n');
-fprintf('  - Exploration: pm.list_children(path), pm.list_properties(path)\n');
-fprintf('  - MATLAB-compatible types: all values are native Python types\n');
-fprintf('  - Clear error messages for debugging\n');
-fprintf('\n');
+% Summary
+% The PoelisMatlab provides:
+%   - Simple path-based API: pm.get_value("workspace.product.item.property")
+%   - Exploration: pm.list_children(path), pm.list_properties(path)
+%   - MATLAB-compatible types: all values are native Python types
+%   - Clear error messages for debugging
 
 %% Setup: Initialize the Poelis MATLAB Facade
-% TODO: Replace with your actual Python venv path
-% TODO: Replace 'your-api-key' with your actual API key from: Organization Settings → API Keys in the Poelis webapp
 
-pyenv('Version', '/path/to/python/venv/bin/python', 'ExecutionMode','OutOfProcess'); % TODO: Replace with your actual Python venv path
+% TODO: Replace with your actual Python venv path
+pyenv('Version', '/path/to/python/venv/bin/python', 'ExecutionMode','OutOfProcess'); 
 
 poelis_sdk = py.importlib.import_module('poelis_sdk');
 pkg = py.importlib.import_module('pkg_resources');
 disp(['poelis-sdk version: ' char(pkg.get_distribution('poelis-sdk').version)]);
 
-api_key = 'your-api-key'; % TODO: Replace with your actual API key
+% TODO: Replace with your actual API key
+api_key = 'your-api-key';
+
 pm = py.poelis_sdk.PoelisMatlab(api_key);
 fprintf('✓ Poelis MATLAB facade initialized\n\n');
 
@@ -39,9 +37,11 @@ fprintf('\n');
 %% Example 2: Get a Single Property Value
 
 fprintf('=== Example 2: Getting a Property Value ===\n');
-% Get the property value (returns Python float/int/str)
+
+% TODO: Replace with your actual path. You can copy the path from the Poelis webapp
 path = 'demo_workspace.demo_product.demo_item.demo_sub_item.demo_property_mass';
-value = pm.get_value(path);
+
+alue = pm.get_value(path);
 % Convert to MATLAB double (for numeric values)
 numeric_value = double(value);
 fprintf('Property path: %s\n', path);
@@ -51,7 +51,7 @@ fprintf('\n');
 
 %% Example 3: Get Property Information (Value, Unit, Category)
 
-fprintf('=== Example 3b: Getting Property Information ===\n');
+fprintf('=== Example 3: Getting Property Information ===\n');
 mass = pm.get_property('demo_workspace.demo_product.demo_item.demo_sub_item.demo_property_mass');
 value = double(mass{'value'});
 unit = char(mass{'unit'});
@@ -67,7 +67,7 @@ fprintf('\n');
 
 fprintf('=== Example 4: Exploring Available Nodes ===\n');
 
-% Replace with your actual workspace, product, and item names
+% TODO: Replace with your actual workspace, product, and item names
 workspace_name = 'demo_workspace';
 product_name = 'demo_product';
 item_name = 'demo_item';
@@ -96,8 +96,6 @@ fprintf('Properties: %s\n', strjoin(properties, ', '));
 fprintf('\n');
 
 %% Example 5: Working with Versioned Products
-% Access properties from specific product versions
-
 fprintf('=== Example 5: Accessing Versioned Properties ===\n');
 
 % Access property from a specific version (v1, v2, etc.)
