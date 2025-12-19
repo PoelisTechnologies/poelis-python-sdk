@@ -149,12 +149,25 @@ class PoelisMatlab:
                         f"Original error: {str(e)}"
                     ) from e
             else:
-                # Intermediate node: try __getitem__ first (handles display names with spaces),
-                # then fall back to getattr (for safe keys)
+                # Intermediate node: try getattr first for version nodes (v1, v2, baseline, draft),
+                # then try __getitem__ (handles display names with spaces),
+                # then fall back to getattr again (for safe keys)
                 try:
-                    if hasattr(obj, "__getitem__"):
+                    # Version nodes and special nodes (baseline, draft) are accessed via __getattr__
+                    # Check if this looks like a version node or special node
+                    is_version_like = (
+                        name in ("baseline", "draft") or
+                        (name.startswith("v") and len(name) > 1 and name[1:].isdigit())
+                    )
+                    
+                    if is_version_like:
+                        # Try getattr first for version nodes
+                        obj = getattr(obj, name)
+                    elif hasattr(obj, "__getitem__"):
+                        # Try __getitem__ for display names with spaces
                         obj = obj[name]
                     else:
+                        # Fall back to getattr
                         obj = getattr(obj, name)
                 except (KeyError, AttributeError):
                     # Provide helpful error message
@@ -237,7 +250,15 @@ class PoelisMatlab:
             parts = [p.strip() for p in path.split(".") if p.strip()]
             for name in parts:
                 try:
-                    if hasattr(obj, "__getitem__"):
+                    # Version nodes and special nodes are accessed via __getattr__
+                    is_version_like = (
+                        name in ("baseline", "draft") or
+                        (name.startswith("v") and len(name) > 1 and name[1:].isdigit())
+                    )
+                    
+                    if is_version_like:
+                        obj = getattr(obj, name)
+                    elif hasattr(obj, "__getitem__"):
                         obj = obj[name]
                     else:
                         obj = getattr(obj, name)
@@ -297,7 +318,15 @@ class PoelisMatlab:
         
         for name in parts:
             try:
-                if hasattr(obj, "__getitem__"):
+                # Version nodes and special nodes are accessed via __getattr__
+                is_version_like = (
+                    name in ("baseline", "draft") or
+                    (name.startswith("v") and len(name) > 1 and name[1:].isdigit())
+                )
+                
+                if is_version_like:
+                    obj = getattr(obj, name)
+                elif hasattr(obj, "__getitem__"):
                     obj = obj[name]
                 else:
                     obj = getattr(obj, name)
