@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project>
+    <metadata>
+        <name>Poelis MATLAB Toolbox</name>
+        <version>0.6.2</version>
+        <author>Matteo Braceschi</author>
+        <email>matteo@poelis.com</email>
+        <company>Poelis Technologies</company>
+        <summary>MATLAB interface to Poelis API - Native MATLAB types with automatic Python-to-MATLAB conversions</summary>
+        <description>Poelis MATLAB Toolbox provides a native MATLAB interface to the Poelis Python SDK. All type conversions between Python and MATLAB are handled automatically, so you can work with native MATLAB types (string arrays, doubles, structs) without manual conversions.
+
+Features:
+- Native MATLAB types: All methods return MATLAB string arrays, doubles, structs, etc.
+- No manual conversions: No need for string(cell(...)) conversions
+- Clean API: MATLAB-style method calls with helpful error messages
+- Automatic type conversion: Python types are automatically converted to MATLAB types
+
+Prerequisites:
+- Python 3.11 or later
+- poelis-sdk Python package (install with: pip install poelis-sdk)
+- MATLAB R2018b or later (for Python interface support)
+
+Quick Start:
+  1. Install: pip install poelis-sdk
+  2. Configure: pyenv('Version', '/path/to/python')
+  3. Use: client = poelis.PoelisClient('your-api-key')
+  4. Example: workspaces = client.list_children()</description>
+        <keywords>poelis,api,sdk,matlab,product,data,management</keywords>
+        <license>MIT</license>
+        <homepage>https://poelis.com</homepage>
+        <support>https://github.com/PoelisTechnologies/poelis-python-sdk/issues</support>
+    </metadata>
+    <files>
+        <file>+poelis/PoelisClient.m</file>
+        <file>+poelis/checkInstallation.m</file>
+        <file>GettingStarted.m</file>
+        <file>examples/example_usage.m</file>
+    </files>
+    <toolbox>
+    </toolbox>
+</project>
+

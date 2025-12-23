@@ -1,0 +1,19 @@
+# MATLAB Toolbox build artifacts
+*.mltbx
+*.mlappinstall
+
+# MATLAB temporary files
+*.asv
+*.autosave
+
+# MATLAB cache
+*.mexw64
+*.mexw32
+*.mexa64
+*.mexmaci64
+*.mexglx
+
+# OS files
+.DS_Store
+Thumbs.db
+
