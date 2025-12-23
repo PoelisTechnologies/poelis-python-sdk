@@ -6,11 +6,11 @@
 
 Then, either:
 
-- **Double‑click** the `Poelis_MATLAB_Toolbox.mltbx` file in the Current Folder browser, **or**
+- **Double‑click** the `PoelisToolbox.mltbx` file in the Current Folder browser, **or**
 - Run this command in MatLab:
 
 ```matlab
-matlab.addons.install('Poelis_MATLAB_Toolbox.mltbx');
+matlab.addons.install('PoelisToolbox.mltbx');
 ```
 
 ---
