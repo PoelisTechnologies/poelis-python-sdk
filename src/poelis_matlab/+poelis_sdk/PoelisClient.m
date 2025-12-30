@@ -5,7 +5,7 @@ classdef PoelisClient < handle
     % All conversions between Python and MATLAB types are handled automatically.
     %
     % Usage:
-    %   client = poelis.PoelisClient('your-api-key');
+    %   client = poelis_sdk.PoelisClient('your-api-key');
     %   workspaces = client.list_children();  % Returns string array directly
     %   value = client.get_value('workspace.product.property');  % Returns MATLAB double/string
     %
@@ -34,8 +34,8 @@ classdef PoelisClient < handle
             %       Default: 30.0
             %
             % Example:
-            %   client = poelis.PoelisClient('your-api-key');
-            %   client = poelis.PoelisClient('your-api-key', 'https://custom-url.com', 60.0);
+            %   client = poelis_sdk.PoelisClient('your-api-key');
+            %   client = poelis_sdk.PoelisClient('your-api-key', 'https://custom-url.com', 60.0);
             
             % Import the Python module
             try
@@ -83,7 +83,7 @@ classdef PoelisClient < handle
             
             try
                 py_value = obj.pm.get_value(char(path));
-                value = poelis.PoelisClient.convertToMatlab(py_value);
+                value = poelis_sdk.PoelisClient.convertToMatlab(py_value);
             catch ME
                 if contains(ME.message, 'Path cannot be empty')
                     error('poelis:EmptyPath', 'Path cannot be empty');
@@ -122,10 +122,10 @@ classdef PoelisClient < handle
             try
                 py_info = obj.pm.get_property(char(path));
                 info = struct();
-                info.value = poelis.PoelisClient.convertToMatlab(py_info{'value'});
-                info.unit = poelis.PoelisClient.convertToMatlab(py_info{'unit'});
-                info.category = poelis.PoelisClient.convertToMatlab(py_info{'category'});
-                info.name = poelis.PoelisClient.convertToMatlab(py_info{'name'});
+                info.value = poelis_sdk.PoelisClient.convertToMatlab(py_info{'value'});
+                info.unit = poelis_sdk.PoelisClient.convertToMatlab(py_info{'unit'});
+                info.category = poelis_sdk.PoelisClient.convertToMatlab(py_info{'category'});
+                info.name = poelis_sdk.PoelisClient.convertToMatlab(py_info{'name'});
             catch ME
                 if contains(ME.message, 'Path cannot be empty')
                     error('poelis:EmptyPath', 'Path cannot be empty');
@@ -164,7 +164,7 @@ classdef PoelisClient < handle
             
             try
                 py_children = obj.pm.list_children(char(path));
-                children = poelis.PoelisClient.convertListToStringArray(py_children);
+                children = poelis_sdk.PoelisClient.convertListToStringArray(py_children);
             catch ME
                 if contains(ME.message, 'not found')
                     error('poelis:PathNotFound', 'Path not found: %s', path);
@@ -202,7 +202,7 @@ classdef PoelisClient < handle
             
             try
                 py_properties = obj.pm.list_properties(char(path));
-                properties = poelis.PoelisClient.convertListToStringArray(py_properties);
+                properties = poelis_sdk.PoelisClient.convertListToStringArray(py_properties);
             catch ME
                 if contains(ME.message, 'not found')
                     error('poelis:PathNotFound', 'Path not found: %s', path);
@@ -278,7 +278,7 @@ classdef PoelisClient < handle
                         % Mixed types - convert each element recursively
                         converted = cell(1, length(cell_array));
                         for i = 1:length(cell_array)
-                            converted{i} = poelis.PoelisClient.convertToMatlab(cell_array{i});
+                            converted{i} = poelis_sdk.PoelisClient.convertToMatlab(cell_array{i});
                         end
                         matlab_value = converted;
                     end
@@ -299,7 +299,7 @@ classdef PoelisClient < handle
                         key = char(keys{i});
                         % Replace invalid field name characters
                         key = matlab.lang.makeValidName(key);
-                        s.(key) = poelis.PoelisClient.convertToMatlab(values{i});
+                        s.(key) = poelis_sdk.PoelisClient.convertToMatlab(values{i});
                     end
                     matlab_value = s;
                 catch
