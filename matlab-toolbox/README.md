@@ -45,7 +45,7 @@ pyenv   % optional: check it looks correct
 You can quickly check everything with:
 
 ```matlab
-poelis.checkInstallation();
+poelis_sdk.checkInstallation();
 ```
 
 ---
