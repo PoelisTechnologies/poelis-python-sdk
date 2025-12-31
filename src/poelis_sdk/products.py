@@ -22,12 +22,20 @@ class ProductsClient:
 
     def list_by_workspace(self, *, workspace_id: str, q: Optional[str] = None, limit: int = 100, offset: int = 0) -> PaginatedProducts:
         """List products using GraphQL for a given workspace.
+        
+        Products are automatically filtered by the user's access permissions.
+        Products with NO_ACCESS are excluded from results. Access is determined by:
+        product-level roles (if set) or workspace-level roles (if no product role).
 
         Args:
             workspace_id: Workspace ID to scope products.
             q: Optional free-text filter.
             limit: Page size.
             offset: Offset for pagination.
+            
+        Returns:
+            PaginatedProducts: Container with products the user can access.
+            If user has NO_ACCESS to all products, returns empty list.
         """
 
         query = (
@@ -38,6 +46,8 @@ class ProductsClient:
             "    readableId\n"
             "    workspaceId\n"
             "    baselineVersionNumber\n"
+            "    reviewers { id userName imageUrl }\n"
+            "    approvalMode\n"
             "  }\n"
             "}"
         )
@@ -114,6 +124,8 @@ class ProductsClient:
             "    readableId\n"
             "    workspaceId\n"
             "    baselineVersionNumber\n"
+            "    reviewers { id userName imageUrl }\n"
+            "    approvalMode\n"
             "  }\n"
             "}"
         )

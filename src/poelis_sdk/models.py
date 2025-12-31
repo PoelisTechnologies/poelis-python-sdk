@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, List, Optional, Union
+from typing import Any, List, Literal, Optional, Union
 
 from datetime import datetime
 
@@ -9,8 +9,36 @@ from pydantic import BaseModel, ConfigDict, Field
 """Pydantic models for SDK resources."""
 
 
+class ChangedByUser(BaseModel):
+    """User information for reviewers and change tracking.
+    
+    Attributes:
+        id: User identifier.
+        user_name: Username or display name.
+        image_url: Optional URL to user's profile image.
+    """
+    
+    model_config = ConfigDict(populate_by_name=True)
+    
+    id: str = Field(min_length=1)
+    user_name: str = Field(alias="userName", min_length=1)
+    image_url: Optional[str] = Field(alias="imageUrl", default=None)
+
+
 class Product(BaseModel):
-    """Product resource representation."""
+    """Product resource representation.
+    
+    Attributes:
+        id: Product identifier.
+        name: Product name.
+        readableId: Optional human-readable identifier.
+        workspaceId: Identifier of the workspace containing this product.
+        baseline_version_number: Optional baseline version number for this product.
+        code: Optional product code.
+        description: Optional product description.
+        reviewers: List of users who are reviewers for this product.
+        approval_mode: Optional approval mode (sequential, any, all, or None).
+    """
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -24,6 +52,11 @@ class Product(BaseModel):
     )
     code: Optional[str] = None
     description: Optional[str] = None
+    reviewers: List[ChangedByUser] = Field(default_factory=list)
+    approval_mode: Optional[Literal["sequential", "any", "all"]] = Field(
+        alias="approvalMode",
+        default=None,
+    )
 
 
 class ProductVersion(BaseModel):
@@ -195,5 +228,55 @@ class PropertySearchResponse(BaseModel):
     limit: int
     offset: int
     processing_time_ms: int = Field(alias="processingTimeMs")
+
+
+class ProductAccess(BaseModel):
+    """Product access information with role.
+    
+    Attributes:
+        id: Product identifier.
+        name: Product name.
+        readable_id: Optional human-readable identifier.
+        role: User's role for this product (product-level role or inherited workspace role).
+    """
+    
+    model_config = ConfigDict(populate_by_name=True)
+    
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    readable_id: Optional[str] = Field(alias="readableId", default=None)
+    role: str = Field(min_length=1)  # Role enum: EDITOR, VIEWER, NO_ACCESS, etc.
+
+
+class WorkspaceWithProducts(BaseModel):
+    """Workspace with its accessible products and role information.
+    
+    Attributes:
+        id: Workspace identifier.
+        name: Workspace name.
+        readable_id: Optional human-readable identifier.
+        role: User's role for this workspace.
+        products: List of products accessible in this workspace with their roles.
+    """
+    
+    model_config = ConfigDict(populate_by_name=True)
+    
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    readable_id: Optional[str] = Field(alias="readableId", default=None)
+    role: str = Field(min_length=1)  # Role enum: EDITOR, VIEWER, etc.
+    products: List[ProductAccess] = Field(default_factory=list)
+
+
+class UserAccessibleResources(BaseModel):
+    """User's accessible resources (workspaces and products) with role information.
+    
+    Attributes:
+        workspaces: List of workspaces the user can access with their roles and products.
+    """
+    
+    model_config = ConfigDict(populate_by_name=True)
+    
+    workspaces: List[WorkspaceWithProducts] = Field(default_factory=list)
 
 
