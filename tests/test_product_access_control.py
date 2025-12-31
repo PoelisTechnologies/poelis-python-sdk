@@ -10,20 +10,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-import httpx
 import pytest
 
 if TYPE_CHECKING:
-    from _pytest.fixtures import FixtureRequest
     from _pytest.monkeypatch import MonkeyPatch
 
 from poelis_sdk import PoelisClient
 from poelis_sdk.models import (
     ChangedByUser,
     Product,
-    ProductAccess,
     UserAccessibleResources,
-    WorkspaceWithProducts,
 )
 
 
