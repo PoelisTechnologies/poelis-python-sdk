@@ -5,6 +5,7 @@ import time
 from types import MethodType
 from typing import Any, Dict, List, Optional
 
+from .exceptions import NotFoundError, UnauthorizedError
 from .org_validation import get_organization_context_message
 
 """GraphQL-backed dot-path browser for Poelis SDK.
@@ -1836,6 +1837,198 @@ class _PropWrapper:
         except ValueError:
             return False
 
+    def change_property(
+        self,
+        value: Any,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        changed_via: Optional[str] = None,
+    ) -> None:
+        """Update the property value via the backend.
+
+        Updates the property value by calling the appropriate GraphQL mutation.
+        Only draft properties can be updated.
+
+        Args:
+            value: New value for the property. Format depends on property type:
+                - Numeric: number, array, or matrix (will be converted to JSON string)
+                - Text: string
+                - Date: string in ISO 8601 format (YYYY-MM-DD)
+                - Status: string (DRAFT, UNDER_REVIEW, or DONE)
+            title: Optional title/reason for history tracking (mapped to 'reason' in mutation).
+            description: Optional description for history tracking.
+
+        Raises:
+            ValueError: If property is versioned (not draft), or if value format is invalid.
+            NotFoundError: If property doesn't exist.
+            UnauthorizedError: If permission denied.
+            RuntimeError: For other GraphQL errors.
+
+        Example:
+            >>> item.prop.change_property(123.45, title='Updated mass', description='Changed mass value')
+        """
+        # Check if property is draft (only draft properties can be updated)
+        if self._raw.get("productVersionNumber") is not None:
+            raise ValueError(
+                "Cannot update versioned property. Only draft properties can be updated. "
+                "Use product.draft.get_property() to access the draft version."
+            )
+
+        # Get property ID
+        property_id = self._raw.get("id")
+        if not property_id:
+            raise RuntimeError("Property ID not found in property data")
+
+        # Get PropertiesClient from client
+        if self._client is None:
+            raise RuntimeError("Client not available. Cannot update property without client connection.")
+
+        properties_client = getattr(self._client, "properties", None)
+        if properties_client is None:
+            raise RuntimeError("Properties client not available. Cannot update property.")
+
+        # Determine property type from _raw data
+        property_type = self._get_property_type()
+
+        # Build mutation parameters
+        mutation_params: Dict[str, Any] = {"id": property_id}
+
+        # Convert value based on property type
+        converted_value = self._convert_value_for_mutation(value, property_type)
+        mutation_params["value"] = converted_value
+
+        # Add reason (from title) and description if provided
+        if title is not None:
+            mutation_params["reason"] = title
+        if description is not None:
+            mutation_params["description"] = description
+        
+        # Note: changed_via parameter is not passed to mutations because the backend
+        # doesn't support the ChangedVia enum type yet. Once backend support is added,
+        # we can pass it conditionally: if changed_via is not None: mutation_params["changed_via"] = changed_via
+
+        # Call appropriate mutation based on property type
+        try:
+            if property_type == "numeric":
+                updated_property = properties_client.update_numeric_property(**mutation_params)
+            elif property_type == "text":
+                updated_property = properties_client.update_text_property(**mutation_params)
+            elif property_type == "date":
+                updated_property = properties_client.update_date_property(**mutation_params)
+            elif property_type == "status":
+                updated_property = properties_client.update_status_property(**mutation_params)
+            else:
+                raise RuntimeError(f"Unknown property type: {property_type}")
+
+            # Update _raw with response from backend
+            self._raw.update(updated_property)
+
+            # Update change tracking baseline after successful write
+            if self._client is not None:
+                try:
+                    change_tracker = getattr(self._client, "_change_tracker", None)
+                    if change_tracker is not None and change_tracker.is_enabled():
+                        property_id = self._raw.get("id")
+                        if property_id:
+                            # Update baseline with new value
+                            new_value = self._get_property_value()
+                            change_tracker.record_accessed_property(
+                                property_path=None,  # Path not needed for baseline update
+                                property_name=self._raw.get("readableId") or self._raw.get("name") or property_id,
+                                property_id=property_id,
+                            )
+                            # Update baseline directly
+                            if hasattr(change_tracker, "_baselines"):
+                                change_tracker._baselines[property_id] = {
+                                    "value": new_value,
+                                    "updated_at": self._raw.get("updatedAt"),
+                                    "updated_by": self._raw.get("updatedBy"),
+                                }
+                except Exception:
+                    # Silently ignore tracking errors
+                    pass
+
+        except (NotFoundError, UnauthorizedError, ValueError, RuntimeError):
+            # Re-raise these exceptions as-is
+            raise
+        except Exception as e:
+            # Wrap unexpected errors
+            raise RuntimeError(f"Failed to update property: {str(e)}") from e
+
+    def _get_property_type(self) -> str:
+        """Determine property type from _raw data.
+
+        Returns:
+            str: Property type ('numeric', 'text', 'date', 'status').
+
+        Raises:
+            RuntimeError: If property type cannot be determined.
+        """
+        # Try __typename first (from GraphQL union types)
+        typename = self._raw.get("__typename", "").lower()
+        if "numeric" in typename:
+            return "numeric"
+        elif "text" in typename:
+            return "text"
+        elif "date" in typename:
+            return "date"
+        elif "status" in typename:
+            return "status"
+
+        # Try propertyType field
+        prop_type = self._raw.get("propertyType", "").lower()
+        if prop_type in ("numeric", "numericproperty"):
+            return "numeric"
+        elif prop_type in ("text", "textproperty"):
+            return "text"
+        elif prop_type in ("date", "dateproperty"):
+            return "date"
+        elif prop_type in ("status", "statusproperty"):
+            return "status"
+
+        # Try type field
+        type_field = self._raw.get("type", "").lower()
+        if type_field in ("numeric", "text", "date", "status"):
+            return type_field
+
+        raise RuntimeError(f"Could not determine property type from property data: {self._raw}")
+
+    def _convert_value_for_mutation(self, value: Any, property_type: str) -> str:
+        """Convert a value to the format expected by GraphQL mutations.
+
+        Args:
+            value: Value to convert.
+            property_type: Property type ('numeric', 'text', 'date', 'status').
+
+        Returns:
+            str: Converted value as string.
+
+        Raises:
+            ValueError: If value format is invalid.
+        """
+        from .properties import PropertiesClient
+
+        if property_type == "numeric":
+            # Convert to JSON string (handles numbers, arrays, matrices)
+            return PropertiesClient._convert_numeric_value(value)
+        elif property_type == "text":
+            # Text values are passed as strings directly
+            if not isinstance(value, str):
+                return str(value)
+            return value
+        elif property_type == "date":
+            # Validate and return ISO 8601 date format
+            if not isinstance(value, str):
+                raise ValueError("Date value must be a string in ISO 8601 format: YYYY-MM-DD")
+            return PropertiesClient._validate_date_format(value)
+        elif property_type == "status":
+            # Validate status enum
+            if not isinstance(value, str):
+                raise ValueError("Status value must be a string: DRAFT, UNDER_REVIEW, or DONE")
+            return PropertiesClient._validate_status_value(value)
+        else:
+            raise ValueError(f"Unknown property type for value conversion: {property_type}")
+
     @property
     def category(self) -> Optional[str]:
         """Return the category for this property.
@@ -1874,7 +2067,7 @@ class _PropWrapper:
 
     def __dir__(self) -> List[str]:  # pragma: no cover - notebook UX
         # Expose only the minimal attributes for browsing
-        return ["value", "category", "unit"]
+        return ["value", "category", "unit", "change_property"]
 
     def __repr__(self) -> str:  # pragma: no cover - notebook UX
         name = self._raw.get("readableId") or self._raw.get("name") or self._raw.get("id")

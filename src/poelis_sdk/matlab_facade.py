@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Dict, Optional
 
 from .client import PoelisClient
 
@@ -471,4 +471,130 @@ class PoelisMatlab:
             raise RuntimeError(
                 f"Error listing properties at path '{path}': {str(e)}"
             ) from e
+    
+    def change_property(
+        self,
+        path: str,
+        value: Any,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> None:
+        """Update a property value by dot-separated path.
+        
+        Resolves a path starting from the browser root, navigating through
+        workspace → product → (optional version) → item nodes, and finally
+        accessing a property to update its value. Only draft properties can be updated.
+        
+        Args:
+            path: Dot-separated path to the property, e.g., 
+                "workspace.product.item.property" or "workspace.product.draft.item.property"
+            value: New value for the property. Format depends on property type:
+                - Numeric: number, array, or matrix (will be converted to JSON string)
+                - Text: string
+                - Date: string in ISO 8601 format (YYYY-MM-DD)
+                - Status: string (DRAFT, UNDER_REVIEW, or DONE)
+            title: Optional title/reason for history tracking.
+            description: Optional description for history tracking.
+        
+        Raises:
+            ValueError: If path is empty, invalid, or property is versioned (not draft).
+            AttributeError: If an intermediate node in the path doesn't exist.
+            RuntimeError: If the property cannot be found or cannot be updated.
+        
+        Example:
+            >>> pm = PoelisMatlab(api_key="test")
+            >>> pm.change_property("demo_workspace.demo_product.draft.item.mass", 123.45, title="Updated mass")
+            
+            In MATLAB:
+                pm = py.poelis_sdk.PoelisMatlab('your-api-key');
+                pm.change_property('workspace.product.draft.item.property', 123.45, 'title', pyargs('title', 'Updated mass'));
+        """
+        if not path or not path.strip():
+            raise ValueError("Path cannot be empty")
+        
+        # Split path into components
+        parts = [p.strip() for p in path.split(".") if p.strip()]
+        if not parts:
+            raise ValueError(f"Invalid path: '{path}' (no valid components after splitting)")
+        
+        # Start from browser root
+        obj = self.client.browser
+        
+        # Navigate through intermediate nodes
+        for i, name in enumerate(parts):
+            is_last = i == len(parts) - 1
+            
+            if is_last:
+                # Last element: must be a property
+                # Check if get_property is available on this node
+                if not hasattr(obj, "get_property"):
+                    raise RuntimeError(
+                        f"Path '{path}' failed: node '{parts[i-1] if i > 0 else 'root'}' "
+                        f"does not support property access. get_property() is only available "
+                        f"on product, version, or item nodes."
+                    )
+                
+                # Get the property
+                try:
+                    prop = obj.get_property(name)
+                    # Call change_property on the property wrapper with changed_via='MATLAB_SDK'
+                    prop.change_property(value, title=title, description=description, changed_via="MATLAB_SDK")
+                except RuntimeError as e:
+                    # Re-raise with more context
+                    raise RuntimeError(
+                        f"Property '{name}' not found at path '{path}'. "
+                        f"Original error: {str(e)}"
+                    ) from e
+                except ValueError as e:
+                    # Re-raise ValueError (e.g., versioned property, invalid format)
+                    raise ValueError(
+                        f"Cannot update property '{name}' at path '{path}': {str(e)}"
+                    ) from e
+            else:
+                # Intermediate node: try getattr first for version nodes (v1, v2, baseline, draft),
+                # then try __getitem__ (handles display names with spaces),
+                # then fall back to getattr again (for safe keys)
+                try:
+                    # Version nodes and special nodes (baseline, draft) are accessed via __getattr__
+                    # Check if this looks like a version node or special node
+                    is_version_like = (
+                        name in ("baseline", "draft") or
+                        (name.startswith("v") and len(name) > 1 and name[1:].isdigit())
+                    )
+                    
+                    if is_version_like:
+                        # Try getattr first for version nodes
+                        obj = getattr(obj, name)
+                    elif hasattr(obj, "__getitem__"):
+                        # Try __getitem__ for display names with spaces
+                        obj = obj[name]
+                    else:
+                        # Fall back to getattr
+                        obj = getattr(obj, name)
+                except (KeyError, AttributeError):
+                    # If we're at a product node and access failed, try through baseline automatically
+                    # This allows paths like "workspace.product.item" to work without specifying "baseline"
+                    if hasattr(obj, "_level") and obj._level == "product" and not is_version_like:
+                        try:
+                            # Try accessing through baseline version
+                            baseline = getattr(obj, "baseline")
+                            # Now try to access the item from baseline
+                            if hasattr(baseline, "__getitem__"):
+                                obj = baseline[name]
+                            else:
+                                obj = getattr(baseline, name)
+                        except (KeyError, AttributeError):
+                            # If baseline access also fails, raise the original error
+                            partial_path = ".".join(parts[:i+1])
+                            raise AttributeError(
+                                f"Path '{path}' failed: node '{name}' not found at '{partial_path}'. "
+                                f"Available nodes can be listed using list_children() method."
+                            ) from None
+                    else:
+                        # Provide helpful error message
+                        partial_path = ".".join(parts[:i+1])
+                        raise AttributeError(
+                            f"Path '{path}' failed: node '{name}' not found at '{partial_path}'. "
+                            f"Available nodes can be listed using list_children() method."
+                        ) from None
 
