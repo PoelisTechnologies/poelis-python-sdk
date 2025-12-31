@@ -23,7 +23,7 @@ Prerequisites:
 Quick Start:
   1. Install: pip install poelis-sdk
   2. Configure: pyenv('Version', '/path/to/python')
-  3. Use: client = poelis.PoelisClient('your-api-key')
+  3. Use: client = poelis_sdk.PoelisClient('your-api-key')
   4. Example: workspaces = client.list_children()</description>
         <keywords>poelis,api,sdk,matlab,product,data,management</keywords>
         <license>MIT</license>

@@ -16,7 +16,7 @@
 % TODO: Replace with your actual API ke
 api_key = 'poelis_live_Sku_3c_-Nyp6UGsIVuxxwLlUP012iKeH_lYQFe8F__g';
 
-poelis = poelis.PoelisClient(api_key);
+poelis = poelis_sdk.PoelisClient(api_key);
 fprintf('✓ Poelis client initialized\n\n');
 
 %% Example 1: List Available Workspaces

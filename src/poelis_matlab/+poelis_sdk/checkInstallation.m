@@ -6,7 +6,7 @@ function [status, details] = checkInstallation()
     %   details (struct): Detailed information about the installation
     %
     % Example:
-    %   [ok, info] = poelis.checkInstallation();
+    %   [ok, info] = poelis_sdk.checkInstallation();
     %   if ~ok
     %       fprintf('Installation check failed: %s\n', info.message);
     %   end
