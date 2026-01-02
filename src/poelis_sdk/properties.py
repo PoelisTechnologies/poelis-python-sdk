@@ -160,11 +160,18 @@ class PropertiesClient:
         resp.raise_for_status()
         payload = resp.json()
 
+        # CRITICAL: Check for errors FIRST - backend must enforce permissions
+        # If a VIEWER user can write, the backend is not properly enforcing permissions
         if "errors" in payload:
             self._handle_graphql_errors(payload["errors"])
 
         property_data = payload.get("data", {}).get("updateNumericProperty")
         if property_data is None:
+            # If we get here without errors but no data, something is wrong
+            # This could indicate the backend allowed the mutation but returned no data
+            # Check if there are any errors we might have missed
+            if "errors" in payload:
+                self._handle_graphql_errors(payload["errors"])
             raise RuntimeError("Malformed GraphQL response: missing 'updateNumericProperty' field")
 
         return property_data
@@ -291,11 +298,16 @@ class PropertiesClient:
         resp.raise_for_status()
         payload = resp.json()
 
+        # CRITICAL: Check for errors FIRST - backend must enforce permissions
+        # If a VIEWER user can write, the backend is not properly enforcing permissions
         if "errors" in payload:
             self._handle_graphql_errors(payload["errors"])
 
         property_data = payload.get("data", {}).get("updateTextProperty")
         if property_data is None:
+            # If we get here without errors but no data, something is wrong
+            if "errors" in payload:
+                self._handle_graphql_errors(payload["errors"])
             raise RuntimeError("Malformed GraphQL response: missing 'updateTextProperty' field")
 
         return property_data
@@ -421,11 +433,16 @@ class PropertiesClient:
         resp.raise_for_status()
         payload = resp.json()
 
+        # CRITICAL: Check for errors FIRST - backend must enforce permissions
+        # If a VIEWER user can write, the backend is not properly enforcing permissions
         if "errors" in payload:
             self._handle_graphql_errors(payload["errors"])
 
         property_data = payload.get("data", {}).get("updateDateProperty")
         if property_data is None:
+            # If we get here without errors but no data, something is wrong
+            if "errors" in payload:
+                self._handle_graphql_errors(payload["errors"])
             raise RuntimeError("Malformed GraphQL response: missing 'updateDateProperty' field")
 
         return property_data
@@ -551,11 +568,16 @@ class PropertiesClient:
         resp.raise_for_status()
         payload = resp.json()
 
+        # CRITICAL: Check for errors FIRST - backend must enforce permissions
+        # If a VIEWER user can write, the backend is not properly enforcing permissions
         if "errors" in payload:
             self._handle_graphql_errors(payload["errors"])
 
         property_data = payload.get("data", {}).get("updateStatusProperty")
         if property_data is None:
+            # If we get here without errors but no data, something is wrong
+            if "errors" in payload:
+                self._handle_graphql_errors(payload["errors"])
             raise RuntimeError("Malformed GraphQL response: missing 'updateStatusProperty' field")
 
         return property_data
@@ -582,7 +604,13 @@ class PropertiesClient:
         if error_code == "not_found":
             raise NotFoundError(404, message=error_message)
         elif error_code == "forbidden":
-            raise UnauthorizedError(403, message=error_message)
+            # Enhanced error message for permission issues
+            enhanced_message = (
+                f"{error_message}. "
+                "Write operations require EDITOR role for the workspace or product. "
+                "Users with VIEWER role can only read data."
+            )
+            raise UnauthorizedError(403, message=enhanced_message)
         elif error_code == "invalid_date_format":
             raise ValueError(f"Date must be in ISO 8601 format: YYYY-MM-DD. {error_message}")
         elif error_code == "invalid_status_value":

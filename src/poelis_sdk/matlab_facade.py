@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from .client import PoelisClient
+from .exceptions import NotFoundError, UnauthorizedError
 
 
 def _ensure_matlab_compatible(value: Any) -> Any:
@@ -142,6 +143,9 @@ class PoelisMatlab:
                     value = prop.value
                     # Ensure the value is MATLAB-compatible
                     return _ensure_matlab_compatible(value)
+                except (NotFoundError, UnauthorizedError):
+                    # Re-raise permission/access errors as-is
+                    raise
                 except RuntimeError as e:
                     # Re-raise with more context
                     raise RuntimeError(
@@ -252,6 +256,9 @@ class PoelisMatlab:
                         "name": _ensure_matlab_compatible(prop.name) if hasattr(prop, "name") else None,
                     }
                     return info
+                except (NotFoundError, UnauthorizedError):
+                    # Re-raise permission/access errors as-is
+                    raise
                 except RuntimeError as e:
                     raise RuntimeError(
                         f"Property '{name}' not found at path '{path}'. "
@@ -484,6 +491,7 @@ class PoelisMatlab:
         Resolves a path starting from the browser root, navigating through
         workspace → product → (optional version) → item nodes, and finally
         accessing a property to update its value. Only draft properties can be updated.
+        Requires EDITOR role for the workspace or product.
         
         Args:
             path: Dot-separated path to the property, e.g., 
@@ -500,6 +508,12 @@ class PoelisMatlab:
             ValueError: If path is empty, invalid, or property is versioned (not draft).
             AttributeError: If an intermediate node in the path doesn't exist.
             RuntimeError: If the property cannot be found or cannot be updated.
+            UnauthorizedError: If permission denied (requires EDITOR role; VIEWER role is read-only).
+        
+        Note:
+            Write permissions are enforced by the backend. Users with VIEWER role will receive
+            an UnauthorizedError. Only users with EDITOR role for the workspace or product can
+            update property values.
         
         Example:
             >>> pm = PoelisMatlab(api_key="test")

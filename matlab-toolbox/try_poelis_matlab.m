@@ -124,11 +124,7 @@ fprintf('Verified value: %.2f\n', updated_value);
 fprintf('\n');
 
 % Update a text property
-text_property_path = 'demo_workspace.demo_product.draft.demo_item.demo_sub_item.demo_property_description';
-try
-    poelis.change_property(text_property_path, 'New description text', 'Updated description');
-    fprintf('✓ Updated text property\n');
-catch ME
-    fprintf('Note: Text property update skipped (property may not exist)\n');
-end
-fprintf('\n');
+text_property_path = 'demo_workspace.demo_product.draft.demo_item.property_string';
+poelis.change_property(text_property_path, 'New string text');
+fprintf('✓ Updated text property\n');
+

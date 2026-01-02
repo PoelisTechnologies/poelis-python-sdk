@@ -8,6 +8,39 @@ from typing import Any, Dict, List, Optional
 from .exceptions import NotFoundError, UnauthorizedError
 from .org_validation import get_organization_context_message
 
+
+def _handle_graphql_read_errors(errors: list[Dict[str, Any]]) -> None:
+    """Handle GraphQL errors for read operations and map them to appropriate exceptions.
+    
+    Args:
+        errors: List of GraphQL error dictionaries.
+    
+    Raises:
+        NotFoundError: For 'not_found' errors.
+        UnauthorizedError: For 'forbidden' errors (access denied).
+        RuntimeError: For other errors.
+    """
+    if not errors:
+        return
+    
+    error = errors[0]  # Use first error
+    error_code = error.get("extensions", {}).get("code")
+    error_message = error.get("message", "GraphQL error")
+    
+    if error_code == "not_found":
+        raise NotFoundError(404, message=error_message)
+    elif error_code == "forbidden":
+        # Enhanced error message for access permission issues
+        enhanced_message = (
+            f"{error_message}. "
+            "You do not have access to this workspace or product. "
+            "Access is determined by your role (EDITOR, VIEWER, or NO_ACCESS). "
+            "Contact your administrator if you need access."
+        )
+        raise UnauthorizedError(403, message=enhanced_message)
+    else:
+        raise RuntimeError(f"GraphQL error: {error_message}")
+
 """GraphQL-backed dot-path browser for Poelis SDK.
 
 Provides lazy, name-based navigation across workspaces → products → items → child items,
@@ -1204,9 +1237,11 @@ class _Node:
                                 # Fall through to try without version, but this means we'll get draft properties
                                 pass
                             else:
-                                raise RuntimeError(data["errors"])  # Other errors should be raised
+                                # Handle GraphQL errors (forbidden, not_found, etc.)
+                                _handle_graphql_read_errors(errors)
                         else:
-                            raise RuntimeError(data["errors"])  # Draft queries should raise on error
+                            # Handle GraphQL errors (forbidden, not_found, etc.)
+                            _handle_graphql_read_errors(errors)
                     self._props_cache = data.get("data", {}).get("properties", []) or []
                     self._props_loaded_at = time.time()
                     return self._props_cache
@@ -1234,7 +1269,8 @@ class _Node:
                 r2.raise_for_status()
                 data2 = r2.json()
                 if "errors" in data2:
-                    raise RuntimeError(data2["errors"])  # try minimal
+                    # Handle GraphQL errors (forbidden, not_found, etc.)
+                    _handle_graphql_read_errors(data2["errors"])
                 self._props_cache = data2.get("data", {}).get("searchProperties", {}).get("hits", []) or []
                 self._props_loaded_at = time.time()
             except Exception:
@@ -1249,7 +1285,8 @@ class _Node:
                 r3.raise_for_status()
                 data3 = r3.json()
                 if "errors" in data3:
-                    raise RuntimeError(data3["errors"])  # propagate
+                    # Handle GraphQL errors (forbidden, not_found, etc.)
+                    _handle_graphql_read_errors(data3["errors"])
                 self._props_cache = data3.get("data", {}).get("searchProperties", {}).get("hits", []) or []
                 self._props_loaded_at = time.time()
         except Exception:
@@ -1847,7 +1884,7 @@ class _PropWrapper:
         """Update the property value via the backend.
 
         Updates the property value by calling the appropriate GraphQL mutation.
-        Only draft properties can be updated.
+        Only draft properties can be updated. Requires EDITOR role for the workspace or product.
 
         Args:
             value: New value for the property. Format depends on property type:
@@ -1861,8 +1898,13 @@ class _PropWrapper:
         Raises:
             ValueError: If property is versioned (not draft), or if value format is invalid.
             NotFoundError: If property doesn't exist.
-            UnauthorizedError: If permission denied.
+            UnauthorizedError: If permission denied (requires EDITOR role; VIEWER role is read-only).
             RuntimeError: For other GraphQL errors.
+
+        Note:
+            Write permissions are enforced by the backend. Users with VIEWER role will receive
+            an UnauthorizedError. Only users with EDITOR role for the workspace or product can
+            update property values.
 
         Example:
             >>> item.prop.change_property(123.45, title='Updated mass', description='Changed mass value')
