@@ -1945,9 +1945,9 @@ class _PropWrapper:
         if description is not None:
             mutation_params["description"] = description
         
-        # Note: changed_via parameter is not passed to mutations because the backend
-        # doesn't support the ChangedVia enum type yet. Once backend support is added,
-        # we can pass it conditionally: if changed_via is not None: mutation_params["changed_via"] = changed_via
+        # Add changed_via if provided (e.g., "MATLAB_SDK" from MATLAB, "PYTHON_SDK" from Python)
+        if changed_via is not None:
+            mutation_params["changed_via"] = changed_via
 
         # Call appropriate mutation based on property type
         try:
