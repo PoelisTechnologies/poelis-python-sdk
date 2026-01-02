@@ -14,7 +14,7 @@
 % pyenv('Version', '/path/to/venv/bin/python');
 
 % TODO: Replace with your actual API key
-api_key = 'poelis_live_Sku_3c_-Nyp6UGsIVuxxwLlUP012iKeH_lYQFe8F__g';
+api_key = 'your-api-key';
 
 poelis = poelis_sdk.PoelisClient(api_key);
 fprintf('✓ Poelis client initialized\n\n');
