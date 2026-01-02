@@ -355,10 +355,25 @@ classdef PoelisClient < handle
                 return;
             end
             
-            % Handle numeric types
+            % Handle numeric types (both wrapped and native Python types)
             if isa(py_value, 'py.float') || isa(py_value, 'py.int')
                 matlab_value = double(py_value);
                 return;
+            end
+            
+            % Try to convert to double for native Python numeric types
+            % _ensure_matlab_compatible returns native Python int/float which MATLAB
+            % receives as Python objects (not py.float/py.int wrappers)
+            try
+                % Attempt direct conversion - works for native Python numeric types
+                converted = double(py_value);
+                % Only use if conversion succeeded and result is finite
+                if isnumeric(converted) && isfinite(converted)
+                    matlab_value = converted;
+                    return;
+                end
+            catch
+                % Conversion failed, not a numeric type - continue to other checks
             end
             
             % Handle boolean
