@@ -207,15 +207,19 @@ class _Node:
                 raise AttributeError("props")
             return _PropsNode(self)
 
+        # Version pseudo-children for product nodes (e.g., v4, draft, baseline)
         if self._level == "product":
             if attr == "draft":
                 node = _Node(self._client, "version", self, None, "draft")
                 node._cache_ttl = self._cache_ttl
                 return node
-            if attr == "baseline":
+            elif attr == "baseline":
+                # Return the configured baseline version if available, otherwise latest.
                 try:
+                    # Prefer configured baseline_version_number from the product model
                     version_number: Optional[int] = getattr(self, "_baseline_version_number", None)
                     if version_number is None:
+                        # Fallback to latest version from backend if no baseline is configured
                         page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
                         versions = getattr(page, "data", []) or []
                         if versions:
@@ -225,15 +229,35 @@ class _Node:
                         node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
                         node._cache_ttl = self._cache_ttl
                         return node
+                    # If no versions found, fall back to draft
                     node = _Node(self._client, "version", self, None, "draft")
                     node._cache_ttl = self._cache_ttl
                     return node
                 except Exception:
+                    # On error, fall back to draft
                     node = _Node(self._client, "version", self, None, "draft")
                     node._cache_ttl = self._cache_ttl
                     return node
-            if attr.startswith("v") and attr[1:].isdigit():
+            elif attr.startswith("v") and attr[1:].isdigit():
                 version_number = int(attr[1:])
+                # Verify that this version actually exists before creating the node
+                try:
+                    page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
+                    versions = getattr(page, "data", []) or []
+                    version_numbers = [getattr(v, "version_number", None) for v in versions]
+                    if version_number not in version_numbers:
+                        available_versions = [v for v in version_numbers if v is not None]
+                        raise AttributeError(
+                            f"Version '{attr}' does not exist for product '{self._name or self._id}'. "
+                            f"Available versions: {', '.join(f'v{v}' for v in sorted(available_versions)) if available_versions else 'none'}"
+                        )
+                except Exception as e:
+                    # If it's already an AttributeError, re-raise it
+                    if isinstance(e, AttributeError):
+                        raise
+                    # For other errors (e.g., network issues), still create the node
+                    # to avoid breaking existing code that might handle errors differently
+                    pass
                 node = _Node(self._client, "version", self, str(version_number), attr)
                 node._cache_ttl = self._cache_ttl
                 return node
