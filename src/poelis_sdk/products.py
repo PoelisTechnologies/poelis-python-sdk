@@ -47,7 +47,6 @@ class ProductsClient:
             "    workspaceId\n"
             "    baselineVersionNumber\n"
             "    reviewers { id userName imageUrl }\n"
-            "    approvalMode\n"
             "  }\n"
             "}"
         )
@@ -125,7 +124,6 @@ class ProductsClient:
             "    workspaceId\n"
             "    baselineVersionNumber\n"
             "    reviewers { id userName imageUrl }\n"
-            "    approvalMode\n"
             "  }\n"
             "}"
         )
