@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from .client import PoelisClient
 from .exceptions import NotFoundError, UnauthorizedError

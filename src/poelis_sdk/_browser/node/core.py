@@ -6,7 +6,6 @@ helper modules in this package.
 
 from __future__ import annotations
 
-import time
 from types import MethodType
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 

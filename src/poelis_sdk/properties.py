@@ -666,7 +666,7 @@ class PropertiesClient:
             raise ValueError("Date must be in ISO 8601 format: YYYY-MM-DD")
 
         try:
-            year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+            _, month, day = int(parts[0]), int(parts[1]), int(parts[2])
             # Basic range checks
             if not (1 <= month <= 12) or not (1 <= day <= 31):
                 raise ValueError("Date must be in ISO 8601 format: YYYY-MM-DD")
