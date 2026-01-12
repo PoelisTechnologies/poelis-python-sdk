@@ -6,11 +6,11 @@
 
 Then, either:
 
-- **Double‑click** the `Poelis_MATLAB_Toolbox.mltbx` file in the Current Folder browser, **or**
+- **Double‑click** the `PoelisToolbox.mltbx` file in the Current Folder browser, **or**
 - Run this command in MatLab:
 
 ```matlab
-matlab.addons.install('Poelis_MATLAB_Toolbox.mltbx');
+matlab.addons.install('PoelisToolbox.mltbx');
 ```
 
 ---
@@ -74,5 +74,32 @@ path = 'demo_workspace.demo_product.demo_item.demo_sub_item.demo_property_mass';
 You should see:
 - list of workspaces,
 - example property values,
+- property updates,
 - and basic error‑handling output.
+
+---
+
+## 5. Example: Updating Property Values
+
+The toolbox supports updating property values for draft properties:
+
+```matlab
+% Update a numeric property
+poelis.change_property('workspace.product.draft.item.property', 123.45);
+
+% Update with title and description
+poelis.change_property('workspace.product.draft.item.property', 123.45, 'Title of change (optional)', 'Description of change (optional)');
+
+% Update a text property
+poelis.change_property('workspace.product.draft.item.description', 'New text');
+```
+
+**Important Notes:**
+- Only **draft properties** can be updated (use `.draft` in the path)
+- Versioned properties (`.v1`, `.v2`, `.baseline`) are read-only
+- **Requires EDITOR role**: Write operations require EDITOR role for the workspace or product
+  - Users with VIEWER role can only read data and will receive a permission error
+- Numeric values can be numbers or matrixes
+- Text values must be strings
+- Date values must be in ISO 8601 format (YYYY-MM-DD)
 

@@ -65,25 +65,29 @@ class _MockTransport(httpx.BaseTransport):
                 return httpx.Response(200, json=data)
 
             # Properties for item (both with and without version)
-            if "properties(itemId:" in query:
+            # NOTE: When change detection is enabled the SDK may query `sdkProperties(...)`.
+            if "properties(itemId:" in query or "sdkProperties(itemId:" in query:
                 item_id = vars.get("iid")
+                is_sdk = "sdkProperties(itemId:" in query
                 if item_id == "i1":
                     # Return properties for parent item (no demo_property_mass here)
                     # Note: "Color" and "Weight" use capitalized readableId to match existing tests
-                    data = {"data": {"properties": [
+                    props = [
                         {"__typename": "TextProperty", "id": "p1", "name": "Color", "readableId": "Color", "value": "Red", "parsedValue": "Red"},
                         {"__typename": "NumericProperty", "id": "p3", "name": "Weight", "readableId": "Weight", "integerPart": 5, "exponent": 0, "category": "Mass"},
-                    ]}}
+                    ]
+                    data = {"data": {"properties": props, "sdkProperties": props} if is_sdk else {"properties": props}}
                     return httpx.Response(200, json=data)
                 elif item_id == "i2":
                     # Return properties for child item (demo_property_mass is here)
-                    data = {"data": {"properties": [
+                    props = [
                         {"__typename": "NumericProperty", "id": "p2", "name": "Mass", "readableId": "demo_property_mass", "category": "Mass", "displayUnit": "kg", "value": "10.5", "parsedValue": 10.5},
-                    ]}}
+                    ]
+                    data = {"data": {"properties": props, "sdkProperties": props} if is_sdk else {"properties": props}}
                     return httpx.Response(200, json=data)
                 else:
                     # Return empty for other items
-                    data = {"data": {"properties": []}}
+                    data = {"data": {"properties": [], "sdkProperties": []} if is_sdk else {"properties": []}}
                     return httpx.Response(200, json=data)
 
             # Product versions
@@ -115,10 +119,11 @@ class _MockTransport(httpx.BaseTransport):
 def _client_with_graphql_mock(t: httpx.BaseTransport, **client_kwargs: Any) -> PoelisClient:
     from poelis_sdk.client import Transport as _T
 
-    def _init(self, base_url: str, api_key: str, org_id: str, timeout_seconds: float) -> None:  # type: ignore[no-redef]
+    def _init(self, base_url: str, api_key: str, timeout_seconds: float, **_: Any) -> None:  # type: ignore[no-redef]
+        # org_id was removed from Transport and is deprecated in PoelisClient.
+        # Keep the test monkeypatch tolerant to avoid coupling to a signature.
         self._client = httpx.Client(base_url=base_url, transport=t, timeout=timeout_seconds)
         self._api_key = api_key
-        self._org_id = org_id
         self._timeout = timeout_seconds
 
 
@@ -149,8 +154,9 @@ def test_browser_traversal_and_properties() -> None:
 
     # Item names
     item_names = prod.list_items().names
-    assert item_names and "Gadget A" in item_names
-    item = prod["Gadget A"]
+    # For versioned/baseline product nodes, the browser prefers `readableId` when present.
+    assert item_names and "gadget_a" in item_names
+    item = prod["gadget_a"]
 
     # Properties list
     item_prop_names = item.list_properties().names
@@ -172,7 +178,7 @@ def test_names_filtering() -> None:
     b = c.browser
     ws = b["uh2"]
     prod = ws["Widget Pro"]
-    item = prod["Gadget A"]
+    item = prod["gadget_a"]
     
     # Test workspace level filtering
     all_workspace_names = ws.list_products().names
@@ -184,11 +190,11 @@ def test_names_filtering() -> None:
     
     # Test product level filtering
     all_product_names = prod.list_items().names
-    assert "Gadget A" in all_product_names
+    assert "gadget_a" in all_product_names
     
     items_only = prod.list_items().names
     assert items_only == all_product_names  # At product level, children are items
-    assert "Gadget A" in items_only
+    assert "gadget_a" in items_only
     
     # Test item level filtering - properties list only
     item_all_names = item.list_properties().names
@@ -225,7 +231,7 @@ def test_names_filtering_with_child_items() -> None:
     b = c.browser
     ws = b["uh2"]
     prod = ws["Widget Pro"]
-    item = prod["Gadget A"]
+    item = prod["gadget_a"]
     
     # Refresh to load child items
     item._refresh()
@@ -406,7 +412,7 @@ def test_get_property_on_item_node() -> None:
     b = c.browser
     ws = b["uh2"]
     prod = ws["Widget Pro"]
-    item = prod["Gadget A"]
+    item = prod["gadget_a"]
     
     # Get property from item node (should search in item and sub-items)
     # In our mock, demo_property_mass is in child item i2
@@ -441,7 +447,7 @@ def test_get_property_on_item_node_with_version() -> None:
     if not item:
         # Try to get by name
         for child in v1._children_cache.values():
-            if child._name == "Gadget A":
+            if child._name == "gadget_a":
                 item = child
                 break
     
@@ -542,7 +548,8 @@ def test_change_tracking_with_get_property_records_id_and_path(tmp_path: Any) ->
     # Check that baseline and version are in dir()
     dir_items = dir(prod)
     assert "baseline" in dir_items
-    assert "version" in dir_items
+    # Product nodes expose version shortcuts as v1/v2/... (not a literal "version" attribute).
+    assert "v1" in dir_items
     assert "draft" in dir_items
 
 

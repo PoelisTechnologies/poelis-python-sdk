@@ -11,9 +11,9 @@
 % Initialize the client with your API key
 
 % TODO: If not already set, replace with your actual venv path
-pyenv('Version', '/path/to/venv/bin/python');
+% pyenv('Version', '/path/to/venv/bin/python');
 
-% TODO: Replace with your actual API ke
+% TODO: Replace with your actual API key
 api_key = 'your-api-key';
 
 poelis = poelis_sdk.PoelisClient(api_key);
@@ -101,3 +101,30 @@ value_draft = poelis.get_value(draft_path);
 fprintf('Draft value: %.2f\n', value_draft);
 
 fprintf('\n');
+
+%% Example 6: Updating Property Values
+
+fprintf('=== Example 6: Updating Property Values ===\n');
+
+% Note: Only draft properties can be updated. Versioned properties are read-only.
+
+% Update a numeric property value
+draft_property_path = 'demo_workspace.demo_product.draft.demo_item.demo_sub_item.demo_property_mass';
+old_value = poelis.get_value(draft_property_path);
+fprintf('Current value: %.2f\n', old_value);
+
+% Update the value
+new_value = 123.45;
+poelis.change_property(draft_property_path, new_value, 'Updated mass', 'Changed mass value for testing');
+fprintf('✓ Updated property value to %.2f\n', new_value);
+
+% Verify the update
+updated_value = poelis.get_value(draft_property_path);
+fprintf('Verified value: %.2f\n', updated_value);
+fprintf('\n');
+
+% Update a text property
+text_property_path = 'demo_workspace.demo_product.draft.demo_item.property_string';
+poelis.change_property(text_property_path, 'New string text');
+fprintf('✓ Updated text property\n');
+

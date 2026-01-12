@@ -11,6 +11,7 @@ from .change_tracker import PropertyChangeTracker
 from .items import ItemsClient
 from .logging import quiet_logging
 from .products import ProductsClient
+from .properties import PropertiesClient
 from .search import SearchClient
 from .workspaces import WorkspacesClient
 from .versions import VersionsClient
@@ -112,6 +113,7 @@ class PoelisClient:
         self.products = ProductsClient(self._transport, self.workspaces)
         self.items = ItemsClient(self._transport)
         self.versions = VersionsClient(self._transport)
+        self.properties = PropertiesClient(self._transport)
         self.search = SearchClient(self._transport)
         self.browser = Browser(self)
 

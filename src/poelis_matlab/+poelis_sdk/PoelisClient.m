@@ -14,7 +14,8 @@ classdef PoelisClient < handle
     %
     % Methods:
     %   get_value(path) - Get property value by path
-    %   get_property(path) - Get property info (value, unit, category, name)
+    %   get_property(path) - Get property info (value, unit, category, name
+    %   change_property(path, value, title, description) - Update property value
     %   list_children(path) - List child nodes (returns string array)
     %   list_properties(path) - List property names (returns string array)
     
@@ -89,6 +90,15 @@ classdef PoelisClient < handle
                     error('poelis:EmptyPath', 'Path cannot be empty');
                 elseif contains(ME.message, 'not found')
                     error('poelis:PathNotFound', 'Path not found: %s', path);
+                elseif contains(ME.message, 'forbidden') || contains(ME.message, 'permission denied') || ...
+                       contains(ME.message, 'UnauthorizedError') || contains(ME.message, 'do not have access')
+                    error('poelis:AccessDenied', ...
+                        ['Access denied: You do not have access to this workspace or product.\n' ...
+                         'Access is determined by your role (EDITOR, VIEWER, or NO_ACCESS).\n' ...
+                         'Contact your administrator if you need access.\n' ...
+                         'Path: %s\n' ...
+                         'Original error: %s'], ...
+                        path, ME.message);
                 else
                     error('poelis:GetValueFailed', ...
                         'Failed to get value at path "%s".\nOriginal error: %s', ...
@@ -131,6 +141,15 @@ classdef PoelisClient < handle
                     error('poelis:EmptyPath', 'Path cannot be empty');
                 elseif contains(ME.message, 'not found')
                     error('poelis:PathNotFound', 'Path not found: %s', path);
+                elseif contains(ME.message, 'forbidden') || contains(ME.message, 'permission denied') || ...
+                       contains(ME.message, 'UnauthorizedError') || contains(ME.message, 'do not have access')
+                    error('poelis:AccessDenied', ...
+                        ['Access denied: You do not have access to this workspace or product.\n' ...
+                         'Access is determined by your role (EDITOR, VIEWER, or NO_ACCESS).\n' ...
+                         'Contact your administrator if you need access.\n' ...
+                         'Path: %s\n' ...
+                         'Original error: %s'], ...
+                        path, ME.message);
                 else
                     error('poelis:GetPropertyFailed', ...
                         'Failed to get property at path "%s".\nOriginal error: %s', ...
@@ -171,6 +190,105 @@ classdef PoelisClient < handle
                 else
                     error('poelis:ListChildrenFailed', ...
                         'Failed to list children at path "%s".\nOriginal error: %s', ...
+                        path, ME.message);
+                end
+            end
+        end
+        
+        function change_property(obj, path, value, title, description)
+            % change_property - Update a property value by dot-separated path
+            %
+            % Args:
+            %   path (string, required): Dot-separated path to the property, e.g.,
+            %       'workspace.product.draft.item.property'
+            %   value (required): New value for the property. Can be:
+            %       - double: For numeric properties
+            %       - string/char: For text, date, or status properties
+            %       - array: For numeric array/matrix properties
+            %   title (string, optional): Title/reason for history tracking
+            %   description (string, optional): Description for history tracking
+            %
+            % Note: 
+            %   - Only draft properties can be updated. Versioned properties
+            %     (e.g., from v1, v2, baseline) cannot be changed.
+            %   - Requires EDITOR role for the workspace or product. Users with
+            %     VIEWER role can only read data and will receive a permission error.
+            %
+            % Example:
+            %   % Update numeric property
+            %   client.change_property('workspace.product.draft.item.mass', 123.45, 'Updated mass');
+            %
+            %   % Update text property
+            %   client.change_property('workspace.product.draft.item.description', 'New text', 'Updated description');
+            %
+            %   % Update with title and description
+            %   client.change_property('workspace.product.draft.item.mass', 123.45, ...
+            %       'Updated mass', 'Changed mass value for testing');
+            
+            if nargin < 3
+                error('poelis:InvalidArguments', 'change_property requires at least path and value arguments');
+            end
+            
+            if ~ischar(path) && ~isstring(path)
+                error('poelis:InvalidPath', 'Path must be a string or char array');
+            end
+            
+            if isempty(path)
+                error('poelis:EmptyPath', 'Path cannot be empty');
+            end
+            
+            % Convert value to Python type
+            py_value = poelis_sdk.PoelisClient.convertToPython(value);
+            
+            try
+                if nargin >= 4 && ~isempty(title)
+                    if ~ischar(title) && ~isstring(title)
+                        error('poelis:InvalidTitle', 'Title must be a string or char array');
+                    end
+                    if nargin >= 5 && ~isempty(description)
+                        if ~ischar(description) && ~isstring(description)
+                            error('poelis:InvalidDescription', 'Description must be a string or char array');
+                        end
+                        % Call with both title and description
+                        obj.pm.change_property(char(path), py_value, ...
+                            pyargs('title', char(title), 'description', char(description)));
+                    else
+                        % Call with only title
+                        obj.pm.change_property(char(path), py_value, ...
+                            pyargs('title', char(title)));
+                    end
+                else
+                    % Call without optional arguments
+                    obj.pm.change_property(char(path), py_value);
+                end
+            catch ME
+                if contains(ME.message, 'Path cannot be empty')
+                    error('poelis:EmptyPath', 'Path cannot be empty');
+                elseif contains(ME.message, 'not found')
+                    error('poelis:PathNotFound', 'Path not found: %s', path);
+                elseif contains(ME.message, 'Cannot update versioned property')
+                    error('poelis:VersionedProperty', ...
+                        'Cannot update versioned property. Only draft properties can be updated.\nPath: %s', ...
+                        path);
+                elseif contains(ME.message, 'forbidden') || contains(ME.message, 'permission denied') || ...
+                       contains(ME.message, 'UnauthorizedError') || contains(ME.message, 'EDITOR role')
+                    error('poelis:PermissionDenied', ...
+                        ['Permission denied: Write operations require EDITOR role for the workspace or product.\n' ...
+                         'Users with VIEWER role can only read data.\n' ...
+                         'Path: %s\n' ...
+                         'Original error: %s'], ...
+                        path, ME.message);
+                elseif contains(ME.message, 'Date must be in ISO 8601 format')
+                    error('poelis:InvalidDate', ...
+                        'Date value must be in ISO 8601 format (YYYY-MM-DD).\nPath: %s', ...
+                        path);
+                elseif contains(ME.message, 'Status must be one of')
+                    error('poelis:InvalidStatus', ...
+                        'Status value must be one of: DRAFT, UNDER_REVIEW, DONE.\nPath: %s', ...
+                        path);
+                else
+                    error('poelis:ChangePropertyFailed', ...
+                        'Failed to update property at path "%s".\nOriginal error: %s', ...
                         path, ME.message);
                 end
             end
@@ -237,10 +355,25 @@ classdef PoelisClient < handle
                 return;
             end
             
-            % Handle numeric types
+            % Handle numeric types (both wrapped and native Python types)
             if isa(py_value, 'py.float') || isa(py_value, 'py.int')
                 matlab_value = double(py_value);
                 return;
+            end
+            
+            % Try to convert to double for native Python numeric types
+            % _ensure_matlab_compatible returns native Python int/float which MATLAB
+            % receives as Python objects (not py.float/py.int wrappers)
+            try
+                % Attempt direct conversion - works for native Python numeric types
+                converted = double(py_value);
+                % Only use if conversion succeeded and result is finite
+                if isnumeric(converted) && isfinite(converted)
+                    matlab_value = converted;
+                    return;
+                end
+            catch
+                % Conversion failed, not a numeric type - continue to other checks
             end
             
             % Handle boolean
@@ -337,6 +470,73 @@ classdef PoelisClient < handle
                 error('poelis:ConversionFailed', ...
                     'Failed to convert Python list to string array.\nOriginal error: %s', ...
                     ME.message);
+            end
+        end
+        
+        function py_value = convertToPython(matlab_value)
+            % convertToPython - Convert MATLAB value to Python type
+            %
+            % Handles conversion of MATLAB types to Python types:
+            %   - MATLAB double -> Python float
+            %   - MATLAB string/char -> Python str
+            %   - MATLAB logical -> Python bool
+            %   - MATLAB numeric array -> Python list
+            %   - MATLAB cell array -> Python list
+            
+            % Handle numeric types
+            if isnumeric(matlab_value)
+                if isscalar(matlab_value)
+                    py_value = py.float(matlab_value);
+                else
+                    % Convert array to Python list
+                    py_list = py.list();
+                    for i = 1:numel(matlab_value)
+                        py_list.append(py.float(matlab_value(i)));
+                    end
+                    py_value = py_list;
+                end
+                return;
+            end
+            
+            % Handle string/char
+            if ischar(matlab_value) || isstring(matlab_value)
+                py_value = py.str(char(matlab_value));
+                return;
+            end
+            
+            % Handle logical
+            if islogical(matlab_value)
+                if isscalar(matlab_value)
+                    py_value = py.bool(matlab_value);
+                else
+                    % Convert array to Python list
+                    py_list = py.list();
+                    for i = 1:numel(matlab_value)
+                        py_list.append(py.bool(matlab_value(i)));
+                    end
+                    py_value = py_list;
+                end
+                return;
+            end
+            
+            % Handle cell array
+            if iscell(matlab_value)
+                py_list = py.list();
+                for i = 1:length(matlab_value)
+                    converted = poelis_sdk.PoelisClient.convertToPython(matlab_value{i});
+                    py_list.append(converted);
+                end
+                py_value = py_list;
+                return;
+            end
+            
+            % Default: try to convert to string
+            try
+                py_value = py.str(char(matlab_value));
+            catch
+                error('poelis:ConversionFailed', ...
+                    'Cannot convert MATLAB value to Python type. Unsupported type: %s', ...
+                    class(matlab_value));
             end
         end
     end
