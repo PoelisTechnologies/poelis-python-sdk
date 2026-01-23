@@ -34,7 +34,7 @@ class ItemsClient:
 
         Args:
             product_id: Identifier of the parent product.
-            q: Optional free-text filter applied to item name/description.
+            q: Optional free-text filter applied to item name/description (deprecated, not supported by backend).
             limit: Maximum number of items to return.
             offset: Offset for pagination.
 
@@ -47,11 +47,11 @@ class ItemsClient:
         """
 
         query = (
-            "query($pid: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, q: $q, limit: $limit, offset: $offset) { id name readableId productId parentId owner position }\n"
+            "query($pid: ID!, $limit: Int!, $offset: Int!) {\n"
+            "  items(productId: $pid, limit: $limit, offset: $offset) { id name readableId productId parentId owner position }\n"
             "}"
         )
-        variables = {"pid": product_id, "q": q, "limit": int(limit), "offset": int(offset)}
+        variables = {"pid": product_id, "limit": int(limit), "offset": int(offset)}
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()

@@ -42,7 +42,7 @@ class VersionsClient:
         Args:
             product_id: Identifier of the parent product.
             version_number: Version number of the product whose items to list.
-            q: Optional free-text filter applied to item name/description.
+            q: Optional free-text filter applied to item name/description (deprecated, not supported by backend).
             limit: Maximum number of items to return.
             offset: Offset for pagination.
 
@@ -54,8 +54,8 @@ class VersionsClient:
         """
 
         query = (
-            "query($pid: ID!, $version: VersionInput!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, version: $version, q: $q, limit: $limit, offset: $offset) {\n"
+            "query($pid: ID!, $version: VersionInput!, $limit: Int!, $offset: Int!) {\n"
+            "  items(productId: $pid, version: $version, limit: $limit, offset: $offset) {\n"
             "    id\n"
             "    name\n"
             "    readableId\n"
@@ -69,7 +69,6 @@ class VersionsClient:
         variables = {
             "pid": product_id,
             "version": {"productId": product_id, "versionNumber": int(version_number)},
-            "q": q,
             "limit": int(limit),
             "offset": int(offset),
         }

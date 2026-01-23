@@ -14,14 +14,17 @@ class SearchClient:
         self._t = transport
 
     def products(self, *, q: str, workspace_id: str, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
-        """Search/list products via GraphQL products(workspaceId, q)."""
+        """Search/list products via GraphQL products(workspaceId).
+
+        Note: The 'q' parameter is no longer supported by the backend and is ignored.
+        """
 
         query = (
-            "query($ws: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) { id name workspaceId }\n"
+            "query($ws: ID!, $limit: Int!, $offset: Int!) {\n"
+            "  products(workspaceId: $ws, limit: $limit, offset: $offset) { id name workspaceId }\n"
             "}"
         )
-        variables = {"ws": workspace_id, "q": q, "limit": int(limit), "offset": int(offset)}
+        variables = {"ws": workspace_id, "limit": int(limit), "offset": int(offset)}
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
@@ -31,20 +34,30 @@ class SearchClient:
         return {"query": q, "hits": hits, "total": None, "limit": limit, "offset": offset}
 
     def items(self, *, q: Optional[str], product_id: str, parent_item_id: Optional[str] = None, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
-        """Search/list items via GraphQL items(product_id, q, parent_item_id)."""
+        """Search/list items via GraphQL items(product_id).
+
+        Note: The 'q' and 'parentItemId' parameters are no longer supported by the backend.
+        All items are fetched and filtered client-side if needed.
+        """
 
         query = (
-            "query($pid: ID!, $q: String, $parent: ID, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, q: $q, parentItemId: $parent, limit: $limit, offset: $offset) { id name productId parentId owner position }\n"
+            "query($pid: ID!, $limit: Int!, $offset: Int!) {\n"
+            "  items(productId: $pid, limit: $limit, offset: $offset) { id name productId parentId owner position }\n"
             "}"
         )
-        variables = {"pid": product_id, "q": q, "parent": parent_item_id, "limit": int(limit), "offset": int(offset)}
+        variables = {"pid": product_id, "limit": int(limit), "offset": int(offset)}
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
         if "errors" in payload:
             raise RuntimeError(str(payload["errors"]))
         hits = payload.get("data", {}).get("items", [])
+        
+        # Filter by parent_item_id if provided (client-side filtering)
+        if parent_item_id is not None:
+            hits = [item for item in hits if item.get("parentId") == parent_item_id]
+        
+        # Note: 'q' parameter is ignored as it's no longer supported by backend
         return {"query": q, "hits": hits, "total": None, "limit": limit, "offset": offset}
 
     def properties(self, *, q: str, workspace_id: Optional[str] = None, product_id: Optional[str] = None, item_id: Optional[str] = None, property_type: Optional[str] = None, category: Optional[str] = None, limit: int = 20, offset: int = 0, sort: Optional[str] = None) -> Dict[str, Any]:

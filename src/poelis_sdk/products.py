@@ -29,7 +29,7 @@ class ProductsClient:
 
         Args:
             workspace_id: Workspace ID to scope products.
-            q: Optional free-text filter.
+            q: Optional free-text filter (deprecated, not supported by backend).
             limit: Page size.
             offset: Offset for pagination.
             
@@ -39,8 +39,8 @@ class ProductsClient:
         """
 
         query = (
-            "query($ws: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) {\n"
+            "query($ws: ID!, $limit: Int!, $offset: Int!) {\n"
+            "  products(workspaceId: $ws, limit: $limit, offset: $offset) {\n"
             "    id\n"
             "    name\n"
             "    readableId\n"
@@ -50,7 +50,7 @@ class ProductsClient:
             "  }\n"
             "}"
         )
-        variables = {"ws": workspace_id, "q": q, "limit": int(limit), "offset": int(offset)}
+        variables = {"ws": workspace_id, "limit": int(limit), "offset": int(offset)}
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()

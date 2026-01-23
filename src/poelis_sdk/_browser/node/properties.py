@@ -379,20 +379,9 @@ def search_property_in_item_and_children(
         )
         child_items = [it for it in all_items if it.get("parentId") == item_id]
     else:
-        child_query = (
-            "query($pid: ID!, $parent: ID!, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name readableId productId parentId owner position }\n"
-            "}"
-        )
         try:
-            r = node._client._transport.graphql(
-                child_query, {"pid": product_id, "parent": item_id, "limit": 1000, "offset": 0}
-            )
-            r.raise_for_status()
-            data = r.json()
-            if "errors" in data:
-                raise RuntimeError(f"Property with readableId '{readable_id}' not found")
-            child_items = data.get("data", {}).get("items", []) or []
+            all_items = node._client.items.list_by_product(product_id=product_id, limit=1000, offset=0)
+            child_items = [it for it in all_items if it.get("parentId") == item_id]
         except Exception:
             raise RuntimeError(f"Property with readableId '{readable_id}' not found")
 

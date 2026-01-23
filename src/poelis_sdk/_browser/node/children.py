@@ -131,17 +131,8 @@ def load_children(node: "_Node") -> None:
             )
             rows = [it for it in all_items if it.get("parentId") == node._id]
         else:
-            q = (
-                "query($pid: ID!, $parent: ID!, $limit: Int!, $offset: Int!) {\n"
-                "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name readableId productId parentId owner position }\n"
-                "}"
-            )
-            r = node._client._transport.graphql(q, {"pid": pid, "parent": node._id, "limit": 1000, "offset": 0})
-            r.raise_for_status()
-            data = r.json()
-            if "errors" in data:
-                raise RuntimeError(data["errors"])
-            rows = data.get("data", {}).get("items", []) or []
+            all_items = node._client.items.list_by_product(product_id=pid, limit=1000, offset=0)
+            rows = [it for it in all_items if it.get("parentId") == node._id]
 
         for it2 in rows:
             if str(it2.get("id")) == str(node._id):
