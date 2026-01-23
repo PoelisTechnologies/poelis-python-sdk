@@ -344,8 +344,8 @@ def test_version_method_by_version_number() -> None:
     assert v3._id == "3"
 
 
-def test_get_property_on_version() -> None:
-    """Test getting a property by readableId from a product version."""
+def test_get_property_on_version_raises_error() -> None:
+    """Test that get_property is not available on version nodes and raises AttributeError."""
     
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
@@ -357,32 +357,37 @@ def test_get_property_on_version() -> None:
     # Access version v1
     v1 = prod.v1
     
-    # Get property by readableId (searches all items in version, including child items)
-    mass_prop = v1.get_property("demo_property_mass")
+    # get_property should not be available on version nodes
+    with pytest.raises(AttributeError, match="get_property.*not available on version nodes"):
+        _ = v1.get_property("demo_property_mass")
+    
+    # Users should access items in the version first, then get properties from items
+    # Load children for v1 and get item from cache
+    v1._load_children()
+    item = v1._children_cache.get("gadget_a") or v1._children_cache.get("Gadget_A")
+    if not item:
+        # Try to get by name
+        for child in v1._children_cache.values():
+            if child._name == "Gadget A" or child._name == "gadget_a":
+                item = child
+                break
+    assert item is not None, "Item not found in version"
+    mass_prop = item.get_property("demo_property_mass")
     
     # Verify it returns a property wrapper with correct value
     assert mass_prop is not None
     assert mass_prop.value == 10.5
-    assert mass_prop.name == "demo_property_mass"  # name property returns readableId if available
+    assert mass_prop.name == "demo_property_mass"
     assert mass_prop.category == "Mass"
     assert mass_prop.unit == "kg"
     
-    # Test accessing value directly
-    assert v1.get_property("demo_property_mass").value == 10.5
-    
-    # Test error for non-existent property
-    with pytest.raises(RuntimeError, match="not found"):
-        _ = v1.get_property("nonexistent_property")
-    
-    # Test that it works on product node (uses baseline)
-    # This should work now since get_property is available on product nodes
-    prod_mass = prod.get_property("demo_property_mass")
-    assert prod_mass is not None
-    assert prod_mass.value == 10.5
+    # Test that get_property is NOT available on product nodes
+    with pytest.raises(AttributeError, match="get_property.*not available on product nodes"):
+        _ = prod.get_property("demo_property_mass")
 
 
-def test_get_property_on_product_node() -> None:
-    """Test getting a property by readableId from a product node (uses baseline)."""
+def test_get_property_on_product_node_raises_error() -> None:
+    """Test that get_property is not available on product nodes and raises AttributeError."""
     
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
@@ -391,11 +396,14 @@ def test_get_property_on_product_node() -> None:
     ws = b["uh2"]
     prod = ws["Widget Pro"]
     
-    # Get property from product node (should use baseline/latest version, which is v3)
-    # Since v3 now includes child items in the mock, this should work
-    mass_prop = prod.get_property("demo_property_mass")
+    # get_property should not be available on product nodes
+    with pytest.raises(AttributeError, match="get_property.*not available on product nodes"):
+        _ = prod.get_property("demo_property_mass")
     
-    # Verify it returns a property wrapper with correct value
+    # Users should access items in baseline first, then get properties from items
+    # For product nodes, accessing items automatically routes through baseline
+    item = prod["gadget_a"]
+    mass_prop = item.get_property("demo_property_mass")
     assert mass_prop is not None
     assert mass_prop.value == 10.5
     assert mass_prop.name == "demo_property_mass"
@@ -459,8 +467,8 @@ def test_get_property_on_item_node_with_version() -> None:
     assert mass_prop.value == 10.5
 
 
-def test_get_property_on_draft_version() -> None:
-    """Test getting a property by readableId from draft version."""
+def test_get_property_on_draft_version_raises_error() -> None:
+    """Test that get_property is not available on draft version nodes."""
     
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
@@ -472,8 +480,22 @@ def test_get_property_on_draft_version() -> None:
     # Access draft version
     draft = prod.draft
     
-    # Get property by readableId (searches all items including child items)
-    mass_prop = draft.get_property("demo_property_mass")
+    # get_property should not be available on version nodes (including draft)
+    with pytest.raises(AttributeError, match="get_property.*not available on version nodes"):
+        _ = draft.get_property("demo_property_mass")
+    
+    # Users should access items in draft first, then get properties from items
+    # Load children for draft and get item from cache
+    draft._load_children()
+    item = draft._children_cache.get("gadget_a") or draft._children_cache.get("Gadget_A")
+    if not item:
+        # Try to get by name
+        for child in draft._children_cache.values():
+            if child._name == "Gadget A" or child._name == "gadget_a":
+                item = child
+                break
+    assert item is not None, "Item not found in draft"
+    mass_prop = item.get_property("demo_property_mass")
     
     # Verify it returns a property wrapper
     assert mass_prop is not None
@@ -493,7 +515,8 @@ def test_change_tracking_with_get_property_records_id_and_path(tmp_path: Any) ->
     This simulates the notebook usage pattern:
 
         prod = ws.demo_product
-        mass = prod.get_property("demo_property_mass")
+        item = prod.baseline.demo_item
+        mass = item.get_property("demo_property_mass")
         print(mass.value)
 
     and verifies that:
@@ -521,8 +544,10 @@ def test_change_tracking_with_get_property_records_id_and_path(tmp_path: Any) ->
     ws = b["uh2"]
     prod = ws["Widget Pro"]
 
-    # Access property via get_property at product level and read its value.
-    mass_prop = prod.get_property("demo_property_mass")
+    # Access property via get_property at item level (within baseline) and read its value.
+    # For product nodes, accessing items automatically routes through baseline
+    item = prod["gadget_a"]
+    mass_prop = item.get_property("demo_property_mass")
     value = mass_prop.value
     assert value == 10.5
 

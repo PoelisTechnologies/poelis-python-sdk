@@ -205,174 +205,29 @@ def props_key_map(node: "_Node") -> Dict[str, Dict[str, Any]]:
 
 
 def get_property(node: "_Node", readable_id: str) -> "_PropWrapper":
-    """Get a property by its readableId from this product/version/item context.
+    """Get a property by its readableId from an item context.
 
     Implementation moved from `src/poelis_sdk/_browser/node_properties.py` (legacy)
     to fully consolidate node property logic under `src/poelis_sdk/_browser/node/`.
+    
+    Note: get_property() is only available on item nodes. For product or version nodes,
+    navigate to an item first, e.g., product.baseline.<item>.get_property() or
+    version.<item>.get_property().
     """
     if node._level == "product":
-        try:
-            version_number: Optional[int] = getattr(node, "_baseline_version_number", None)
-            if version_number is None:
-                page = node._client.products.list_product_versions(product_id=node._id, limit=100, offset=0)
-                versions = getattr(page, "data", []) or []
-                if versions:
-                    latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
-                    version_number = getattr(latest_version, "version_number", None)
-            if version_number is not None:
-                baseline_node = node.__class__(node._client, "version", node, str(version_number), f"v{version_number}")
-                baseline_node._cache_ttl = node._cache_ttl
-                return baseline_node._get_property(readable_id)
-            draft_node = node.__class__(node._client, "version", node, None, "draft")
-            draft_node._cache_ttl = node._cache_ttl
-            return draft_node._get_property(readable_id)
-        except Exception:
-            draft_node = node.__class__(node._client, "version", node, None, "draft")
-            draft_node._cache_ttl = node._cache_ttl
-            return draft_node._get_property(readable_id)
-
-    if node._level == "item":
-        return get_property_from_item_tree(node, readable_id)
-
-    if node._level != "version":
-        raise AttributeError("get_property() method is only available on product, version, and item nodes")
-
-    anc = node
-    pid: Optional[str] = None
-    while anc is not None:
-        if anc._level == "product":
-            pid = anc._id
-            break
-        anc = anc._parent  # type: ignore[assignment]
-
-    if not pid:
-        raise RuntimeError("Cannot determine product ID for version node")
-
-    version_number: Optional[int] = None
-    if node._id is not None:
-        try:
-            version_number = int(node._id)
-        except (TypeError, ValueError):
-            version_number = None
-
-    use_sdk_properties = False
-    try:
-        change_tracker = getattr(node._client, "_change_tracker", None)
-        if change_tracker is not None and change_tracker.is_enabled():
-            use_sdk_properties = True
-    except Exception:
-        use_sdk_properties = False
-
-    if version_number is not None:
-        items = node._client.versions.list_items(
-            product_id=pid,
-            version_number=version_number,
-            limit=1000,
-            offset=0,
+        raise AttributeError(
+            "get_property() is not available on product nodes. "
+            "Use product.baseline.<item>.get_property() or product.draft.<item>.get_property() instead."
         )
-    else:
-        items = node._client.items.list_by_product(product_id=pid, limit=1000, offset=0)
 
-    for item in items:
-        item_id = item.get("id")
-        if not item_id:
-            continue
+    if node._level == "version":
+        raise AttributeError(
+            "get_property() is not available on version nodes. "
+            "Use version.<item>.get_property() instead to access properties from items in this version."
+        )
 
-        query_name = "sdkProperties" if use_sdk_properties else "properties"
-        property_type_prefix = "Sdk" if use_sdk_properties else ""
-        updated_fields = " updatedAt updatedBy" if use_sdk_properties else ""
-        if version_number is not None:
-            prop_query = (
-                f"query($iid: ID!, $version: VersionInput!) {{\n"
-                f"  {query_name}(itemId: $iid, version: $version) {{\n"
-                f"    __typename\n"
-                f"    ... on {property_type_prefix}NumericProperty {{ id name readableId category displayUnit value parsedValue{updated_fields} }}\n"
-                f"    ... on {property_type_prefix}TextProperty {{ id name readableId value parsedValue{updated_fields} }}\n"
-                f"    ... on {property_type_prefix}DateProperty {{ id name readableId value{updated_fields} }}\n"
-                f"  }}\n"
-                f"}}"
-            )
-            prop_variables = {"iid": item_id, "version": {"productId": pid, "versionNumber": version_number}}
-        else:
-            prop_query = (
-                f"query($iid: ID!) {{\n"
-                f"  {query_name}(itemId: $iid) {{\n"
-                f"    __typename\n"
-                f"    ... on {property_type_prefix}NumericProperty {{ id name readableId category displayUnit value parsedValue{updated_fields} }}\n"
-                f"    ... on {property_type_prefix}TextProperty {{ id name readableId value parsedValue{updated_fields} }}\n"
-                f"    ... on {property_type_prefix}DateProperty {{ id name readableId value{updated_fields} }}\n"
-                f"  }}\n"
-                f"}}"
-            )
-            prop_variables = {"iid": item_id}
-
-        try:
-            r = node._client._transport.graphql(prop_query, prop_variables)
-            r.raise_for_status()
-            data = r.json()
-            if "errors" in data:
-                if use_sdk_properties:
-                    if version_number is not None:
-                        fallback_query = (
-                            "query($iid: ID!, $version: VersionInput!) {\n"
-                            "  properties(itemId: $iid, version: $version) {\n"
-                            "    __typename\n"
-                            "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
-                            "    ... on TextProperty { id name readableId value parsedValue }\n"
-                            "    ... on DateProperty { id name readableId value }\n"
-                            "  }\n"
-                            "}"
-                        )
-                        fallback_vars = {"iid": item_id, "version": {"productId": pid, "versionNumber": version_number}}
-                    else:
-                        fallback_query = (
-                            "query($iid: ID!) {\n"
-                            "  properties(itemId: $iid) {\n"
-                            "    __typename\n"
-                            "    ... on NumericProperty { id name readableId category displayUnit value parsedValue }\n"
-                            "    ... on TextProperty { id name readableId value parsedValue }\n"
-                            "    ... on DateProperty { id name readableId value }\n"
-                            "  }\n"
-                            "}"
-                        )
-                        fallback_vars = {"iid": item_id}
-                    try:
-                        r_fb = node._client._transport.graphql(fallback_query, fallback_vars)
-                        r_fb.raise_for_status()
-                        data = r_fb.json()
-                        if "errors" in data:
-                            continue
-                    except Exception:
-                        continue
-                else:
-                    continue
-
-            props = data.get("data", {}).get(query_name, []) or []
-            if not props:
-                props = data.get("data", {}).get("properties", []) or []
-
-            for prop in props:
-                if prop.get("readableId") == readable_id:
-                    wrapper = _PropWrapper(prop, client=node._client)
-                    if node._client is not None:
-                        try:
-                            change_tracker2 = getattr(node._client, "_change_tracker", None)
-                            if change_tracker2 is not None and change_tracker2.is_enabled():
-                                property_path = node._build_path(readable_id)
-                                if property_path:
-                                    prop_name = prop.get("readableId") or prop.get("name") or readable_id
-                                    prop_id = prop.get("id")
-                                    change_tracker2.record_accessed_property(property_path, prop_name, prop_id)
-                        except Exception:
-                            pass
-                    return wrapper
-        except Exception:
-            continue
-
-    raise RuntimeError(
-        f"Property with readableId '{readable_id}' not found in product version "
-        f"{f'v{version_number}' if version_number is not None else 'draft'}"
-    )
+    # Only item nodes are allowed
+    return get_property_from_item_tree(node, readable_id)
 
 
 def get_property_from_item_tree(node: "_Node", readable_id: str) -> "_PropWrapper":

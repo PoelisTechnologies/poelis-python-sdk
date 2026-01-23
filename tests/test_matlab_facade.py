@@ -392,8 +392,8 @@ def test_change_property_numeric() -> None:
     # Replace transport's graphql method
     client._transport.graphql = mock_graphql  # type: ignore[assignment]
     
-    # Change property value
-    pm.change_property("uh2.Widget_Pro.draft.Child_Item.demo_property_mass", 123.45, title="Updated mass")
+    # Change property value (using correct item name from mock)
+    pm.change_property("uh2.Widget_Pro.draft.Gadget_A.demo_property_mass", 123.45, title="Updated mass")
     
     # Verify the update was called (check that graphql was called with update mutation)
     # The actual verification would require checking the transport's request history
@@ -436,4 +436,115 @@ class _MockResponse:
     def json(self) -> Dict[str, Any]:
         """Return JSON data."""
         return self._json_data
+
+
+def test_get_value_implicit_baseline() -> None:
+    """Test that get_value routes through baseline when path ends at product level."""
+    t = _MockTransport()
+    client = _client_with_mock_transport(t)
+    
+    pm = PoelisMatlab.__new__(PoelisMatlab)
+    pm.client = client
+    
+    # Path without explicit version should route through baseline
+    value = pm.get_value("uh2.Widget_Pro.Gadget_A.demo_property_mass")
+    
+    assert isinstance(value, (int, float))
+    assert value == 10.5
+
+
+def test_get_value_explicit_baseline() -> None:
+    """Test that get_value works with explicit baseline path."""
+    t = _MockTransport()
+    client = _client_with_mock_transport(t)
+    
+    pm = PoelisMatlab.__new__(PoelisMatlab)
+    pm.client = client
+    
+    # Path with explicit baseline should work
+    value = pm.get_value("uh2.Widget_Pro.baseline.Gadget_A.demo_property_mass")
+    
+    assert isinstance(value, (int, float))
+    assert value == 10.5
+
+
+def test_get_value_explicit_draft() -> None:
+    """Test that get_value works with explicit draft path."""
+    t = _MockTransport()
+    client = _client_with_mock_transport(t)
+    
+    pm = PoelisMatlab.__new__(PoelisMatlab)
+    pm.client = client
+    
+    # Path with explicit draft should work
+    value = pm.get_value("uh2.Widget_Pro.draft.Gadget_A.demo_property_mass")
+    
+    assert isinstance(value, (int, float))
+    assert value == 10.5
+
+
+def test_get_property_implicit_baseline() -> None:
+    """Test that get_property routes through baseline when path ends at product level."""
+    t = _MockTransport()
+    client = _client_with_mock_transport(t)
+    
+    pm = PoelisMatlab.__new__(PoelisMatlab)
+    pm.client = client
+    
+    # Path without explicit version should route through baseline
+    info = pm.get_property("uh2.Widget_Pro.Gadget_A.demo_property_mass")
+    
+    assert isinstance(info, dict)
+    assert "value" in info
+    assert info["value"] == 10.5
+    assert "unit" in info
+    assert info["unit"] == "kg"
+
+
+def test_change_property_implicit_draft() -> None:
+    """Test that change_property routes through draft when path ends at product level."""
+    t = _MockTransport()
+    client = _client_with_mock_transport(t)
+    
+    pm = PoelisMatlab.__new__(PoelisMatlab)
+    pm.client = client
+    
+    # Set up mock response for property update
+    def mock_graphql(query: str, variables: Optional[Dict[str, Any]] = None) -> Any:
+        """Mock graphql that handles update mutation."""
+        if "updateNumericProperty" in query:
+            return _MockResponse(200, {
+                "data": {
+                    "updateNumericProperty": {
+                        "id": "p2",
+                        "readableId": "demo_property_mass",
+                        "value": "123.45",
+                        "parsedValue": 123.45,
+                        "type": "numeric",
+                    }
+                }
+            })
+        # For property queries, use existing mock
+        return t.handle_request(httpx.Request("POST", "/v1/graphql", content=json.dumps({"query": query, "variables": variables or {}}).encode()))
+    
+    # Replace transport's graphql method
+    client._transport.graphql = mock_graphql  # type: ignore[assignment]
+    
+    # Path without explicit draft should route through draft automatically
+    pm.change_property("uh2.Widget_Pro.Gadget_A.demo_property_mass", 123.45, title="Updated mass")
+    
+    # If no exception was raised, the test passes
+
+
+def test_change_property_frozen_version_error() -> None:
+    """Test that change_property raises error when trying to write to frozen version."""
+    t = _MockTransport()
+    client = _client_with_mock_transport(t)
+    
+    pm = PoelisMatlab.__new__(PoelisMatlab)
+    pm.client = client
+    
+    # Try to change a property on a frozen version (v1)
+    with pytest.raises(ValueError, match="Cannot write to frozen version"):
+        pm.change_property("uh2.Widget_Pro.v1.Gadget_A.demo_property_mass", 123.45)
 

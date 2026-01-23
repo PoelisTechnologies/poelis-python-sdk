@@ -83,10 +83,10 @@ class _Node:
             keys.extend(list(self._props_key_map().keys()))
             keys.extend(["list_items", "list_properties", "get_property"])
         elif self._level == "product":
-            keys.extend(["list_items", "list_product_versions", "baseline", "draft", "get_version", "get_property"])
+            keys.extend(["list_items", "list_product_versions", "baseline", "draft", "get_version"])
             keys.extend(self._get_version_names())
         elif self._level == "version":
-            keys.extend(["list_items", "get_property"])
+            keys.extend(["list_items"])
         elif self._level == "workspace":
             keys.append("list_products")
         elif self._level == "root":
@@ -176,10 +176,10 @@ class _Node:
             suggestions.extend(list(self._props_key_map().keys()))
             suggestions.extend(["list_items", "list_properties", "get_property"])
         elif self._level == "product":
-            suggestions.extend(["list_items", "list_product_versions", "baseline", "draft", "get_version", "get_property"])
+            suggestions.extend(["list_items", "list_product_versions", "baseline", "draft", "get_version"])
             suggestions.extend(self._get_version_names())
         elif self._level == "version":
-            suggestions.extend(["list_items", "get_property"])
+            suggestions.extend(["list_items"])
         elif self._level == "workspace":
             suggestions.append("list_products")
         elif self._level == "root":
@@ -321,8 +321,18 @@ class _Node:
                 return MethodType(_Node._list_properties, self)
             raise AttributeError(attr)
         if attr == "get_property":
-            if self._level in ("product", "version", "item"):
+            if self._level == "item":
                 return MethodType(_Node._get_property, self)
+            if self._level == "product":
+                raise AttributeError(
+                    "get_property() is not available on product nodes. "
+                    "Use product.baseline.<item>.get_property() or product.draft.<item>.get_property() instead."
+                )
+            if self._level == "version":
+                raise AttributeError(
+                    "get_property() is not available on version nodes. "
+                    "Use version.<item>.get_property() instead to access properties from items in this version."
+                )
             raise AttributeError(attr)
 
         if self._level == "item":
