@@ -119,29 +119,31 @@ class PropertyValue(BaseModel):
 
 class NumericProperty(BaseModel):
     """Numeric property representation.
-    
-    Note: The `category` field contains normalized/canonicalized values.
+
+    Note: The `category` field contains normalized/canonicalized values when set.
     Categories are normalized server-side (upper-cased, deduplicated) and
-    may differ from the original input values.
+    may differ from the original input values. For formula properties,
+    `category` and `display_unit` are always unset; `value` is null when the
+    formula is invalid.
     """
 
     model_config = ConfigDict(populate_by_name=True)
-    
+
     id: str = Field(min_length=1)
     product_id: Optional[str] = Field(alias="productId", default=None)
     product_version_number: Optional[int] = Field(alias="productVersionNumber", default=None)
     item_id: str = Field(alias="itemId", min_length=1)
     position: float
     name: str = Field(min_length=1)
-    value: str
-    category: str
+    value: Optional[str] = None
+    category: Optional[str] = None
     display_unit: Optional[str] = Field(alias="displayUnit", default=None)
     owner: str = Field(min_length=1)
     type: str = Field(min_length=1)
     parsed_value: Optional[Union[int, float, List[Any], str]] = Field(alias="parsedValue", default=None)
-    
+
     @property
-    def typed_value(self) -> Union[int, float, List[Any], str]:
+    def typed_value(self) -> Union[int, float, List[Any], str, None]:
         """Get the properly typed value, falling back to raw string if parsing failed."""
         return self.parsed_value if self.parsed_value is not None else self.value
 

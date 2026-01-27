@@ -189,13 +189,13 @@ class _PropWrapper:
                 return (integer_part or 0) * (10 ** int(exponent))
             except Exception:
                 return integer_part
-        # If parsedValue was None or missing, try to parse the raw value for numeric properties
+        # If parsedValue was None or missing, try to parse the raw value for numeric/formula properties
         if "value" in p:
             raw_value = p.get("value")
-            # Check if this is a numeric property and try to parse the string
             property_type = (p.get("__typename") or p.get("propertyType") or "").lower()
-            is_numeric = property_type in ("numericproperty", "numeric")
-            # If it's a numeric property, try to parse the string as a number
+            is_numeric = property_type in ("numericproperty", "numeric", "formulaproperty", "formula")
+            if raw_value is None:
+                return None  # invalid formula or missing value
             if isinstance(raw_value, str) and is_numeric:
                 try:
                     # Try to parse as float first (handles decimals), then int
@@ -269,6 +269,11 @@ class _PropWrapper:
         to emit a warning and log entry for this local edit. It does not push the
         change back to the Poelis backend.
         """
+        if self._raw.get("formulaExpression") is not None or self._raw.get("formulaDependencies"):
+            raise ValueError(
+                "Formula properties cannot be updated via the SDK. "
+                "They are computed from their expression and dependencies."
+            )
         old_value = self._get_property_value()
 
         # If the value did not actually change, do nothing.
@@ -355,6 +360,7 @@ class _PropWrapper:
                 - Text: string
                 - Date: string in ISO 8601 format (YYYY-MM-DD)
                 - Status: string (DRAFT, UNDER_REVIEW, or DONE)
+                - Formula: read-only; calling change_property raises an error.
             title: Optional title/reason for history tracking (mapped to 'reason' in mutation).
             description: Optional description for history tracking.
 
@@ -392,8 +398,19 @@ class _PropWrapper:
         if properties_client is None:
             raise RuntimeError("Properties client not available. Cannot update property.")
 
+        if self._raw.get("formulaExpression") is not None or self._raw.get("formulaDependencies"):
+            raise ValueError(
+                "Formula properties cannot be updated via the SDK. "
+                "They are computed from their expression and dependencies."
+            )
+
         # Determine property type from _raw data
         property_type = self._get_property_type()
+        if property_type == "formula":
+            raise ValueError(
+                "Formula properties cannot be updated via the SDK. "
+                "They are computed from their expression and dependencies."
+            )
 
         # Build mutation parameters
         mutation_params: Dict[str, Any] = {"id": property_id}
@@ -464,7 +481,7 @@ class _PropWrapper:
         """Determine property type from _raw data.
 
         Returns:
-            str: Property type ('numeric', 'text', 'date', 'status').
+            str: Property type ('numeric', 'text', 'date', 'status', 'formula').
 
         Raises:
             RuntimeError: If property type cannot be determined.
@@ -473,6 +490,8 @@ class _PropWrapper:
         typename = self._raw.get("__typename", "").lower()
         if "numeric" in typename:
             return "numeric"
+        elif "formula" in typename:
+            return "formula"
         elif "text" in typename:
             return "text"
         elif "date" in typename:
@@ -484,6 +503,8 @@ class _PropWrapper:
         prop_type = self._raw.get("propertyType", "").lower()
         if prop_type in ("numeric", "numericproperty"):
             return "numeric"
+        elif prop_type in ("formula", "formulaproperty"):
+            return "formula"
         elif prop_type in ("text", "textproperty"):
             return "text"
         elif prop_type in ("date", "dateproperty"):
@@ -493,7 +514,7 @@ class _PropWrapper:
 
         # Try type field
         type_field = self._raw.get("type", "").lower()
-        if type_field in ("numeric", "text", "date", "status"):
+        if type_field in ("numeric", "text", "date", "status", "formula"):
             return type_field
 
         raise RuntimeError(f"Could not determine property type from property data: {self._raw}")
@@ -516,6 +537,11 @@ class _PropWrapper:
         if property_type == "numeric":
             # Convert to JSON string (handles numbers, arrays, matrices)
             return PropertiesClient._convert_numeric_value(value)
+        elif property_type == "formula":
+            raise ValueError(
+                "Formula properties cannot be updated via the SDK. "
+                "They are computed from their expression and dependencies."
+            )
         elif property_type == "text":
             # Text values are passed as strings directly
             if not isinstance(value, str):
