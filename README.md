@@ -80,6 +80,10 @@ item_category = item.some_property.category  # Access property categories direct
 item_unit = item.some_property.unit  # Access property units directly
 ```
 
+### Formula properties
+
+For property type `formula`, `property.category` and `property.unit` is always `None`. The unit is part of the value itself: the value is the computed result of the expression (e.g. `"10 kg"`), so there is no separate unit field. For invalid formulas, `property.value` is `None`.
+
 ## Property Change Detection
 
 The SDK can automatically warn you when property values change between script/notebook runs. This is useful when you're using property values for calculations and want to be notified if a colleague changes them in the webapp.
