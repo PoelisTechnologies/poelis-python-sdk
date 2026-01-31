@@ -153,7 +153,7 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
         q2_parsed = (
             "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
             "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-            "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value parsedValue owner }\n"
+            "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value parsedValue }\n"
             "  }\n"
             "}"
         )
@@ -169,7 +169,7 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
             q2_min = (
                 "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
                 "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-                "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value owner }\n"
+                "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value }\n"
                 "  }\n"
                 "}"
             )
@@ -383,7 +383,7 @@ def search_property_in_item_and_children(
     else:
         child_query = (
             "query($pid: ID!, $parent: ID!, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name readableId productId parentId owner position }\n"
+            "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name readableId productId parentId position }\n"
             "}"
         )
         try:

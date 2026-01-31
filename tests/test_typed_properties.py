@@ -28,7 +28,6 @@ class TestTypedPropertyModels:
             "value": "42.5",
             "category": "Physical",
             "displayUnit": "kg",
-            "owner": "user1",
             "type": "numeric",
             "parsedValue": 42.5
         }
@@ -48,7 +47,6 @@ class TestTypedPropertyModels:
             "value": "42.5",
             "category": "Physical",
             "displayUnit": "kg",
-            "owner": "user1",
             "type": "numeric"
         }
         
@@ -64,7 +62,6 @@ class TestTypedPropertyModels:
             "position": 2.0,
             "name": "Tags",
             "value": '["tag1", "tag2", "tag3"]',
-            "owner": "user1",
             "type": "text",
             "parsedValue": ["tag1", "tag2", "tag3"]
         }
@@ -82,7 +79,6 @@ class TestTypedPropertyModels:
             "position": 3.0,
             "name": "Count",
             "value": "100",
-            "owner": "user1",
             "type": "text",
             "parsedValue": 100
         }
@@ -100,7 +96,6 @@ class TestTypedPropertyModels:
             "position": 4.0,
             "name": "Created Date",
             "value": "2024-01-15",
-            "owner": "user1",
             "type": "date",
             "parsedValue": "2024-01-15"
         }
@@ -123,7 +118,6 @@ class TestTypedPropertyModels:
             "displayUnit": "°C",
             "value": "25.3",
             "parsedValue": 25.3,
-            "owner": "user1",
             "createdBy": "user1",
             "createdAt": "2024-01-15T10:00:00Z",
             "updatedAt": "2024-01-15T10:00:00Z"

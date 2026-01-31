@@ -133,7 +133,7 @@ def load_children(node: "_Node") -> None:
         else:
             q = (
                 "query($pid: ID!, $parent: ID!, $limit: Int!, $offset: Int!) {\n"
-                "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name readableId productId parentId owner position }\n"
+                "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name readableId productId parentId position }\n"
                 "}"
             )
             r = node._client._transport.graphql(q, {"pid": pid, "parent": node._id, "limit": 1000, "offset": 0})

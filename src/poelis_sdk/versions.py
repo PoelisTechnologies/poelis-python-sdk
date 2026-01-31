@@ -61,7 +61,6 @@ class VersionsClient:
             "    readableId\n"
             "    productId\n"
             "    parentId\n"
-            "    owner\n"
             "    position\n"
             "  }\n"
             "}"

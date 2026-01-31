@@ -49,8 +49,8 @@ class _MockTransport(httpx.BaseTransport):
                 assert vars.get("pid") == "p1"
                 # For draft queries, include both parent and child items
                 data = {"data": {"items": [
-                    {"id": "i1", "name": "Gadget A", "code": "GA", "description": "", "productId": "p1", "parentId": None, "owner": "o", "position": 1},
-                    {"id": "i2", "name": "Child Item", "code": "CI", "description": "", "productId": "p1", "parentId": "i1", "owner": "o", "position": 1},
+                    {"id": "i1", "name": "Gadget A", "code": "GA", "description": "", "productId": "p1", "parentId": None, "position": 1},
+                    {"id": "i2", "name": "Child Item", "code": "CI", "description": "", "productId": "p1", "parentId": "i1", "position": 1},
                 ]}}
                 return httpx.Response(200, json=data)
 
@@ -58,7 +58,7 @@ class _MockTransport(httpx.BaseTransport):
             if "parentItemId" in query:
                 if vars.get("parent") == "i1":
                     data = {"data": {"items": [
-                        {"id": "i2", "name": "Child Item", "code": "CI", "description": "", "productId": "p1", "parentId": "i1", "owner": "o", "position": 1},
+                        {"id": "i2", "name": "Child Item", "code": "CI", "description": "", "productId": "p1", "parentId": "i1", "position": 1},
                     ]}}
                 else:
                     data = {"data": {"items": []}}
@@ -105,8 +105,8 @@ class _MockTransport(httpx.BaseTransport):
                 assert vars.get("pid") == "p1"
                 # Include both parent and child items for all versioned queries
                 data = {"data": {"items": [
-                    {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "owner": "o", "position": 1},
-                    {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "owner": "o", "position": 1},
+                    {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "position": 1},
+                    {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "position": 1},
                 ]}}
                 return httpx.Response(200, json=data)
 

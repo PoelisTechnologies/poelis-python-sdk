@@ -70,7 +70,6 @@ class _MockTransport(httpx.BaseTransport):
                                 "description": "",
                                 "productId": "p1",
                                 "parentId": None,
-                                "owner": "o",
                                 "position": 1,
                             },
                         ]
@@ -141,7 +140,6 @@ class _MockTransport(httpx.BaseTransport):
                                 "readableId": "gadget_a",
                                 "productId": "p1",
                                 "parentId": None,
-                                "owner": "o",
                                 "position": 1,
                             },
                         ]

@@ -138,7 +138,6 @@ class NumericProperty(BaseModel):
     value: Optional[str] = None
     category: Optional[str] = None
     display_unit: Optional[str] = Field(alias="displayUnit", default=None)
-    owner: str = Field(min_length=1)
     type: str = Field(min_length=1)
     parsed_value: Optional[Union[int, float, List[Any], str]] = Field(alias="parsedValue", default=None)
 
@@ -160,7 +159,6 @@ class TextProperty(BaseModel):
     position: float
     name: str = Field(min_length=1)
     value: str
-    owner: str = Field(min_length=1)
     type: str = Field(min_length=1)
     parsed_value: Optional[Union[int, float, List[Any], str]] = Field(alias="parsedValue", default=None)
     
@@ -182,7 +180,6 @@ class DateProperty(BaseModel):
     position: float
     name: str = Field(min_length=1)
     value: str
-    owner: str = Field(min_length=1)
     type: str = Field(min_length=1)
     parsed_value: Optional[str] = Field(alias="parsedValue", default=None)
     
@@ -208,7 +205,6 @@ class PropertySearchResult(BaseModel):
     display_unit: Optional[str] = Field(alias="displayUnit", default=None)
     value: Any  # Raw value from GraphQL
     parsed_value: Optional[Union[int, float, List[Any], str]] = Field(alias="parsedValue", default=None)
-    owner: str = Field(min_length=1)
     created_by: str = Field(alias="createdBy", min_length=1)
     created_at: str = Field(alias="createdAt", min_length=1)
     updated_at: str = Field(alias="updatedAt", min_length=1)

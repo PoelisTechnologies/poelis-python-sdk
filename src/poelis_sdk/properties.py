@@ -31,7 +31,6 @@ class PropertiesClient:
         position: Optional[float] = None,
         category: Optional[str] = None,
         display_unit: Optional[str] = None,
-        owner: Optional[str] = None,
         reason: Optional[str] = None,
         description: Optional[str] = None,
         changed_via: Optional[str] = None,
@@ -47,7 +46,6 @@ class PropertiesClient:
             position: Optional position for ordering.
             category: Optional category (auto-normalized to uppercase snake_case).
             display_unit: Optional display unit.
-            owner: Optional owner.
             reason: Optional reason for history tracking.
             description: Optional description for history tracking.
 
@@ -64,7 +62,7 @@ class PropertiesClient:
             mutation = (
                 "mutation UpdateNumericProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
                 "$position: Float, $value: String, $category: String, $displayUnit: String, "
-                "$owner: String, $reason: String, $description: String, $changedVia: ChangedVia) {\n"
+                "$reason: String, $description: String, $changedVia: ChangedVia) {\n"
                 "  updateNumericProperty(\n"
                 "    id: $id\n"
                 "    itemId: $itemId\n"
@@ -74,7 +72,6 @@ class PropertiesClient:
                 "    value: $value\n"
                 "    category: $category\n"
                 "    displayUnit: $displayUnit\n"
-                "    owner: $owner\n"
                 "    reason: $reason\n"
                 "    description: $description\n"
                 "    changedVia: $changedVia\n"
@@ -86,7 +83,6 @@ class PropertiesClient:
                 "    position\n"
                 "    value\n"
                 "    type\n"
-                "    owner\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -100,7 +96,7 @@ class PropertiesClient:
             mutation = (
                 "mutation UpdateNumericProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
                 "$position: Float, $value: String, $category: String, $displayUnit: String, "
-                "$owner: String, $reason: String, $description: String) {\n"
+                "$reason: String, $description: String) {\n"
                 "  updateNumericProperty(\n"
                 "    id: $id\n"
                 "    itemId: $itemId\n"
@@ -110,7 +106,6 @@ class PropertiesClient:
                 "    value: $value\n"
                 "    category: $category\n"
                 "    displayUnit: $displayUnit\n"
-                "    owner: $owner\n"
                 "    reason: $reason\n"
                 "    description: $description\n"
                 "  ) {\n"
@@ -121,7 +116,6 @@ class PropertiesClient:
                 "    position\n"
                 "    value\n"
                 "    type\n"
-                "    owner\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -147,8 +141,6 @@ class PropertiesClient:
             variables["category"] = category
         if display_unit is not None:
             variables["displayUnit"] = display_unit
-        if owner is not None:
-            variables["owner"] = owner
         if reason is not None:
             variables["reason"] = reason
         if description is not None:
@@ -185,7 +177,6 @@ class PropertiesClient:
         name: Optional[str] = None,
         readable_id: Optional[str] = None,
         position: Optional[float] = None,
-        owner: Optional[str] = None,
         reason: Optional[str] = None,
         description: Optional[str] = None,
         changed_via: Optional[str] = None,
@@ -199,7 +190,6 @@ class PropertiesClient:
             name: Optional property name.
             readable_id: Optional readable ID.
             position: Optional position for ordering.
-            owner: Optional owner.
             reason: Optional reason for history tracking.
             description: Optional description for history tracking.
 
@@ -215,7 +205,7 @@ class PropertiesClient:
         if changed_via is not None:
             mutation = (
                 "mutation UpdateTextProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
-                "$position: Float, $value: String, $owner: String, $reason: String, $description: String, $changedVia: ChangedVia) {\n"
+                "$position: Float, $value: String, $reason: String, $description: String, $changedVia: ChangedVia) {\n"
                 "  updateTextProperty(\n"
                 "    id: $id\n"
                 "    itemId: $itemId\n"
@@ -223,7 +213,6 @@ class PropertiesClient:
                 "    readableId: $readableId\n"
                 "    position: $position\n"
                 "    value: $value\n"
-                "    owner: $owner\n"
                 "    reason: $reason\n"
                 "    description: $description\n"
                 "    changedVia: $changedVia\n"
@@ -235,7 +224,6 @@ class PropertiesClient:
                 "    position\n"
                 "    value\n"
                 "    type\n"
-                "    owner\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -246,7 +234,7 @@ class PropertiesClient:
         else:
             mutation = (
                 "mutation UpdateTextProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
-                "$position: Float, $value: String, $owner: String, $reason: String, $description: String) {\n"
+                "$position: Float, $value: String, $reason: String, $description: String) {\n"
                 "  updateTextProperty(\n"
                 "    id: $id\n"
                 "    itemId: $itemId\n"
@@ -254,7 +242,6 @@ class PropertiesClient:
                 "    readableId: $readableId\n"
                 "    position: $position\n"
                 "    value: $value\n"
-                "    owner: $owner\n"
                 "    reason: $reason\n"
                 "    description: $description\n"
                 "  ) {\n"
@@ -265,7 +252,6 @@ class PropertiesClient:
                 "    position\n"
                 "    value\n"
                 "    type\n"
-                "    owner\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -285,8 +271,6 @@ class PropertiesClient:
             variables["position"] = position
         if value is not None:
             variables["value"] = value
-        if owner is not None:
-            variables["owner"] = owner
         if reason is not None:
             variables["reason"] = reason
         if description is not None:
@@ -321,7 +305,6 @@ class PropertiesClient:
         name: Optional[str] = None,
         readable_id: Optional[str] = None,
         position: Optional[float] = None,
-        owner: Optional[str] = None,
         reason: Optional[str] = None,
         description: Optional[str] = None,
         changed_via: Optional[str] = None,
@@ -335,7 +318,6 @@ class PropertiesClient:
             name: Optional property name.
             readable_id: Optional readable ID.
             position: Optional position for ordering.
-            owner: Optional owner.
             reason: Optional reason for history tracking.
             description: Optional description for history tracking.
 
@@ -352,7 +334,7 @@ class PropertiesClient:
         if changed_via is not None:
             mutation = (
                 "mutation UpdateDateProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
-                "$position: Float, $value: String, $owner: String, $reason: String, $description: String, $changedVia: ChangedVia) {\n"
+                "$position: Float, $value: String, $reason: String, $description: String, $changedVia: ChangedVia) {\n"
                 "  updateDateProperty(\n"
                 "    id: $id\n"
                 "    itemId: $itemId\n"
@@ -360,7 +342,6 @@ class PropertiesClient:
                 "    readableId: $readableId\n"
                 "    position: $position\n"
                 "    value: $value\n"
-                "    owner: $owner\n"
                 "    reason: $reason\n"
                 "    description: $description\n"
                 "    changedVia: $changedVia\n"
@@ -372,7 +353,6 @@ class PropertiesClient:
                 "    position\n"
                 "    value\n"
                 "    type\n"
-                "    owner\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -382,7 +362,7 @@ class PropertiesClient:
         else:
             mutation = (
                 "mutation UpdateDateProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
-                "$position: Float, $value: String, $owner: String, $reason: String, $description: String) {\n"
+                "$position: Float, $value: String, $reason: String, $description: String) {\n"
                 "  updateDateProperty(\n"
                 "    id: $id\n"
                 "    itemId: $itemId\n"
@@ -390,7 +370,6 @@ class PropertiesClient:
                 "    readableId: $readableId\n"
                 "    position: $position\n"
                 "    value: $value\n"
-                "    owner: $owner\n"
                 "    reason: $reason\n"
                 "    description: $description\n"
                 "  ) {\n"
@@ -401,7 +380,6 @@ class PropertiesClient:
                 "    position\n"
                 "    value\n"
                 "    type\n"
-                "    owner\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -420,8 +398,6 @@ class PropertiesClient:
             variables["position"] = position
         if value is not None:
             variables["value"] = value
-        if owner is not None:
-            variables["owner"] = owner
         if reason is not None:
             variables["reason"] = reason
         if description is not None:
@@ -456,7 +432,6 @@ class PropertiesClient:
         name: Optional[str] = None,
         readable_id: Optional[str] = None,
         position: Optional[float] = None,
-        owner: Optional[str] = None,
         reason: Optional[str] = None,
         description: Optional[str] = None,
         changed_via: Optional[str] = None,
@@ -470,7 +445,6 @@ class PropertiesClient:
             name: Optional property name.
             readable_id: Optional readable ID.
             position: Optional position for ordering.
-            owner: Optional owner.
             reason: Optional reason for history tracking.
             description: Optional description for history tracking.
 
@@ -487,7 +461,7 @@ class PropertiesClient:
         if changed_via is not None:
             mutation = (
                 "mutation UpdateStatusProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
-                "$position: Float, $value: StatusPropertyValue, $owner: String, $reason: String, $description: String, $changedVia: ChangedVia) {\n"
+                "$position: Float, $value: StatusPropertyValue, $reason: String, $description: String, $changedVia: ChangedVia) {\n"
                 "  updateStatusProperty(\n"
                 "    id: $id\n"
                 "    itemId: $itemId\n"
@@ -495,7 +469,6 @@ class PropertiesClient:
                 "    readableId: $readableId\n"
                 "    position: $position\n"
                 "    value: $value\n"
-                "    owner: $owner\n"
                 "    reason: $reason\n"
                 "    description: $description\n"
                 "    changedVia: $changedVia\n"
@@ -507,7 +480,6 @@ class PropertiesClient:
                 "    position\n"
                 "    value\n"
                 "    type\n"
-                "    owner\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -517,7 +489,7 @@ class PropertiesClient:
         else:
             mutation = (
                 "mutation UpdateStatusProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
-                "$position: Float, $value: StatusPropertyValue, $owner: String, $reason: String, $description: String) {\n"
+                "$position: Float, $value: StatusPropertyValue, $reason: String, $description: String) {\n"
                 "  updateStatusProperty(\n"
                 "    id: $id\n"
                 "    itemId: $itemId\n"
@@ -525,7 +497,6 @@ class PropertiesClient:
                 "    readableId: $readableId\n"
                 "    position: $position\n"
                 "    value: $value\n"
-                "    owner: $owner\n"
                 "    reason: $reason\n"
                 "    description: $description\n"
                 "  ) {\n"
@@ -536,7 +507,6 @@ class PropertiesClient:
                 "    position\n"
                 "    value\n"
                 "    type\n"
-                "    owner\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -555,8 +525,6 @@ class PropertiesClient:
             variables["position"] = position
         if value is not None:
             variables["value"] = value
-        if owner is not None:
-            variables["owner"] = owner
         if reason is not None:
             variables["reason"] = reason
         if description is not None:
