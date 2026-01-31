@@ -1,4 +1,4 @@
-"""Tests for SearchClient endpoints alignment and basic params."""
+"""Tests for SearchClient: uses GraphQL /v1/graphql only."""
 
 from __future__ import annotations
 
@@ -14,12 +14,15 @@ if TYPE_CHECKING:
 
 class _MockTransport(httpx.BaseTransport):
     def handle_request(self, request: httpx.Request) -> httpx.Response:  # type: ignore[override]
-        if request.url.path == "/v1/search/products":
-            return httpx.Response(200, json={"hits": [], "limit": 20, "offset": 0})
-        if request.url.path == "/v1/search/items":
-            return httpx.Response(200, json={"hits": [], "limit": 20, "offset": 0})
-        if request.url.path == "/v1/search/properties":
-            return httpx.Response(200, json={"hits": [], "limit": 20, "offset": 0})
+        if request.url.path != "/v1/graphql" or request.method != "POST":
+            return httpx.Response(404)
+        body = request.content.decode()
+        if "products(" in body:
+            return httpx.Response(200, json={"data": {"products": []}})
+        if "items(" in body:
+            return httpx.Response(200, json={"data": {"items": []}})
+        if "searchProperties(" in body:
+            return httpx.Response(200, json={"data": {"searchProperties": {"query": "", "hits": [], "total": 0, "limit": 20, "offset": 0, "processingTimeMs": 0}}})
         return httpx.Response(404)
 
 
@@ -37,8 +40,8 @@ def test_search_endpoints(monkeypatch: "MonkeyPatch") -> None:
     _T.__init__ = _init  # type: ignore[assignment]
     try:
         c = PoelisClient(base_url="http://localhost:8000", api_key="k")
-        assert c.search.products(q="abc")["hits"] == []
-        assert c.search.items(q="abc")["hits"] == []
+        assert c.search.products(q="abc", workspace_id="ws1")["hits"] == []
+        assert c.search.items(q="abc", product_id="pid1")["hits"] == []
         assert c.search.properties(q="abc")["hits"] == []
     finally:
         _T.__init__ = orig  # type: ignore[assignment]

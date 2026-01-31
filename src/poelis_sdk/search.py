@@ -8,7 +8,7 @@ from ._transport import Transport
 
 
 class SearchClient:
-    """Client for /v1/search endpoints (products, items, properties)."""
+    """Search for products, items, and properties via GraphQL (/v1/graphql)."""
 
     def __init__(self, transport: Transport) -> None:
         self._t = transport
