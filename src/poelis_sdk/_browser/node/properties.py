@@ -162,7 +162,7 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
         q2_parsed = (
             "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
             "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-            "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value parsedValue }\n"
+            "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value }\n"
             "  }\n"
             "}"
         )
@@ -401,13 +401,13 @@ def search_property_in_item_and_children(
         child_items = [it for it in all_items if it.get("parentId") == item_id]
     else:
         child_query = (
-            "query($pid: ID!, $parent: ID!, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name readableId productId parentId position }\n"
+            "query($pid: ID!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
+            "  items(productId: $pid, filter: $filter, limit: $limit, offset: $offset) { id name readableId productId parentId position }\n"
             "}"
         )
         try:
             r = node._client._transport.graphql(
-                child_query, {"pid": product_id, "parent": item_id, "limit": 1000, "offset": 0}
+                child_query, {"pid": product_id, "filter": {"parentItemId": item_id}, "limit": 1000, "offset": 0}
             )
             r.raise_for_status()
             data = r.json()

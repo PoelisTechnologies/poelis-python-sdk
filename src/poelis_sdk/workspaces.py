@@ -73,19 +73,17 @@ class WorkspacesClient:
         """
         
         query = (
-            "query($userId: ID!) {\n"
+            "query($userId: String!) {\n"
             "  userAccessibleResources(userId: $userId) {\n"
-            "    workspaces {\n"
+            "    id\n"
+            "    name\n"
+            "    readableId\n"
+            "    role\n"
+            "    products {\n"
             "      id\n"
             "      name\n"
             "      readableId\n"
             "      role\n"
-            "      products {\n"
-            "        id\n"
-            "        name\n"
-            "        readableId\n"
-            "        role\n"
-            "      }\n"
             "    }\n"
             "  }\n"
             "}"
@@ -96,10 +94,10 @@ class WorkspacesClient:
         if "errors" in payload:
             raise RuntimeError(str(payload["errors"]))
         
-        data = payload.get("data", {}).get("userAccessibleResources")
-        if data is None:
+        raw = payload.get("data", {}).get("userAccessibleResources")
+        if raw is None:
             raise RuntimeError("Malformed GraphQL response: missing 'userAccessibleResources' field")
-        
-        return UserAccessibleResources(**data)
+        workspaces = raw if isinstance(raw, list) else [raw]
+        return UserAccessibleResources(workspaces=workspaces)
 
 

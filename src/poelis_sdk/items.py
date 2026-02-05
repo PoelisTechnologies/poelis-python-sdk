@@ -47,11 +47,11 @@ class ItemsClient:
         """
 
         query = (
-            "query($pid: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, q: $q, limit: $limit, offset: $offset) { id name readableId productId parentId position }\n"
+            "query($pid: ID!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
+            "  items(productId: $pid, filter: $filter, limit: $limit, offset: $offset) { id name readableId productId parentId position }\n"
             "}"
         )
-        variables = {"pid": product_id, "q": q, "limit": int(limit), "offset": int(offset)}
+        variables = {"pid": product_id, "filter": {"q": q} if q else None, "limit": int(limit), "offset": int(offset)}
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()

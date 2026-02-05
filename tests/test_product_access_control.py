@@ -119,19 +119,16 @@ def test_user_accessible_resources_model() -> None:
             {
                 "id": "ws-1",
                 "name": "Workspace 1",
-                "readableId": "workspace-1",
                 "role": "EDITOR",
                 "products": [
                     {
                         "id": "prod-1",
                         "name": "Product 1",
-                        "readableId": "product-1",
                         "role": "VIEWER",
                     },
                     {
                         "id": "prod-2",
                         "name": "Product 2",
-                        "readableId": None,
                         "role": "EDITOR",
                     },
                 ],
@@ -139,7 +136,6 @@ def test_user_accessible_resources_model() -> None:
             {
                 "id": "ws-2",
                 "name": "Workspace 2",
-                "readableId": None,
                 "role": "VIEWER",
                 "products": [],
             },
@@ -171,27 +167,23 @@ def test_user_accessible_resources_empty() -> None:
 
 def test_get_user_accessible_resources_mock(monkeypatch: "MonkeyPatch") -> None:
     """Test get_user_accessible_resources method with mocked transport."""
-    # Mock response data
+    # Mock response data (API returns list of WorkspaceWithProducts with id/name)
     mock_response_data = {
         "data": {
-            "userAccessibleResources": {
-                "workspaces": [
-                    {
-                        "id": "ws-1",
-                        "name": "Workspace 1",
-                        "readableId": "workspace-1",
-                        "role": "EDITOR",
-                        "products": [
-                            {
-                                "id": "prod-1",
-                                "name": "Product 1",
-                                "readableId": "product-1",
-                                "role": "VIEWER",
-                            },
-                        ],
-                    },
-                ],
-            },
+            "userAccessibleResources": [
+                {
+                    "id": "ws-1",
+                    "name": "Workspace 1",
+                    "role": "EDITOR",
+                    "products": [
+                        {
+                            "id": "prod-1",
+                            "name": "Product 1",
+                            "role": "VIEWER",
+                        },
+                    ],
+                },
+            ],
         },
     }
     

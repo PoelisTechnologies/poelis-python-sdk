@@ -132,11 +132,11 @@ def load_children(node: "_Node") -> None:
             rows = [it for it in all_items if it.get("parentId") == node._id]
         else:
             q = (
-                "query($pid: ID!, $parent: ID!, $limit: Int!, $offset: Int!) {\n"
-                "  items(productId: $pid, parentItemId: $parent, limit: $limit, offset: $offset) { id name readableId productId parentId position }\n"
+                "query($pid: ID!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
+                "  items(productId: $pid, filter: $filter, limit: $limit, offset: $offset) { id name readableId productId parentId position }\n"
                 "}"
             )
-            r = node._client._transport.graphql(q, {"pid": pid, "parent": node._id, "limit": 1000, "offset": 0})
+            r = node._client._transport.graphql(q, {"pid": pid, "filter": {"parentItemId": node._id}, "limit": 1000, "offset": 0})
             r.raise_for_status()
             data = r.json()
             if "errors" in data:
