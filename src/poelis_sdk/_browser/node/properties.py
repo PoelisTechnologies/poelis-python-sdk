@@ -44,7 +44,7 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
 
     formula_on_numeric = " formulaExpression formulaDependencies { id name value displayUnit hierarchyContext { id name } itemId productId }" if use_sdk_properties else " formulaExpression formulaDependencies { id name value displayUnit itemId productId }"
     updated_fields = " updatedAt updatedBy" if use_sdk_properties else ""
-    formula_fragment = f"    ... on {property_type_prefix}FormulaProperty {{ id name readableId category displayUnit numericValue: value parsedValue{formula_on_numeric} hasFormulaDependencyChanges{updated_fields} }}\n"
+    formula_fragment = f"    ... on {property_type_prefix}FormulaProperty {{ id name readableId numericValue: value parsedValue{formula_on_numeric} hasFormulaDependencyChanges{updated_fields} }}\n"
     matrix_fragment = f"    ... on {property_type_prefix}MatrixProperty {{ id name readableId category displayUnit value parsedValue{updated_fields} }}\n"
     if version_number is not None and pid is not None:
         q_parsed = (
@@ -112,7 +112,7 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
                     "  properties(itemId: $iid, version: $version) {\n"
                     "    __typename\n"
                     "    ... on NumericProperty { id name readableId category displayUnit numericValue: value parsedValue }\n"
-                    "    ... on FormulaProperty { id name readableId category displayUnit numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
+                    "    ... on FormulaProperty { id name readableId numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
                     "    ... on MatrixProperty { id name readableId category displayUnit value parsedValue }\n"
                     "    ... on TextProperty { id name readableId value }\n"
                     "    ... on DateProperty { id name readableId value }\n"
@@ -126,7 +126,7 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
                     "  properties(itemId: $iid) {\n"
                     "    __typename\n"
                     "    ... on NumericProperty { id name readableId category displayUnit numericValue: value parsedValue }\n"
-                    "    ... on FormulaProperty { id name readableId category displayUnit numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
+                    "    ... on FormulaProperty { id name readableId numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
                     "    ... on MatrixProperty { id name readableId category displayUnit value parsedValue }\n"
                     "    ... on TextProperty { id name readableId value }\n"
                     "    ... on DateProperty { id name readableId value }\n"
@@ -292,7 +292,7 @@ def search_property_in_item_and_children(
     property_type_prefix = "Sdk" if use_sdk_properties else ""
     updated_fields = " updatedAt updatedBy" if use_sdk_properties else ""
     formula_on_numeric = " formulaExpression formulaDependencies { id name value displayUnit hierarchyContext { id name } itemId productId }" if use_sdk_properties else " formulaExpression formulaDependencies { id name value displayUnit itemId productId }"
-    formula_fragment = f"    ... on {property_type_prefix}FormulaProperty {{ id name readableId category displayUnit numericValue: value parsedValue{formula_on_numeric} hasFormulaDependencyChanges{updated_fields} }}\n"
+    formula_fragment = f"    ... on {property_type_prefix}FormulaProperty {{ id name readableId numericValue: value parsedValue{formula_on_numeric} hasFormulaDependencyChanges{updated_fields} }}\n"
     matrix_fragment = f"    ... on {property_type_prefix}MatrixProperty {{ id name readableId category displayUnit value parsedValue{updated_fields} }}\n"
     if version_number is not None:
         prop_query = (
@@ -335,7 +335,7 @@ def search_property_in_item_and_children(
                         "  properties(itemId: $iid, version: $version) {\n"
                         "    __typename\n"
                         "    ... on NumericProperty { id name readableId category displayUnit numericValue: value parsedValue }\n"
-                        "    ... on FormulaProperty { id name readableId category displayUnit numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
+                        "    ... on FormulaProperty { id name readableId numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
                         "    ... on MatrixProperty { id name readableId category displayUnit value parsedValue }\n"
                         "    ... on TextProperty { id name readableId value parsedValue }\n"
                         "    ... on DateProperty { id name readableId value }\n"
@@ -349,7 +349,7 @@ def search_property_in_item_and_children(
                         "  properties(itemId: $iid) {\n"
                         "    __typename\n"
                         "    ... on NumericProperty { id name readableId category displayUnit numericValue: value parsedValue }\n"
-                        "    ... on FormulaProperty { id name readableId category displayUnit numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
+                        "    ... on FormulaProperty { id name readableId numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
                         "    ... on MatrixProperty { id name readableId category displayUnit value parsedValue }\n"
                         "    ... on TextProperty { id name readableId value parsedValue }\n"
                         "    ... on DateProperty { id name readableId value }\n"
