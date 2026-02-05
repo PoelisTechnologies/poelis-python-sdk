@@ -29,7 +29,7 @@ class ProductsClient:
 
         Args:
             workspace_id: Workspace ID to scope products.
-            q: Optional free-text filter.
+            q: Optional free-text filter (passed as filter.q).
             limit: Page size.
             offset: Offset for pagination.
             
@@ -39,8 +39,8 @@ class ProductsClient:
         """
 
         query = (
-            "query($ws: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) {\n"
+            "query($ws: ID!, $filter: ProductFilter, $limit: Int!, $offset: Int!) {\n"
+            "  products(workspaceId: $ws, filter: $filter, limit: $limit, offset: $offset) {\n"
             "    id\n"
             "    name\n"
             "    readableId\n"
@@ -50,7 +50,7 @@ class ProductsClient:
             "  }\n"
             "}"
         )
-        variables = {"ws": workspace_id, "q": q, "limit": int(limit), "offset": int(offset)}
+        variables: dict = {"ws": workspace_id, "filter": {"q": q} if q else None, "limit": int(limit), "offset": int(offset)}
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
@@ -165,12 +165,9 @@ class ProductsClient:
         if self._workspaces_client is None:
             raise RuntimeError("Workspaces client not available. Cannot iterate across all workspaces.")
             
-        # Get all workspaces
         workspaces = self._workspaces_client.list(limit=1000, offset=0)
-        
         for workspace in workspaces:
             workspace_id = workspace['id']
-            # Iterate through products in this workspace
             for product in self.iter_all_by_workspace(workspace_id=workspace_id, q=q, page_size=page_size):
                 yield product
 

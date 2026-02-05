@@ -14,14 +14,14 @@ class SearchClient:
         self._t = transport
 
     def products(self, *, q: str, workspace_id: str, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
-        """Search/list products via GraphQL products(workspaceId, q)."""
+        """Search/list products via GraphQL products(workspaceId, filter: { q })."""
 
         query = (
-            "query($ws: ID!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  products(workspaceId: $ws, q: $q, limit: $limit, offset: $offset) { id name workspaceId }\n"
+            "query($ws: ID!, $filter: ProductFilter, $limit: Int!, $offset: Int!) {\n"
+            "  products(workspaceId: $ws, filter: $filter, limit: $limit, offset: $offset) { id name workspaceId }\n"
             "}"
         )
-        variables = {"ws": workspace_id, "q": q, "limit": int(limit), "offset": int(offset)}
+        variables = {"ws": workspace_id, "filter": {"q": q}, "limit": int(limit), "offset": int(offset)}
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
