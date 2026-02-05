@@ -54,8 +54,8 @@ class VersionsClient:
         """
 
         query = (
-            "query($pid: ID!, $version: VersionInput!, $q: String, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, version: $version, q: $q, limit: $limit, offset: $offset) {\n"
+            "query($pid: ID!, $version: VersionInput!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
+            "  items(productId: $pid, version: $version, filter: $filter, limit: $limit, offset: $offset) {\n"
             "    id\n"
             "    name\n"
             "    readableId\n"
@@ -68,7 +68,7 @@ class VersionsClient:
         variables = {
             "pid": product_id,
             "version": {"productId": product_id, "versionNumber": int(version_number)},
-            "q": q,
+            "filter": {"q": q} if q else None,
             "limit": int(limit),
             "offset": int(offset),
         }

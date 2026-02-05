@@ -79,7 +79,7 @@ class ProductVersion(BaseModel):
 
     product_id: str = Field(alias="productId", min_length=1)
     version_number: int = Field(alias="versionNumber")
-    title: str = Field(min_length=1)
+    title: Optional[str] = Field(default=None)
     description: Optional[str] = None
     created_by: Optional[str] = Field(alias="createdBy", default=None)
     created_at: datetime = Field(alias="createdAt")

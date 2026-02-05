@@ -21,7 +21,7 @@ class SearchClient:
             "  products(workspaceId: $ws, filter: $filter, limit: $limit, offset: $offset) { id name workspaceId }\n"
             "}"
         )
-        variables = {"ws": workspace_id, "filter": {"q": q}, "limit": int(limit), "offset": int(offset)}
+        variables = {"ws": workspace_id, "filter": {"q": q} if q else None, "limit": int(limit), "offset": int(offset)}
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
@@ -34,11 +34,16 @@ class SearchClient:
         """Search/list items via GraphQL items(product_id, q, parent_item_id)."""
 
         query = (
-            "query($pid: ID!, $q: String, $parent: ID, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, q: $q, parentItemId: $parent, limit: $limit, offset: $offset) { id name productId parentId position }\n"
+            "query($pid: ID!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
+            "  items(productId: $pid, filter: $filter, limit: $limit, offset: $offset) { id name productId parentId position }\n"
             "}"
         )
-        variables = {"pid": product_id, "q": q, "parent": parent_item_id, "limit": int(limit), "offset": int(offset)}
+        filter_obj: Dict[str, Any] = {}
+        if q is not None:
+            filter_obj["q"] = q
+        if parent_item_id is not None:
+            filter_obj["parentItemId"] = parent_item_id
+        variables = {"pid": product_id, "filter": filter_obj if filter_obj else None, "limit": int(limit), "offset": int(offset)}
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
@@ -54,7 +59,7 @@ class SearchClient:
             "query($q: String!, $ws: ID, $pid: ID, $iid: ID, $ptype: String, $cat: String, $limit: Int!, $offset: Int!, $sort: String) {\n"
             "  searchProperties(q: $q, workspaceId: $ws, productId: $pid, itemId: $iid, propertyType: $ptype, category: $cat, limit: $limit, offset: $offset, sort: $sort) {\n"
             "    query total limit offset processingTimeMs\n"
-            "    hits { id workspaceId productId itemId propertyType name category value parsedValue }\n"
+            "    hits { id workspaceId productId itemId propertyType name category value }\n"
             "  }\n"
             "}"
         )
