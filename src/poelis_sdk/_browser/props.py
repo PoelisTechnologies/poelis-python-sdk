@@ -189,11 +189,11 @@ class _PropWrapper:
                 return (integer_part or 0) * (10 ** int(exponent))
             except Exception:
                 return integer_part
-        # If parsedValue was None or missing, try to parse the raw value for numeric/formula properties
+        # If parsedValue was None or missing, try to parse the raw value for numeric/formula/matrix
         if "value" in p:
             raw_value = p.get("value")
             property_type = (p.get("__typename") or p.get("propertyType") or "").lower()
-            is_numeric = property_type in ("numericproperty", "numeric", "formulaproperty", "formula")
+            is_numeric = property_type in ("numericproperty", "numeric", "formulaproperty", "formula", "matrixproperty", "matrix")
             if raw_value is None:
                 return None  # invalid formula or missing value
             if isinstance(raw_value, str) and is_numeric:
@@ -356,11 +356,12 @@ class _PropWrapper:
 
         Args:
             value: New value for the property. Format depends on property type:
-                - Numeric: number, array, or matrix (will be converted to JSON string)
+                - Numeric: number or array (will be converted to JSON string)
                 - Text: string
                 - Date: string in ISO 8601 format (YYYY-MM-DD)
                 - Status: string (DRAFT, UNDER_REVIEW, or DONE)
-                - Formula: read-only; calling change_property raises an error.
+                - Formula: read-only
+                - Matrix: 2D array (will be converted to JSON string)
             title: Optional title/reason for history tracking (mapped to 'reason' in mutation).
             description: Optional description for history tracking.
 
@@ -411,7 +412,6 @@ class _PropWrapper:
                 "Formula properties cannot be updated via the SDK. "
                 "They are computed from their expression and dependencies."
             )
-
         # Build mutation parameters
         mutation_params: Dict[str, Any] = {"id": property_id}
 
@@ -432,6 +432,8 @@ class _PropWrapper:
         # Call appropriate mutation based on property type
         try:
             if property_type == "numeric":
+                updated_property = properties_client.update_numeric_property(**mutation_params)
+            elif property_type == "matrix":
                 updated_property = properties_client.update_numeric_property(**mutation_params)
             elif property_type == "text":
                 updated_property = properties_client.update_text_property(**mutation_params)
@@ -481,7 +483,7 @@ class _PropWrapper:
         """Determine property type from _raw data.
 
         Returns:
-            str: Property type ('numeric', 'text', 'date', 'status', 'formula').
+            str: Property type ('numeric', 'text', 'date', 'status', 'formula', 'matrix').
 
         Raises:
             RuntimeError: If property type cannot be determined.
@@ -492,6 +494,8 @@ class _PropWrapper:
             return "numeric"
         elif "formula" in typename:
             return "formula"
+        elif "matrix" in typename:
+            return "matrix"
         elif "text" in typename:
             return "text"
         elif "date" in typename:
@@ -505,6 +509,8 @@ class _PropWrapper:
             return "numeric"
         elif prop_type in ("formula", "formulaproperty"):
             return "formula"
+        elif prop_type in ("matrix", "matrixproperty"):
+            return "matrix"
         elif prop_type in ("text", "textproperty"):
             return "text"
         elif prop_type in ("date", "dateproperty"):
@@ -514,7 +520,7 @@ class _PropWrapper:
 
         # Try type field
         type_field = self._raw.get("type", "").lower()
-        if type_field in ("numeric", "text", "date", "status", "formula"):
+        if type_field in ("numeric", "text", "date", "status", "formula", "matrix"):
             return type_field
 
         raise RuntimeError(f"Could not determine property type from property data: {self._raw}")
@@ -542,6 +548,8 @@ class _PropWrapper:
                 "Formula properties cannot be updated via the SDK. "
                 "They are computed from their expression and dependencies."
             )
+        elif property_type == "matrix":
+            return PropertiesClient._convert_numeric_value(value)
         elif property_type == "text":
             # Text values are passed as strings directly
             if not isinstance(value, str):

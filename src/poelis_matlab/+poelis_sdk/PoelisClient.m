@@ -204,7 +204,7 @@ classdef PoelisClient < handle
             %   value (required): New value for the property. Can be:
             %       - double: For numeric properties
             %       - string/char: For text, date, or status properties
-            %       - array: For numeric array/matrix properties
+            %       - array: For numeric 1D or matrix 2D arrays. Formula is read-only.
             %   title (string, optional): Title/reason for history tracking
             %   description (string, optional): Description for history tracking
             %
@@ -285,6 +285,10 @@ classdef PoelisClient < handle
                 elseif contains(ME.message, 'Status must be one of')
                     error('poelis:InvalidStatus', ...
                         'Status value must be one of: DRAFT, UNDER_REVIEW, DONE.\nPath: %s', ...
+                        path);
+                elseif contains(ME.message, 'Formula properties cannot')
+                    error('poelis:ReadOnlyProperty', ...
+                        'Formula properties are read-only and cannot be updated.\nPath: %s', ...
                         path);
                 else
                     error('poelis:ChangePropertyFailed', ...

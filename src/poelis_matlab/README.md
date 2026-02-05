@@ -99,7 +99,7 @@ poelis.change_property('workspace.product.draft.item.description', 'New text');
 - Versioned properties (`.v1`, `.v2`, `.baseline`) are read-only
 - **Requires EDITOR role**: Write operations require EDITOR role for the workspace or product
   - Users with VIEWER role can only read data and will receive a permission error
-- Numeric values can be numbers or matrixes
+- Numeric values can be numbers or 1D arrays. Matrix values are 2D arrays. Formula properties are read-only.
 - Text values must be strings
 - Date values must be in ISO 8601 format (YYYY-MM-DD)
 

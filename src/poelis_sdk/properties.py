@@ -39,7 +39,7 @@ class PropertiesClient:
 
         Args:
             id: Property ID (required).
-            value: New value as JSON string (number, array, or matrix).
+            value: New value as JSON string (scalar, 1D array, or 2D matrix).
             item_id: Optional item ID to move property to.
             name: Optional property name.
             readable_id: Optional readable ID.
@@ -82,7 +82,6 @@ class PropertiesClient:
                 "    name\n"
                 "    position\n"
                 "    value\n"
-                "    type\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -115,7 +114,6 @@ class PropertiesClient:
                 "    name\n"
                 "    position\n"
                 "    value\n"
-                "    type\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -223,7 +221,6 @@ class PropertiesClient:
                 "    name\n"
                 "    position\n"
                 "    value\n"
-                "    type\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -251,7 +248,6 @@ class PropertiesClient:
                 "    name\n"
                 "    position\n"
                 "    value\n"
-                "    type\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -352,7 +348,6 @@ class PropertiesClient:
                 "    name\n"
                 "    position\n"
                 "    value\n"
-                "    type\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -379,7 +374,6 @@ class PropertiesClient:
                 "    name\n"
                 "    position\n"
                 "    value\n"
-                "    type\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -479,7 +473,6 @@ class PropertiesClient:
                 "    name\n"
                 "    position\n"
                 "    value\n"
-                "    type\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -506,7 +499,6 @@ class PropertiesClient:
                 "    name\n"
                 "    position\n"
                 "    value\n"
-                "    type\n"
                 "    draftPropertyId\n"
                 "    deleted\n"
                 "    hasChanges\n"
@@ -590,26 +582,15 @@ class PropertiesClient:
     def _convert_numeric_value(value: Any) -> str:
         """Convert a numeric value to JSON string format for GraphQL.
 
-        Args:
-            value: Numeric value (int, float, list, or nested list).
-
-        Returns:
-            str: JSON string representation of the value.
-            Arrays are always formatted as matrices: [[1, 2, 3]] for 1D arrays.
+        NumericProperty: scalar or 1D array. MatrixProperty: 2D array.
         """
-        # If it's a list/array, ensure it's always a matrix (2D array)
         if isinstance(value, (list, tuple)):
-            # Handle empty list
             if len(value) == 0:
                 value = []
-            # Check if it's a 1D array (list of numbers, not nested)
-            elif not isinstance(value[0], (list, tuple)):
-                # Wrap 1D array in another list to make it a matrix: [1, 2, 3] -> [[1, 2, 3]]
-                value = [list(value)]
-            else:
-                # Already 2D or higher, convert tuples to lists for JSON serialization
+            elif isinstance(value[0], (list, tuple)):
                 value = [list(row) if isinstance(row, tuple) else row for row in value]
-        
+            else:
+                value = list(value)
         return json.dumps(value)
 
     @staticmethod

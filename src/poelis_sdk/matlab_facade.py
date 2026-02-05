@@ -663,10 +663,12 @@ class PoelisMatlab:
             path: Dot-separated path to the property, e.g., 
                 "workspace.product.item.property" or "workspace.product.draft.item.property"
             value: New value for the property. Format depends on property type:
-                - Numeric: number, array, or matrix (will be converted to JSON string)
+                - Numeric: number or 1D array (will be converted to JSON string)
                 - Text: string
                 - Date: string in ISO 8601 format (YYYY-MM-DD)
                 - Status: string (DRAFT, UNDER_REVIEW, or DONE)
+                - Formula: read-only
+                - Matrix: 2D array (will be converted to JSON string)
             title: Optional title/reason for history tracking.
             description: Optional description for history tracking.
         
