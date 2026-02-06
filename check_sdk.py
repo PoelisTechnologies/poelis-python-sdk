@@ -288,7 +288,7 @@ def main() -> None:
                 prod_names = list(ws_node._children_cache.keys())
             if prod_names:
                 prod_node = ws_node[prod_names[0]]
-                print(f"  ✓ browser → product node")
+                print("  ✓ browser → product node")
                 baseline = getattr(prod_node, "baseline", None)
                 if baseline:
                     baseline._load_children()
@@ -298,9 +298,9 @@ def main() -> None:
                         props = item_node._properties() if hasattr(item_node, "_properties") else []
                         print(f"  ✓ browser → item → {len(props)} props")
                     else:
-                        print(f"  ✓ browser → product (no items)")
+                        print("  ✓ browser → product (no items)")
                 else:
-                    print(f"  ✓ browser → product (no baseline)")
+                    print("  ✓ browser → product (no baseline)")
         except Exception as e:
             print(f"  ✗ browser → {e}")
 

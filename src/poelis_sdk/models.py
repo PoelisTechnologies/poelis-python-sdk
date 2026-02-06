@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from datetime import datetime
 
@@ -118,13 +118,11 @@ class PropertyValue(BaseModel):
 
 
 class NumericProperty(BaseModel):
-    """Numeric property representation.
+    """Numeric property representation (scalar or 1D array values).
 
     Note: The `category` field contains normalized/canonicalized values when set.
     Categories are normalized server-side (upper-cased, deduplicated) and
-    may differ from the original input values. For formula properties,
-    `category` and `display_unit` are always unset; `value` is null when the
-    formula is invalid.
+    may differ from the original input values.
     """
 
     model_config = ConfigDict(populate_by_name=True)
@@ -138,7 +136,7 @@ class NumericProperty(BaseModel):
     value: Optional[str] = None
     category: Optional[str] = None
     display_unit: Optional[str] = Field(alias="displayUnit", default=None)
-    type: str = Field(min_length=1)
+    type: Optional[str] = Field(default=None)
     parsed_value: Optional[Union[int, float, List[Any], str]] = Field(alias="parsedValue", default=None)
 
     @property
@@ -185,6 +183,64 @@ class DateProperty(BaseModel):
     
     @property
     def typed_value(self) -> str:
+        """Get the properly typed value, falling back to raw string if parsing failed."""
+        return self.parsed_value if self.parsed_value is not None else self.value
+
+
+class FormulaProperty(BaseModel):
+    """Formula property representation (read-only, computed from expression and dependencies).
+
+    For formula properties, category and display_unit are typically unset.
+    value is None when the formula is invalid.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str = Field(min_length=1)
+    product_id: Optional[str] = Field(alias="productId", default=None)
+    product_version_number: Optional[int] = Field(alias="productVersionNumber", default=None)
+    item_id: Optional[str] = Field(alias="itemId", default=None)
+    position: Optional[float] = None
+    name: str = Field(min_length=1)
+    readable_id: Optional[str] = Field(alias="readableId", default=None)
+    value: Optional[str] = None
+    numeric_value: Optional[str] = Field(alias="numericValue", default=None)
+    category: Optional[str] = None
+    display_unit: Optional[str] = Field(alias="displayUnit", default=None)
+    parsed_value: Optional[Union[int, float, List[Any], str]] = Field(alias="parsedValue", default=None)
+    formula_expression: Optional[str] = Field(alias="formulaExpression", default=None)
+    formula_dependencies: Optional[List[Dict[str, Any]]] = Field(alias="formulaDependencies", default=None)
+    has_formula_dependency_changes: Optional[bool] = Field(alias="hasFormulaDependencyChanges", default=None)
+    updated_at: Optional[str] = Field(alias="updatedAt", default=None)
+    updated_by: Optional[str] = Field(alias="updatedBy", default=None)
+
+    @property
+    def typed_value(self) -> Union[int, float, List[Any], str, None]:
+        """Get the properly typed value, falling back to raw string if parsing failed."""
+        return self.parsed_value if self.parsed_value is not None else (self.value or self.numeric_value)
+
+
+class MatrixProperty(BaseModel):
+    """Matrix property representation (2D array values)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str = Field(min_length=1)
+    product_id: Optional[str] = Field(alias="productId", default=None)
+    product_version_number: Optional[int] = Field(alias="productVersionNumber", default=None)
+    item_id: Optional[str] = Field(alias="itemId", default=None)
+    position: Optional[float] = None
+    name: str = Field(min_length=1)
+    readable_id: Optional[str] = Field(alias="readableId", default=None)
+    value: Optional[str] = None
+    category: Optional[str] = None
+    display_unit: Optional[str] = Field(alias="displayUnit", default=None)
+    parsed_value: Optional[Union[int, float, List[Any], str]] = Field(alias="parsedValue", default=None)
+    updated_at: Optional[str] = Field(alias="updatedAt", default=None)
+    updated_by: Optional[str] = Field(alias="updatedBy", default=None)
+
+    @property
+    def typed_value(self) -> Union[int, float, List[Any], str, None]:
         """Get the properly typed value, falling back to raw string if parsing failed."""
         return self.parsed_value if self.parsed_value is not None else self.value
 
