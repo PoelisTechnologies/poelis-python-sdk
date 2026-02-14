@@ -55,7 +55,7 @@ class VersionsClient:
 
         query = (
             "query($pid: ID!, $version: VersionInput!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, version: $version, filter: $filter, limit: $limit, offset: $offset) {\n"
+            "  sdkItems(productId: $pid, version: $version, filter: $filter, limit: $limit, offset: $offset) {\n"
             "    id\n"
             "    name\n"
             "    readableId\n"
@@ -78,7 +78,7 @@ class VersionsClient:
         if "errors" in payload:
             raise RuntimeError(str(payload["errors"]))
 
-        items = payload.get("data", {}).get("items", [])
+        items = payload.get("data", {}).get("sdkItems", [])
 
         return items
 

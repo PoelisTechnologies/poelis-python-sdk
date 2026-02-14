@@ -45,7 +45,7 @@ class _MockTransport(httpx.BaseTransport):
                 return httpx.Response(200, json=data)
 
             # Items by product (top-level only, but include child items for draft queries)
-            if "items(productId:" in query and "parentItemId" not in query and "version:" not in query:
+            if "items(productId:" in query and "parentItemId" not in query and "version:" not in query and "sdkItems(" not in query:
                 assert vars.get("pid") == "p1"
                 # For draft queries, include both parent and child items
                 data = {"data": {"items": [
@@ -100,11 +100,14 @@ class _MockTransport(httpx.BaseTransport):
                 ]}}
                 return httpx.Response(200, json=data)
 
-            # Versioned items
-            if "items(productId:" in query and "version:" in query:
+            # Versioned items (new sdkItems query, keep items compatibility in tests)
+            if ("sdkItems(productId:" in query and "version:" in query) or ("items(productId:" in query and "version:" in query):
                 assert vars.get("pid") == "p1"
                 # Include both parent and child items for all versioned queries
-                data = {"data": {"items": [
+                data = {"data": {"sdkItems": [
+                    {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "position": 1},
+                    {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "position": 1},
+                ], "items": [
                     {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "position": 1},
                     {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "position": 1},
                 ]}}

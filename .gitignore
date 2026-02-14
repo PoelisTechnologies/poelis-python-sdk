@@ -211,6 +211,7 @@ __marimo__/
 # Others
 tmp/
 .vscode/
+.cursor/
 
 # Allow GitHub workflows
 !/.github/
