@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 from .client import PoelisClient
 from .exceptions import NotFoundError, UnauthorizedError
+from ._browser.node.properties import get_property_from_item_tree
 
 
 def _ensure_matlab_compatible(value: Any) -> Any:
@@ -44,11 +45,19 @@ def _ensure_matlab_compatible(value: Any) -> Any:
     return str(value)
 
 
-def _resolve_property_from_node(node: Any, property_name: str) -> Any:
+def _resolve_property_from_node(
+    node: Any,
+    property_name: str,
+    *,
+    search_item_subtree: bool = True,
+) -> Any:
     """Resolve a property from a node, avoiding product-level get_property.
     
     This function ensures MATLAB never calls get_property() directly on product nodes.
     Instead, it routes through baseline/draft or uses item-level property access.
+
+    When ``search_item_subtree`` is False (path ended on an explicit item), only that
+    item's own properties are considered — no descendant item walk.
     
     Args:
         node: The node to resolve the property from (product, version, or item).
@@ -67,8 +76,11 @@ def _resolve_property_from_node(node: Any, property_name: str) -> Any:
     # If we're at a product node, route through baseline (for reads)
     if node_level == "product":
         baseline = getattr(node, "baseline")
-        # Recursively resolve from baseline (which is a version node)
-        return _resolve_property_from_node(baseline, property_name)
+        return _resolve_property_from_node(
+            baseline,
+            property_name,
+            search_item_subtree=search_item_subtree,
+        )
     
     # If we're at a version node, we can't call get_property directly
     # We need to search through items in the version
@@ -80,7 +92,11 @@ def _resolve_property_from_node(node: Any, property_name: str) -> Any:
         for item_key, item_node in getattr(node, "_children_cache", {}).items():
             try:
                 # Try to get the property from this item
-                return _resolve_property_from_node(item_node, property_name)
+                return _resolve_property_from_node(
+                    item_node,
+                    property_name,
+                    search_item_subtree=True,
+                )
             except (RuntimeError, AttributeError):
                 # Property not found in this item, try next
                 continue
@@ -110,10 +126,13 @@ def _resolve_property_from_node(node: Any, property_name: str) -> Any:
         except AttributeError:
             pass
     
-    # Fallback: use get_property on item nodes only
     if node_level == "item":
-        if hasattr(node, "get_property"):
+        if search_item_subtree and hasattr(node, "get_property"):
             return node.get_property(property_name)
+        if not search_item_subtree:
+            return get_property_from_item_tree(
+                node, property_name, search_descendants=False
+            )
     
     # If we get here, the node doesn't support property access
     raise RuntimeError(
@@ -122,7 +141,13 @@ def _resolve_property_from_node(node: Any, property_name: str) -> Any:
     )
 
 
-def _resolve_property_for_write(node: Any, property_name: str, path: str) -> Any:
+def _resolve_property_for_write(
+    node: Any,
+    property_name: str,
+    path: str,
+    *,
+    search_item_subtree: bool = True,
+) -> Any:
     """Resolve a property for writing, ensuring we route through draft and prevent frozen version writes.
     
     This function ensures MATLAB never calls get_property() directly on product nodes for writes.
@@ -132,6 +157,7 @@ def _resolve_property_for_write(node: Any, property_name: str, path: str) -> Any
         node: The node to resolve the property from (product, version, or item).
         property_name: The name/readableId of the property to resolve.
         path: The full path for error messages.
+        search_item_subtree: If False, resolve only on the addressed item node.
     
     Returns:
         A _PropWrapper object for the property (must be from draft).
@@ -148,7 +174,12 @@ def _resolve_property_for_write(node: Any, property_name: str, path: str) -> Any
     if node_level == "product":
         draft = getattr(node, "draft")
         # Recursively resolve from draft (which is a version node)
-        return _resolve_property_for_write(draft, property_name, path)
+        return _resolve_property_for_write(
+            draft,
+            property_name,
+            path,
+            search_item_subtree=search_item_subtree,
+        )
     
     # If we're at a version node, check if it's draft and search through items
     if node_level == "version":
@@ -168,7 +199,12 @@ def _resolve_property_for_write(node: Any, property_name: str, path: str) -> Any
         for item_key, item_node in getattr(node, "_children_cache", {}).items():
             try:
                 # Try to get the property from this item
-                return _resolve_property_for_write(item_node, property_name, path)
+                return _resolve_property_for_write(
+                    item_node,
+                    property_name,
+                    path,
+                    search_item_subtree=True,
+                )
             except (RuntimeError, AttributeError, ValueError):
                 # Property not found in this item or write blocked, try next
                 continue
@@ -213,10 +249,13 @@ def _resolve_property_for_write(node: Any, property_name: str, path: str) -> Any
         except AttributeError:
             pass
     
-    # Fallback: use get_property on item nodes only
     if node_level == "item":
-        if hasattr(node, "get_property"):
+        if search_item_subtree and hasattr(node, "get_property"):
             return node.get_property(property_name)
+        if not search_item_subtree:
+            return get_property_from_item_tree(
+                node, property_name, search_descendants=False
+            )
     
     # If we get here, the node doesn't support property access
     raise RuntimeError(
@@ -312,7 +351,11 @@ class PoelisMatlab:
                 # Last element: must be a property
                 # Use helper function that avoids calling get_property on product nodes
                 try:
-                    prop = _resolve_property_from_node(obj, name)
+                    prop = _resolve_property_from_node(
+                        obj,
+                        name,
+                        search_item_subtree=False,
+                    )
                     value = prop.value
                     # Ensure the value is MATLAB-compatible
                     return _ensure_matlab_compatible(value)
@@ -413,7 +456,11 @@ class PoelisMatlab:
                 # Last element: must be a property
                 # Use helper function that avoids calling get_property on product nodes
                 try:
-                    prop = _resolve_property_from_node(obj, name)
+                    prop = _resolve_property_from_node(
+                        obj,
+                        name,
+                        search_item_subtree=False,
+                    )
                     # Extract all property information
                     info: dict[str, Any] = {
                         "value": _ensure_matlab_compatible(prop.value),
@@ -710,7 +757,12 @@ class PoelisMatlab:
                 # Last element: must be a property
                 # Use helper function that routes through draft and prevents frozen version writes
                 try:
-                    prop = _resolve_property_for_write(obj, name, path)
+                    prop = _resolve_property_for_write(
+                        obj,
+                        name,
+                        path,
+                        search_item_subtree=False,
+                    )
                     # Call change_property on the property wrapper with changed_via='MATLAB_SDK'
                     prop.change_property(value, title=title, description=description, changed_via="MATLAB_SDK")
                 except (NotFoundError, UnauthorizedError):
