@@ -69,19 +69,39 @@ class _MockTransport(httpx.BaseTransport):
             if "properties(itemId:" in query or "sdkProperties(itemId:" in query:
                 item_id = vars.get("iid")
                 is_sdk = "sdkProperties(itemId:" in query
+                is_versioned = "version:" in query
                 if item_id == "i1":
                     # Return properties for parent item (no demo_property_mass here)
                     # Note: "Color" and "Weight" use capitalized readableId to match existing tests
                     props = [
-                        {"__typename": "TextProperty", "id": "p1", "name": "Color", "readableId": "Color", "value": "Red", "parsedValue": "Red"},
-                        {"__typename": "NumericProperty", "id": "p3", "name": "Weight", "readableId": "Weight", "integerPart": 5, "exponent": 0, "category": "Mass"},
+                        {"__typename": "TextProperty", "id": "p1", "name": "Color", "readableId": "Color", "value": "Red", "parsedValue": "Red", "deleted": False},
+                        {"__typename": "NumericProperty", "id": "p3", "name": "Weight", "readableId": "Weight", "integerPart": 5, "exponent": 0, "category": "Mass", "deleted": False},
                     ]
+                    if is_sdk and is_versioned:
+                        props.append(
+                            {
+                                "__typename": "TextProperty",
+                                "id": "p_deleted_version",
+                                "name": "Deleted Version Property",
+                                "readableId": "deleted_version_property",
+                                "value": "Hidden",
+                                "parsedValue": "Hidden",
+                                "deleted": True,
+                            }
+                        )
                     data = {"data": {"properties": props, "sdkProperties": props} if is_sdk else {"properties": props}}
                     return httpx.Response(200, json=data)
                 elif item_id == "i2":
                     # Return properties for child item (demo_property_mass is here)
                     props = [
-                        {"__typename": "NumericProperty", "id": "p2", "name": "Mass", "readableId": "demo_property_mass", "category": "Mass", "displayUnit": "kg", "value": "10.5", "parsedValue": 10.5},
+                        {"__typename": "NumericProperty", "id": "p2", "name": "Mass", "readableId": "demo_property_mass", "category": "Mass", "displayUnit": "kg", "value": "10.5", "parsedValue": 10.5, "deleted": False},
+                    ]
+                    data = {"data": {"properties": props, "sdkProperties": props} if is_sdk else {"properties": props}}
+                    return httpx.Response(200, json=data)
+                elif item_id == "i3":
+                    # Deleted child item should never win recursive version-tree lookup
+                    props = [
+                        {"__typename": "NumericProperty", "id": "p_deleted", "name": "Mass", "readableId": "demo_property_mass", "category": "Mass", "displayUnit": "kg", "value": "99.0", "parsedValue": 99.0, "deleted": False},
                     ]
                     data = {"data": {"properties": props, "sdkProperties": props} if is_sdk else {"properties": props}}
                     return httpx.Response(200, json=data)
@@ -105,11 +125,15 @@ class _MockTransport(httpx.BaseTransport):
                 assert vars.get("pid") == "p1"
                 # Include both parent and child items for all versioned queries
                 data = {"data": {"sdkItems": [
-                    {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "position": 1},
-                    {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "position": 1},
+                    {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "position": 1, "deleted": False},
+                    {"id": "i_deleted", "name": "Deleted Item", "readableId": "deleted_item", "productId": "p1", "parentId": None, "position": 99, "deleted": True},
+                    {"id": "i3", "name": "Deleted Child", "readableId": "deleted_child", "productId": "p1", "parentId": "i1", "position": 0, "deleted": True},
+                    {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "position": 1, "deleted": False},
                 ], "items": [
-                    {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "position": 1},
-                    {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "position": 1},
+                    {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "position": 1, "deleted": False},
+                    {"id": "i_deleted", "name": "Deleted Item", "readableId": "deleted_item", "productId": "p1", "parentId": None, "position": 99, "deleted": True},
+                    {"id": "i3", "name": "Deleted Child", "readableId": "deleted_child", "productId": "p1", "parentId": "i1", "position": 0, "deleted": True},
+                    {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "position": 1, "deleted": False},
                 ]}}
                 return httpx.Response(200, json=data)
 
@@ -247,13 +271,67 @@ def test_names_filtering_with_child_items() -> None:
     child_items = item.list_items().names
     # In our mock, there's one child item
     assert "Child Item" in child_items or len(child_items) >= 0
-    
+    assert "Deleted Child" not in child_items
+
     # Filter for properties only - should return only properties
     props_only = item.list_properties().names
     assert "Color" in props_only
     assert "Weight" in props_only
     # Should not include child item names
     assert "Child Item" not in props_only
+
+
+def test_deleted_version_items_hidden_from_browser_navigation() -> None:
+    """Deleted version items should be excluded from tree-style navigation."""
+
+    t = _MockTransport()
+    c = _client_with_graphql_mock(t)
+
+    prod = c.browser["uh2"]["Widget Pro"]
+
+    top_level_names = prod.list_items().names
+    assert "gadget_a" in top_level_names
+    assert "deleted_item" not in top_level_names
+
+    version_names = prod.v1.list_items().names
+    assert "gadget_a" in version_names
+    assert "deleted_item" not in version_names
+
+    version_item = prod.v1["gadget_a"]
+    child_names = version_item.list_items().names
+    assert "child_item" in child_names
+    assert "deleted_child" not in child_names
+
+
+def test_deleted_version_properties_hidden_from_browser_navigation() -> None:
+    """Versioned sdkProperties reads should hide deleted properties."""
+
+    t = _MockTransport()
+    c = _client_with_graphql_mock(t, enable_change_detection=True)
+
+    prod = c.browser["uh2"]["Widget Pro"]
+
+    baseline_item = prod["gadget_a"]
+    baseline_prop_names = baseline_item.list_properties().names
+    assert "Color" in baseline_prop_names
+    assert "Weight" in baseline_prop_names
+    assert "deleted_version_property" not in baseline_prop_names
+    with pytest.raises(KeyError):
+        _ = baseline_item.props["deleted_version_property"]
+    assert baseline_item.get_property("demo_property_mass").value == 10.5
+    with pytest.raises(RuntimeError, match="not found"):
+        _ = baseline_item.get_property("deleted_version_property")
+
+    version_item = prod.v1["gadget_a"]
+    version_prop_names = version_item.list_properties().names
+    assert "Color" in version_prop_names
+    assert "Weight" in version_prop_names
+    assert "deleted_version_property" not in version_prop_names
+    with pytest.raises(KeyError):
+        _ = version_item.props["deleted_version_property"]
+    assert version_item.get_property("demo_property_mass").value == 10.5
+    with pytest.raises(RuntimeError, match="not found"):
+        _ = version_item.get_property("deleted_version_property")
 
 
 def test_baseline_version_access() -> None:
@@ -579,5 +657,3 @@ def test_change_tracking_with_get_property_records_id_and_path(tmp_path: Any) ->
     # Product nodes expose version shortcuts as v1/v2/... (not a literal "version" attribute).
     assert "v1" in dir_items
     assert "draft" in dir_items
-
-

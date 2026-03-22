@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any, Dict, Optional
 
 import httpx
@@ -11,6 +10,7 @@ import pytest
 from poelis_sdk.browser import _PropWrapper
 from poelis_sdk.client import PoelisClient
 from poelis_sdk.exceptions import NotFoundError, UnauthorizedError
+from poelis_sdk.properties import PropertiesClient
 
 
 class _MockTransport:
@@ -63,6 +63,7 @@ def mock_client() -> PoelisClient:
     # Replace transport with mock
     mock_transport = _MockTransport()
     client._transport = mock_transport  # type: ignore[assignment]
+    client.properties = PropertiesClient(mock_transport)  # type: ignore[assignment]
     return client
 
 
@@ -97,13 +98,13 @@ def test_change_property_numeric_value(mock_client: PoelisClient) -> None:
     # Verify request was made
     assert len(mock_client._transport.requests) == 1  # type: ignore[attr-defined]
     request = mock_client._transport.requests[0]  # type: ignore[attr-defined]
-    payload = json.loads(request.content.decode("utf-8"))
-    variables = payload["variables"]
+    variables = request["variables"]
 
     assert variables["id"] == "prop-1"
     assert variables["value"] == "123.45"  # Should be JSON string
     assert variables["reason"] == "Updated mass"
     assert variables["description"] == "Changed mass value"
+    assert "updateNumericProperty" in request["query"]
 
     # Verify _raw was updated
     assert wrapper._raw["value"] == "123.45"
@@ -134,8 +135,7 @@ def test_change_property_numeric_array(mock_client: PoelisClient) -> None:
     wrapper.change_property([4, 5, 6])
 
     request = mock_client._transport.requests[0]  # type: ignore[attr-defined]
-    payload = json.loads(request.content.decode("utf-8"))
-    variables = payload["variables"]
+    variables = request["variables"]
 
     assert variables["value"] == "[4, 5, 6]"  # Should be JSON string
 
@@ -164,12 +164,11 @@ def test_change_property_text_value(mock_client: PoelisClient) -> None:
     wrapper.change_property("New text", title="Updated description")
 
     request = mock_client._transport.requests[0]  # type: ignore[attr-defined]
-    payload = json.loads(request.content.decode("utf-8"))
-    variables = payload["variables"]
+    variables = request["variables"]
 
     assert variables["id"] == "prop-2"
     assert variables["value"] == "New text"
-    assert "updateTextProperty" in payload["query"]
+    assert "updateTextProperty" in request["query"]
 
 
 def test_change_property_date_value(mock_client: PoelisClient) -> None:
@@ -194,11 +193,10 @@ def test_change_property_date_value(mock_client: PoelisClient) -> None:
     wrapper.change_property("2025-12-31")
 
     request = mock_client._transport.requests[0]  # type: ignore[attr-defined]
-    payload = json.loads(request.content.decode("utf-8"))
-    variables = payload["variables"]
+    variables = request["variables"]
 
     assert variables["value"] == "2025-12-31"
-    assert "updateDateProperty" in payload["query"]
+    assert "updateDateProperty" in request["query"]
 
 
 def test_change_property_date_invalid_format(mock_client: PoelisClient) -> None:
@@ -239,11 +237,10 @@ def test_change_property_status_value(mock_client: PoelisClient) -> None:
     wrapper.change_property("DONE")
 
     request = mock_client._transport.requests[0]  # type: ignore[attr-defined]
-    payload = json.loads(request.content.decode("utf-8"))
-    variables = payload["variables"]
+    variables = request["variables"]
 
     assert variables["value"] == "DONE"
-    assert "updateStatusProperty" in payload["query"]
+    assert "updateStatusProperty" in request["query"]
 
 
 def test_change_property_status_invalid_value(mock_client: PoelisClient) -> None:
@@ -308,10 +305,9 @@ def test_change_property_value_only(mock_client: PoelisClient) -> None:
 
     # Check request
     request = mock_client._transport.requests[0]  # type: ignore[attr-defined]
-    payload = json.loads(request.content.decode("utf-8"))
-    assert payload["variables"]["value"] == "123.45"
+    assert request["variables"]["value"] == "123.45"
     # Verify only value is being updated, not other fields
-    assert "category" not in payload["variables"] or payload["variables"].get("category") is None
+    assert "category" not in request["variables"] or request["variables"].get("category") is None
 
 
 def test_change_property_not_found_error(mock_client: PoelisClient) -> None:
@@ -461,8 +457,7 @@ def test_change_property_property_type_detection(mock_client: PoelisClient) -> N
     wrapper1.change_property(123.45)
 
     request = mock_client._transport.requests[0]  # type: ignore[attr-defined]
-    payload = json.loads(request.content.decode("utf-8"))
-    assert "updateNumericProperty" in payload["query"]
+    assert "updateNumericProperty" in request["query"]
 
     # Test with propertyType field
     raw_prop2: Dict[str, Any] = {
@@ -485,8 +480,7 @@ def test_change_property_property_type_detection(mock_client: PoelisClient) -> N
     wrapper2.change_property("New text")
 
     request2 = mock_client._transport.requests[1]  # type: ignore[attr-defined]
-    payload2 = json.loads(request2.content.decode("utf-8"))
-    assert "updateTextProperty" in payload2["query"]
+    assert "updateTextProperty" in request2["query"]
 
 
 def test_change_property_updates_raw_data(mock_client: PoelisClient) -> None:
@@ -524,4 +518,3 @@ def test_change_property_updates_raw_data(mock_client: PoelisClient) -> None:
     # Verify original fields are preserved/updated
     assert wrapper._raw["id"] == original_raw["id"]
     assert wrapper._raw["readableId"] == original_raw["readableId"]
-

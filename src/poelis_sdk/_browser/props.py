@@ -258,57 +258,10 @@ class _PropWrapper:
 
     @value.setter
     def value(self, new_value: Any) -> None:
-        """Set the property value and emit a local change warning if enabled.
-
-        This is primarily intended for notebook/script usage, e.g.::
-
-            mass = ws.demo_product.draft.get_property("demo_property_mass")
-            mass.value = 123.4
-
-        The setter updates the in-memory value and asks the ``PropertyChangeTracker``
-        to emit a warning and log entry for this local edit. It does not push the
-        change back to the Poelis backend.
-        """
-        if self._raw.get("formulaExpression") is not None or self._raw.get("formulaDependencies"):
-            raise ValueError(
-                "Formula properties cannot be updated via the SDK. "
-                "They are computed from their expression and dependencies."
-            )
-        old_value = self._get_property_value()
-
-        # If the value did not actually change, do nothing.
-        if old_value == new_value:
-            return
-
-        # Update the raw payload with the new value. We prefer the canonical
-        # "value" field when present; for legacy shapes we still populate it so
-        # subsequent reads see the edited value.
-        try:
-            self._raw["value"] = new_value
-        except Exception:
-            # If raw is not a standard dict-like, best-effort: ignore.
-            pass
-
-        # Emit a local edit warning through the change tracker when available.
-        if self._client is not None:
-            try:
-                change_tracker = getattr(self._client, "_change_tracker", None)
-                if change_tracker is not None and change_tracker.is_enabled():
-                    property_id = self._raw.get("id")
-                    prop_name = (
-                        self._raw.get("readableId")
-                        or self._raw.get("name")
-                        or self._raw.get("id")
-                    )
-                    change_tracker.warn_on_local_edit(
-                        property_id=property_id,
-                        old_value=old_value,
-                        new_value=new_value,
-                        name=prop_name,
-                    )
-            except Exception:
-                # Silently ignore tracking errors; setting the value itself should not fail.
-                pass
+        """Reject direct assignment and require backend-backed updates."""
+        raise AttributeError(
+            "Property values are read-only. Use change_property(...) to persist an update."
+        )
 
     def _parse_nested_value(self, value: Any) -> Any:
         """Recursively parse nested lists/arrays that might contain string numbers."""
@@ -622,5 +575,4 @@ class _PropWrapper:
             str: The best-effort display name, or an empty string if unknown.
         """
         return self.name or ""
-
 

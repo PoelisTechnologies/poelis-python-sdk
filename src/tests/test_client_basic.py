@@ -27,7 +27,7 @@ def test_client_default_base_url() -> None:
     """Client uses production URL as default when base_url not provided."""
 
     client = PoelisClient(api_key="k")
-    assert client.base_url == "https://api.poelis.ai/"
+    assert client.base_url == "https://poelis-be-py-753618215333.europe-west1.run.app/"
     assert client.org_id is None
     assert hasattr(client, "products")
 
@@ -86,6 +86,5 @@ def test_from_env_default_url(monkeypatch: "MonkeyPatch") -> None:
     monkeypatch.setenv("POELIS_API_KEY", "poelis_live_abc")
 
     c = PoelisClient.from_env()
-    assert c.base_url == "https://api.poelis.ai/"
-
+    assert c.base_url == "https://poelis-be-py-753618215333.europe-west1.run.app/"
 

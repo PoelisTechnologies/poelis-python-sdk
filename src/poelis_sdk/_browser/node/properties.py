@@ -7,10 +7,21 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from .._graphql_errors import _handle_graphql_read_errors
 from ..props import _PropWrapper
-from ..utils import _safe_key
+from ..utils import _is_visible_version_item, _is_visible_version_property, _safe_key
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..nodes import _Node
+
+
+def _filter_visible_version_properties(
+    props: List[Dict[str, Any]],
+    version_number: Optional[int],
+) -> List[Dict[str, Any]]:
+    """Hide deleted properties only for versioned browser reads."""
+
+    if version_number is None:
+        return props
+    return [prop for prop in props if _is_visible_version_property(prop)]
 
 
 def properties(node: "_Node") -> List[Dict[str, Any]]:
@@ -44,18 +55,18 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
 
     formula_on_numeric = " formulaExpression formulaDependencies { id name value displayUnit hierarchyContext { id name } itemId productId }" if use_sdk_properties else " formulaExpression formulaDependencies { id name value displayUnit itemId productId }"
     updated_fields = " updatedAt updatedBy" if use_sdk_properties else ""
-    formula_fragment = f"    ... on {property_type_prefix}FormulaProperty {{ id name readableId numericValue: value parsedValue{formula_on_numeric} hasFormulaDependencyChanges{updated_fields} }}\n"
-    matrix_fragment = f"    ... on {property_type_prefix}MatrixProperty {{ id name readableId category displayUnit value parsedValue{updated_fields} }}\n"
+    formula_fragment = f"    ... on {property_type_prefix}FormulaProperty {{ id name readableId deleted numericValue: value parsedValue{formula_on_numeric} hasFormulaDependencyChanges{updated_fields} }}\n"
+    matrix_fragment = f"    ... on {property_type_prefix}MatrixProperty {{ id name readableId deleted category displayUnit value parsedValue{updated_fields} }}\n"
     if version_number is not None and pid is not None:
         q_parsed = (
             f"query($iid: ID!, $version: VersionInput!) {{\n"
             f"  {query_name}(itemId: $iid, version: $version) {{\n"
             f"    __typename\n"
-            f"    ... on {property_type_prefix}NumericProperty {{ id name readableId category displayUnit numericValue: value parsedValue{updated_fields} }}\n"
+            f"    ... on {property_type_prefix}NumericProperty {{ id name readableId deleted category displayUnit numericValue: value parsedValue{updated_fields} }}\n"
             f"{formula_fragment}"
             f"{matrix_fragment}"
-            f"    ... on {property_type_prefix}TextProperty {{ id name readableId value parsedValue{updated_fields} }}\n"
-            f"    ... on {property_type_prefix}DateProperty {{ id name readableId value{updated_fields} }}\n"
+            f"    ... on {property_type_prefix}TextProperty {{ id name readableId deleted value parsedValue{updated_fields} }}\n"
+            f"    ... on {property_type_prefix}DateProperty {{ id name readableId deleted value{updated_fields} }}\n"
             f"  }}\n"
             f"}}"
         )
@@ -65,11 +76,11 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
             f"query($iid: ID!) {{\n"
             f"  {query_name}(itemId: $iid) {{\n"
             f"    __typename\n"
-            f"    ... on {property_type_prefix}NumericProperty {{ id name readableId category displayUnit numericValue: value parsedValue{updated_fields} }}\n"
+            f"    ... on {property_type_prefix}NumericProperty {{ id name readableId deleted category displayUnit numericValue: value parsedValue{updated_fields} }}\n"
             f"{formula_fragment}"
             f"{matrix_fragment}"
-            f"    ... on {property_type_prefix}TextProperty {{ id name readableId value parsedValue{updated_fields} }}\n"
-            f"    ... on {property_type_prefix}DateProperty {{ id name readableId value{updated_fields} }}\n"
+            f"    ... on {property_type_prefix}TextProperty {{ id name readableId deleted value parsedValue{updated_fields} }}\n"
+            f"    ... on {property_type_prefix}DateProperty {{ id name readableId deleted value{updated_fields} }}\n"
             f"  }}\n"
             f"}}"
         )
@@ -94,7 +105,7 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
                     raise RuntimeError(data["errors"])
         else:
             props_data = data.get("data", {}).get(query_name, []) or []
-            node._props_cache = props_data
+            node._props_cache = _filter_visible_version_properties(props_data, version_number)
             node._props_loaded_at = time.time()
             return node._props_cache
     except RuntimeError:
@@ -111,11 +122,11 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
                     "query($iid: ID!, $version: VersionInput!) {\n"
                     "  properties(itemId: $iid, version: $version) {\n"
                     "    __typename\n"
-                    "    ... on NumericProperty { id name readableId category displayUnit numericValue: value parsedValue }\n"
-                    "    ... on FormulaProperty { id name readableId numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
-                    "    ... on MatrixProperty { id name readableId category displayUnit value parsedValue }\n"
-                    "    ... on TextProperty { id name readableId value }\n"
-                    "    ... on DateProperty { id name readableId value }\n"
+                    "    ... on NumericProperty { id name readableId deleted category displayUnit numericValue: value parsedValue }\n"
+                    "    ... on FormulaProperty { id name readableId deleted numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
+                    "    ... on MatrixProperty { id name readableId deleted category displayUnit value parsedValue }\n"
+                    "    ... on TextProperty { id name readableId deleted value }\n"
+                    "    ... on DateProperty { id name readableId deleted value }\n"
                     "  }\n"
                     "}"
                 )
@@ -125,11 +136,11 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
                     "query($iid: ID!) {\n"
                     "  properties(itemId: $iid) {\n"
                     "    __typename\n"
-                    "    ... on NumericProperty { id name readableId category displayUnit numericValue: value parsedValue }\n"
-                    "    ... on FormulaProperty { id name readableId numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
-                    "    ... on MatrixProperty { id name readableId category displayUnit value parsedValue }\n"
-                    "    ... on TextProperty { id name readableId value }\n"
-                    "    ... on DateProperty { id name readableId value }\n"
+                    "    ... on NumericProperty { id name readableId deleted category displayUnit numericValue: value parsedValue }\n"
+                    "    ... on FormulaProperty { id name readableId deleted numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
+                    "    ... on MatrixProperty { id name readableId deleted category displayUnit value parsedValue }\n"
+                    "    ... on TextProperty { id name readableId deleted value }\n"
+                    "    ... on DateProperty { id name readableId deleted value }\n"
                     "  }\n"
                     "}"
                 )
@@ -148,7 +159,8 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
                             _handle_graphql_read_errors(errors)
                     else:
                         _handle_graphql_read_errors(errors)
-                node._props_cache = data.get("data", {}).get("properties", []) or []
+                props_data = data.get("data", {}).get("properties", []) or []
+                node._props_cache = _filter_visible_version_properties(props_data, version_number)
                 node._props_loaded_at = time.time()
                 return node._props_cache
             except RuntimeError:
@@ -354,18 +366,18 @@ def _search_property_in_item_and_children_impl(
     property_type_prefix = "Sdk" if use_sdk_properties else ""
     updated_fields = " updatedAt updatedBy" if use_sdk_properties else ""
     formula_on_numeric = " formulaExpression formulaDependencies { id name value displayUnit hierarchyContext { id name } itemId productId }" if use_sdk_properties else " formulaExpression formulaDependencies { id name value displayUnit itemId productId }"
-    formula_fragment = f"    ... on {property_type_prefix}FormulaProperty {{ id name readableId numericValue: value parsedValue{formula_on_numeric} hasFormulaDependencyChanges{updated_fields} }}\n"
-    matrix_fragment = f"    ... on {property_type_prefix}MatrixProperty {{ id name readableId category displayUnit value parsedValue{updated_fields} }}\n"
+    formula_fragment = f"    ... on {property_type_prefix}FormulaProperty {{ id name readableId deleted numericValue: value parsedValue{formula_on_numeric} hasFormulaDependencyChanges{updated_fields} }}\n"
+    matrix_fragment = f"    ... on {property_type_prefix}MatrixProperty {{ id name readableId deleted category displayUnit value parsedValue{updated_fields} }}\n"
     if version_number is not None:
         prop_query = (
             f"query($iid: ID!, $version: VersionInput!) {{\n"
             f"  {query_name}(itemId: $iid, version: $version) {{\n"
             f"    __typename\n"
-            f"    ... on {property_type_prefix}NumericProperty {{ id name readableId category displayUnit numericValue: value parsedValue{updated_fields} }}\n"
+            f"    ... on {property_type_prefix}NumericProperty {{ id name readableId deleted category displayUnit numericValue: value parsedValue{updated_fields} }}\n"
             f"{formula_fragment}"
             f"{matrix_fragment}"
-            f"    ... on {property_type_prefix}TextProperty {{ id name readableId value parsedValue{updated_fields} }}\n"
-            f"    ... on {property_type_prefix}DateProperty {{ id name readableId value{updated_fields} }}\n"
+            f"    ... on {property_type_prefix}TextProperty {{ id name readableId deleted value parsedValue{updated_fields} }}\n"
+            f"    ... on {property_type_prefix}DateProperty {{ id name readableId deleted value{updated_fields} }}\n"
             f"  }}\n"
             f"}}"
         )
@@ -375,11 +387,11 @@ def _search_property_in_item_and_children_impl(
             f"query($iid: ID!) {{\n"
             f"  {query_name}(itemId: $iid) {{\n"
             f"    __typename\n"
-            f"    ... on {property_type_prefix}NumericProperty {{ id name readableId category displayUnit numericValue: value parsedValue{updated_fields} }}\n"
+            f"    ... on {property_type_prefix}NumericProperty {{ id name readableId deleted category displayUnit numericValue: value parsedValue{updated_fields} }}\n"
             f"{formula_fragment}"
             f"{matrix_fragment}"
-            f"    ... on {property_type_prefix}TextProperty {{ id name readableId value parsedValue{updated_fields} }}\n"
-            f"    ... on {property_type_prefix}DateProperty {{ id name readableId value{updated_fields} }}\n"
+            f"    ... on {property_type_prefix}TextProperty {{ id name readableId deleted value parsedValue{updated_fields} }}\n"
+            f"    ... on {property_type_prefix}DateProperty {{ id name readableId deleted value{updated_fields} }}\n"
             f"  }}\n"
             f"}}"
         )
@@ -396,11 +408,11 @@ def _search_property_in_item_and_children_impl(
                         "query($iid: ID!, $version: VersionInput!) {\n"
                         "  properties(itemId: $iid, version: $version) {\n"
                         "    __typename\n"
-                        "    ... on NumericProperty { id name readableId category displayUnit numericValue: value parsedValue }\n"
-                        "    ... on FormulaProperty { id name readableId numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
-                        "    ... on MatrixProperty { id name readableId category displayUnit value parsedValue }\n"
-                        "    ... on TextProperty { id name readableId value parsedValue }\n"
-                        "    ... on DateProperty { id name readableId value }\n"
+                        "    ... on NumericProperty { id name readableId deleted category displayUnit numericValue: value parsedValue }\n"
+                        "    ... on FormulaProperty { id name readableId deleted numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
+                        "    ... on MatrixProperty { id name readableId deleted category displayUnit value parsedValue }\n"
+                        "    ... on TextProperty { id name readableId deleted value parsedValue }\n"
+                        "    ... on DateProperty { id name readableId deleted value }\n"
                         "  }\n"
                         "}"
                     )
@@ -410,11 +422,11 @@ def _search_property_in_item_and_children_impl(
                         "query($iid: ID!) {\n"
                         "  properties(itemId: $iid) {\n"
                         "    __typename\n"
-                        "    ... on NumericProperty { id name readableId category displayUnit numericValue: value parsedValue }\n"
-                        "    ... on FormulaProperty { id name readableId numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
-                        "    ... on MatrixProperty { id name readableId category displayUnit value parsedValue }\n"
-                        "    ... on TextProperty { id name readableId value parsedValue }\n"
-                        "    ... on DateProperty { id name readableId value }\n"
+                        "    ... on NumericProperty { id name readableId deleted category displayUnit numericValue: value parsedValue }\n"
+                        "    ... on FormulaProperty { id name readableId deleted numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
+                        "    ... on MatrixProperty { id name readableId deleted category displayUnit value parsedValue }\n"
+                        "    ... on TextProperty { id name readableId deleted value parsedValue }\n"
+                        "    ... on DateProperty { id name readableId deleted value }\n"
                         "  }\n"
                         "}"
                     )
@@ -434,6 +446,7 @@ def _search_property_in_item_and_children_impl(
         props = data.get("data", {}).get(query_name, []) or []
         if not props:
             props = data.get("data", {}).get("properties", []) or []
+        props = _filter_visible_version_properties(props, version_number)
 
         for prop in props:
             if prop.get("readableId") == readable_id:
@@ -463,7 +476,7 @@ def _search_property_in_item_and_children_impl(
             limit=1000,
             offset=0,
         )
-        child_items = [it for it in all_items if it.get("parentId") == item_id]
+        child_items = [it for it in all_items if _is_visible_version_item(it) and it.get("parentId") == item_id]
     else:
         child_query = (
             "query($pid: ID!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
@@ -501,5 +514,3 @@ def _search_property_in_item_and_children_impl(
                 continue
 
     raise RuntimeError(f"Property with readableId '{readable_id}' not found in item tree")
-
-
