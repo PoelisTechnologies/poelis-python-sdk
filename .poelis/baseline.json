@@ -1,0 +1,51 @@
+{
+  "baselines": {
+    "prop1": {
+      "value": 150.0,
+      "name": "Price",
+      "first_accessed_at": 1774202230.516873,
+      "updated_at": null,
+      "updated_by": null
+    },
+    "p1": {
+      "value": "Red",
+      "name": "Color",
+      "first_accessed_at": 1774202230.604655,
+      "updated_at": null,
+      "updated_by": null
+    },
+    "p3": {
+      "value": 5.0,
+      "name": "Weight",
+      "first_accessed_at": 1774202230.604852,
+      "updated_at": null,
+      "updated_by": null
+    },
+    "p2": {
+      "value": 10.5,
+      "name": "demo_property_mass",
+      "first_accessed_at": 1774202230.616267,
+      "updated_at": null,
+      "updated_by": null
+    }
+  },
+  "accessed_items": {},
+  "accessed_properties": {
+    "uh2.Widget Pro.gadget_a.demo_property_mass": {
+      "name": "demo_property_mass",
+      "property_id": "p2",
+      "first_accessed_at": 1774202230.61602
+    },
+    "uh2.Widget Pro.v1.gadget_a.demo_property_mass": {
+      "name": "demo_property_mass",
+      "property_id": "p2",
+      "first_accessed_at": 1774202230.6180532
+    },
+    "uh2.Widget Pro.draft.Gadget A.demo_property_mass": {
+      "name": "demo_property_mass",
+      "property_id": "p2",
+      "first_accessed_at": 1774202230.947155
+    }
+  },
+  "last_updated": 1774202230.9474509
+}

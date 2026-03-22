@@ -1,0 +1,87 @@
+{
+  "baselines": {},
+  "accessed_items": {
+    "local_ws.local_prod": {
+      "name": "local_prod",
+      "item_id": "019d1490-b9ab-7a9f-91b0-849f74499d14",
+      "first_accessed_at": 1774166633.432618
+    },
+    "local_ws.local_prod.draft.test_item": {
+      "name": "test_item",
+      "item_id": "019d1490-d8f2-7628-8fff-28f3a123f313",
+      "first_accessed_at": 1774166688.73538
+    },
+    "local_ws.local_prod.draft.test_item.item1": {
+      "name": "item1",
+      "item_id": "019d1491-0467-7378-bdc4-cdcb15cc0911",
+      "first_accessed_at": 1774166691.148742
+    },
+    "local_ws.local_prod.draft.test_item.item2": {
+      "name": "item2",
+      "item_id": "019d1491-106e-7200-a550-74abea04e21f",
+      "first_accessed_at": 1774166691.736369
+    },
+    "local_ws.local_prod.draft.test_item.item3": {
+      "name": "item3",
+      "item_id": "019d1491-1d94-7456-ad8f-8fc750b4c71b",
+      "first_accessed_at": 1774166692.248333
+    },
+    "local_ws.local_prod.draft.test_item.item4": {
+      "name": "item4",
+      "item_id": "019d1491-2b50-7497-8086-e35e4021f7a3",
+      "first_accessed_at": 1774166692.7144792
+    },
+    "local_ws.local_prod.draft.test_item.item5": {
+      "name": "item5",
+      "item_id": "019d1491-3d39-7114-b6d6-e03a00caf3c7",
+      "first_accessed_at": 1774166692.980413
+    },
+    "local_ws.local_prod.draft.test_item.item6": {
+      "name": "item6",
+      "item_id": "019d1491-4df5-78b3-b888-de165e221442",
+      "first_accessed_at": 1774166693.386188
+    },
+    "local_ws.local_prod.v1.test_item": {
+      "name": "test_item",
+      "item_id": "019d1494-26db-7bf5-8265-9700217dbf34",
+      "first_accessed_at": 1774166764.000742
+    },
+    "local_ws.local_prod.v2.test_item": {
+      "name": "test_item",
+      "item_id": "019d1494-26db-7bf5-8265-9700217dbf34",
+      "first_accessed_at": 1774166831.0431318
+    },
+    "local_ws.local_prod.v3.test_item": {
+      "name": "test_item",
+      "item_id": "019d149c-e9f5-7a95-a6ad-a3b6b13ad19f",
+      "first_accessed_at": 1774167331.711977
+    },
+    "local_ws.local_prod.v4.test_item": {
+      "name": "test_item",
+      "item_id": "019d149c-e9f5-7a95-a6ad-a3b6b13ad19f",
+      "first_accessed_at": 1774168021.294181
+    },
+    "local_ws.local_prod.v5.test_item": {
+      "name": "test_item",
+      "item_id": "019d149c-e9f5-7a95-a6ad-a3b6b13ad19f",
+      "first_accessed_at": 1774168181.251088
+    },
+    "local_ws.local_prod.v5.test_item.item1": {
+      "name": "item1",
+      "item_id": "019d1494-26dc-756d-98e6-abc5c90c4713",
+      "first_accessed_at": 1774168181.3060539
+    },
+    "local_ws.local_prod.v6.test_item": {
+      "name": "test_item",
+      "item_id": "019d149c-e9f5-7a95-a6ad-a3b6b13ad19f",
+      "first_accessed_at": 1774168226.1383932
+    },
+    "local_ws.local_prod.v6.test_item.item1": {
+      "name": "item1",
+      "item_id": "019d1494-26dc-756d-98e6-abc5c90c4713",
+      "first_accessed_at": 1774168226.191036
+    }
+  },
+  "accessed_properties": {},
+  "last_updated": 1774168226.1913788
+}

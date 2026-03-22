@@ -23,6 +23,9 @@ class _MockTransport(httpx.BaseTransport):
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:  # type: ignore[override]
         self.requests.append(request)
+        def _response(data: Dict[str, Any], status_code: int = 200) -> httpx.Response:
+            return httpx.Response(status_code, json=data, request=request)
+
         if request.method == "POST" and request.url.path == "/v1/graphql":
             payload = json.loads(request.content.decode("utf-8"))
             query: str = payload.get("query", "")
@@ -37,7 +40,7 @@ class _MockTransport(httpx.BaseTransport):
                         ]
                     }
                 }
-                return httpx.Response(200, json=data)
+                return _response(data)
 
             # Products by workspace
             if "products(" in query:
@@ -55,7 +58,7 @@ class _MockTransport(httpx.BaseTransport):
                         ]
                     }
                 }
-                return httpx.Response(200, json=data)
+                return _response(data)
 
             # Items by product (both draft and versioned)
             if "items(productId:" in query and "parentItemId" not in query and "sdkItems(" not in query:
@@ -75,40 +78,85 @@ class _MockTransport(httpx.BaseTransport):
                         ]
                     }
                 }
-                return httpx.Response(200, json=data)
+                return _response(data)
 
             # Properties for item
-            if "properties(itemId:" in query:
+            if "properties(itemId:" in query or "sdkProperties(itemId:" in query:
                 item_id = vars.get("iid")
+                is_sdk = "sdkProperties(itemId:" in query
+                is_versioned = "version:" in query
                 if item_id == "i1":
-                    data = {
-                        "data": {
-                            "properties": [
-                                {
-                                    "__typename": "NumericProperty",
-                                    "id": "p2",
-                                    "name": "Mass",
-                                    "readableId": "demo_property_mass",
-                                    "category": "Mass",
-                                    "displayUnit": "kg",
-                                    "value": "10.5",
-                                    "parsedValue": 10.5,
-                                },
-                                {
-                                    "__typename": "TextProperty",
-                                    "id": "p3",
-                                    "name": "Color",
-                                    "readableId": "Color",
-                                    "value": "Red",
-                                    "parsedValue": "Red",
-                                },
-                            ]
-                        }
-                    }
-                    return httpx.Response(200, json=data)
+                    props = [
+                        {
+                            "__typename": "NumericProperty",
+                            "id": "p2",
+                            "name": "Mass",
+                            "readableId": "demo_property_mass",
+                            "category": "Mass",
+                            "displayUnit": "kg",
+                            "value": "10.5",
+                            "parsedValue": 10.5,
+                            "deleted": False,
+                        },
+                        {
+                            "__typename": "TextProperty",
+                            "id": "p3",
+                            "name": "Color",
+                            "readableId": "Color",
+                            "value": "Red",
+                            "parsedValue": "Red",
+                            "deleted": False,
+                        },
+                    ]
+                    if is_sdk and is_versioned:
+                        props.append(
+                            {
+                                "__typename": "TextProperty",
+                                "id": "p_deleted_version",
+                                "name": "Deleted Version Property",
+                                "readableId": "deleted_version_property",
+                                "value": "Hidden",
+                                "parsedValue": "Hidden",
+                                "deleted": True,
+                            }
+                        )
+                    data = {"data": {"properties": props, "sdkProperties": props} if is_sdk else {"properties": props}}
+                    return _response(data)
+                elif item_id == "i2":
+                    props = [
+                        {
+                            "__typename": "NumericProperty",
+                            "id": "p_child",
+                            "name": "Mass",
+                            "readableId": "demo_property_mass",
+                            "category": "Mass",
+                            "displayUnit": "kg",
+                            "value": "10.5",
+                            "parsedValue": 10.5,
+                            "deleted": False,
+                        },
+                    ]
+                    data = {"data": {"properties": props, "sdkProperties": props} if is_sdk else {"properties": props}}
+                    return _response(data)
+                elif item_id == "i3":
+                    props = [
+                        {
+                            "__typename": "NumericProperty",
+                            "id": "p_deleted",
+                            "name": "Mass",
+                            "readableId": "demo_property_mass",
+                            "category": "Mass",
+                            "displayUnit": "kg",
+                            "value": "99.0",
+                            "parsedValue": 99.0,
+                            "deleted": False,
+                        },
+                    ]
+                    data = {"data": {"properties": props, "sdkProperties": props} if is_sdk else {"properties": props}}
+                    return _response(data)
                 else:
-                    data = {"data": {"properties": []}}
-                    return httpx.Response(200, json=data)
+                    data = {"data": {"properties": [], "sdkProperties": []} if is_sdk else {"properties": []}}
+                    return _response(data)
 
             # Product versions
             if "productVersions(" in query:
@@ -126,7 +174,7 @@ class _MockTransport(httpx.BaseTransport):
                         ]
                     }
                 }
-                return httpx.Response(200, json=data)
+                return _response(data)
 
             # Versioned items (new sdkItems query, keep items compatibility in tests)
             if ("sdkItems(productId:" in query and "version:" in query) or ("items(productId:" in query and "version:" in query):
@@ -141,6 +189,34 @@ class _MockTransport(httpx.BaseTransport):
                                 "productId": "p1",
                                 "parentId": None,
                                 "position": 1,
+                                "deleted": False,
+                            },
+                            {
+                                "id": "i_deleted",
+                                "name": "Deleted Item",
+                                "readableId": "deleted_item",
+                                "productId": "p1",
+                                "parentId": None,
+                                "position": 99,
+                                "deleted": True,
+                            },
+                            {
+                                "id": "i3",
+                                "name": "Deleted Child",
+                                "readableId": "deleted_child",
+                                "productId": "p1",
+                                "parentId": "i1",
+                                "position": 0,
+                                "deleted": True,
+                            },
+                            {
+                                "id": "i2",
+                                "name": "Child Item",
+                                "readableId": "child_item",
+                                "productId": "p1",
+                                "parentId": "i1",
+                                "position": 1,
+                                "deleted": False,
                             },
                         ],
                         "items": [
@@ -151,15 +227,43 @@ class _MockTransport(httpx.BaseTransport):
                                 "productId": "p1",
                                 "parentId": None,
                                 "position": 1,
+                                "deleted": False,
+                            },
+                            {
+                                "id": "i_deleted",
+                                "name": "Deleted Item",
+                                "readableId": "deleted_item",
+                                "productId": "p1",
+                                "parentId": None,
+                                "position": 99,
+                                "deleted": True,
+                            },
+                            {
+                                "id": "i3",
+                                "name": "Deleted Child",
+                                "readableId": "deleted_child",
+                                "productId": "p1",
+                                "parentId": "i1",
+                                "position": 0,
+                                "deleted": True,
+                            },
+                            {
+                                "id": "i2",
+                                "name": "Child Item",
+                                "readableId": "child_item",
+                                "productId": "p1",
+                                "parentId": "i1",
+                                "position": 1,
+                                "deleted": False,
                             },
                         ],
                     }
                 }
-                return httpx.Response(200, json=data)
+                return _response(data)
 
-            return httpx.Response(200, json={"data": {}})
+            return _response({"data": {}})
 
-        return httpx.Response(404)
+        return httpx.Response(404, request=request)
 
 
 def _client_with_mock_transport(t: httpx.BaseTransport, **client_kwargs: Any) -> Any:
@@ -218,7 +322,7 @@ def test_get_property_value() -> None:
     pm.client = client
     
     # Get property value (using safe keys with underscores)
-    value = pm.get_value("uh2.Widget_Pro.Gadget_A.demo_property_mass")
+    value = pm.get_value("uh2.Widget_Pro.gadget_a.demo_property_mass")
     
     # Verify it's a native Python type
     assert isinstance(value, (int, float))
@@ -233,7 +337,7 @@ def test_get_property_text_value() -> None:
     pm = PoelisMatlab.__new__(PoelisMatlab)
     pm.client = client
     
-    value = pm.get_value("uh2.Widget_Pro.Gadget_A.Color")
+    value = pm.get_value("uh2.Widget_Pro.gadget_a.Color")
     
     assert isinstance(value, str)
     assert value == "Red"
@@ -260,7 +364,7 @@ def test_get_nonexistent_property() -> None:
     pm.client = client
     
     with pytest.raises(RuntimeError, match="Property 'nonexistent' not found"):
-        pm.get_value("uh2.Widget_Pro.Gadget_A.nonexistent")
+        pm.get_value("uh2.Widget_Pro.gadget_a.nonexistent")
 
 
 def test_list_children_root() -> None:
@@ -292,6 +396,28 @@ def test_list_children_workspace() -> None:
     assert "Widget_Pro" in children
 
 
+def test_list_children_version_navigation_excludes_deleted_items() -> None:
+    """Version-based MATLAB navigation should hide deleted items and children."""
+
+    t = _MockTransport()
+    client = _client_with_mock_transport(t)
+
+    pm = PoelisMatlab.__new__(PoelisMatlab)
+    pm.client = client
+
+    version_children = pm.list_children("uh2.Widget_Pro.v1")
+    assert "gadget_a" in version_children
+    assert "deleted_item" not in version_children
+
+    baseline_children = pm.list_children("uh2.Widget_Pro.gadget_a")
+    assert "child_item" in baseline_children
+    assert "deleted_child" not in baseline_children
+
+    explicit_version_children = pm.list_children("uh2.Widget_Pro.v1.gadget_a")
+    assert "child_item" in explicit_version_children
+    assert "deleted_child" not in explicit_version_children
+
+
 def test_list_children_nonexistent_path() -> None:
     """Test that listing children of non-existent path raises AttributeError."""
     t = _MockTransport()
@@ -312,11 +438,31 @@ def test_list_properties() -> None:
     pm = PoelisMatlab.__new__(PoelisMatlab)
     pm.client = client
     
-    properties = pm.list_properties("uh2.Widget_Pro.Gadget_A")
+    properties = pm.list_properties("uh2.Widget_Pro.gadget_a")
     
     assert isinstance(properties, list)
     assert "demo_property_mass" in properties
     assert "Color" in properties
+
+
+def test_list_properties_version_navigation_excludes_deleted_properties() -> None:
+    """Versioned MATLAB property listing should hide deleted sdkProperties rows."""
+
+    t = _MockTransport()
+    client = _client_with_mock_transport(t, enable_change_detection=True)
+
+    pm = PoelisMatlab.__new__(PoelisMatlab)
+    pm.client = client
+
+    baseline_properties = pm.list_properties("uh2.Widget_Pro.gadget_a")
+    assert "demo_property_mass" in baseline_properties
+    assert "Color" in baseline_properties
+    assert "deleted_version_property" not in baseline_properties
+
+    explicit_version_properties = pm.list_properties("uh2.Widget_Pro.v1.gadget_a")
+    assert "demo_property_mass" in explicit_version_properties
+    assert "Color" in explicit_version_properties
+    assert "deleted_version_property" not in explicit_version_properties
 
 
 def test_list_properties_empty_path() -> None:
@@ -346,7 +492,7 @@ def test_type_compatibility_numeric() -> None:
     pm = PoelisMatlab.__new__(PoelisMatlab)
     pm.client = client
     
-    value = pm.get_value("uh2.Widget_Pro.Gadget_A.demo_property_mass")
+    value = pm.get_value("uh2.Widget_Pro.gadget_a.demo_property_mass")
     
     # Verify it's a native type, not a custom object
     assert isinstance(value, (int, float))
@@ -363,7 +509,7 @@ def test_type_compatibility_string() -> None:
     pm = PoelisMatlab.__new__(PoelisMatlab)
     pm.client = client
     
-    value = pm.get_value("uh2.Widget_Pro.Gadget_A.Color")
+    value = pm.get_value("uh2.Widget_Pro.gadget_a.Color")
     
     assert isinstance(value, str)
     assert not hasattr(value, "__dict__") or not any(
@@ -455,7 +601,7 @@ def test_get_value_implicit_baseline() -> None:
     pm.client = client
     
     # Path without explicit version should route through baseline
-    value = pm.get_value("uh2.Widget_Pro.Gadget_A.demo_property_mass")
+    value = pm.get_value("uh2.Widget_Pro.gadget_a.demo_property_mass")
     
     assert isinstance(value, (int, float))
     assert value == 10.5
@@ -470,7 +616,7 @@ def test_get_value_explicit_baseline() -> None:
     pm.client = client
     
     # Path with explicit baseline should work
-    value = pm.get_value("uh2.Widget_Pro.baseline.Gadget_A.demo_property_mass")
+    value = pm.get_value("uh2.Widget_Pro.baseline.gadget_a.demo_property_mass")
     
     assert isinstance(value, (int, float))
     assert value == 10.5
@@ -500,7 +646,7 @@ def test_get_property_implicit_baseline() -> None:
     pm.client = client
     
     # Path without explicit version should route through baseline
-    info = pm.get_property("uh2.Widget_Pro.Gadget_A.demo_property_mass")
+    info = pm.get_property("uh2.Widget_Pro.gadget_a.demo_property_mass")
     
     assert isinstance(info, dict)
     assert "value" in info
@@ -554,5 +700,4 @@ def test_change_property_frozen_version_error() -> None:
     
     # Try to change a property on a frozen version (v1)
     with pytest.raises(ValueError, match="Cannot write to frozen version"):
-        pm.change_property("uh2.Widget_Pro.v1.Gadget_A.demo_property_mass", 123.45)
-
+        pm.change_property("uh2.Widget_Pro.v1.gadget_a.demo_property_mass", 123.45)

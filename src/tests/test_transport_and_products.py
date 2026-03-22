@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 import httpx
@@ -18,50 +19,92 @@ class _MockTransport(httpx.BaseTransport):
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:  # type: ignore[override]
         self.requests.append(request)
-        if request.url.path == "/graphql":
-            # Minimal GraphQL mock: handle SetBaseline mutation
-            body = request.content.decode()
-            if "SetBaseline" in body and "setProductBaselineVersion" in body:
-                return httpx.Response(
-                    200,
-                    json={
-                        "data": {
-                            "setProductBaselineVersion": {
-                                "id": "p1",
-                                "name": "Prod 1",
-                                "readableId": "P-1",
-                                "workspaceId": "w1",
-                                "baselineVersionNumber": 5,
-                            }
-                        }
-                    },
-                )
-            return httpx.Response(200, json={"data": {}})
-        if request.url.path == "/v1/products":
-            qs = request.url.params
-            limit = int(qs.get("limit", 100))
-            offset = int(qs.get("offset", 0))
-            # two pages of 2 items
-            data = []
-            if offset == 0:
-                data = [
-                    {"id": "p1", "name": "Prod 1", "workspace_id": "w1", "baseline_version_number": 1},
-                    {"id": "p2", "name": "Prod 2", "workspace_id": "w1", "baseline_version_number": None},
-                ]
-            elif offset == 2:
-                data = [
-                    {"id": "p3", "name": "Prod 3", "workspace_id": "w1", "baseline_version_number": 3},
-                    {"id": "p4", "name": "Prod 4", "workspace_id": "w1", "baseline_version_number": None},
-                ]
+        if request.url.path != "/v1/graphql":
+            return httpx.Response(404, request=request)
+
+        body = json.loads(request.content.decode())
+        query = body.get("query", "")
+        variables = body.get("variables", {})
+
+        if "workspaces(limit:" in query:
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "workspaces": [
+                            {"id": "w1", "orgId": "o1", "name": "Workspace 1", "readableId": "workspace_1"}
+                        ]
+                    }
+                },
+                request=request,
+            )
+
+        if "products(workspaceId:" in query:
+            all_products = [
+                {
+                    "id": "p1",
+                    "name": "Prod 1",
+                    "readableId": "P-1",
+                    "workspaceId": "w1",
+                    "baselineVersionNumber": 1,
+                    "reviewers": [],
+                },
+                {
+                    "id": "p2",
+                    "name": "Prod 2",
+                    "readableId": "P-2",
+                    "workspaceId": "w1",
+                    "baselineVersionNumber": None,
+                    "reviewers": [],
+                },
+                {
+                    "id": "p3",
+                    "name": "Prod 3",
+                    "readableId": "P-3",
+                    "workspaceId": "w1",
+                    "baselineVersionNumber": 3,
+                    "reviewers": [],
+                },
+                {
+                    "id": "p4",
+                    "name": "Prod 4",
+                    "readableId": "P-4",
+                    "workspaceId": "w1",
+                    "baselineVersionNumber": None,
+                    "reviewers": [],
+                },
+            ]
+            if variables.get("ws") != "w1":
+                page = []
             else:
-                data = []
-            content = {
-                "data": data,
-                "limit": limit,
-                "offset": offset,
-            }
-            return httpx.Response(200, json=content)
-        return httpx.Response(404)
+                limit = int(variables.get("limit", 100))
+                offset = int(variables.get("offset", 0))
+                page = all_products[offset:offset + limit]
+            return httpx.Response(
+                200,
+                json={"data": {"products": page}},
+                request=request,
+            )
+
+        if "SetBaseline" in query and "setProductBaselineVersion" in query:
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "setProductBaselineVersion": {
+                            "id": "p1",
+                            "name": "Prod 1",
+                            "readableId": "P-1",
+                            "workspaceId": "w1",
+                            "baselineVersionNumber": 5,
+                            "reviewers": [],
+                        }
+                    }
+                },
+                request=request,
+            )
+
+        return httpx.Response(404, request=request)
 
 
 def test_auth_header_and_pagination(monkeypatch: "MonkeyPatch") -> None:
@@ -103,5 +146,4 @@ def test_auth_header_and_pagination(monkeypatch: "MonkeyPatch") -> None:
         assert updated.readableId == "P-1"
     finally:
         _T.__init__ = _orig_init  # type: ignore[assignment]
-
 

@@ -62,6 +62,7 @@ class VersionsClient:
             "    productId\n"
             "    parentId\n"
             "    position\n"
+            "    deleted\n"
             "  }\n"
             "}"
         )
@@ -118,5 +119,4 @@ class VersionsClient:
             for item in page:
                 yield item
             offset += len(page)
-
 

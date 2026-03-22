@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from poelis_sdk import PoelisClient
-from poelis_sdk.exceptions import NotFoundError, RateLimitError, UnauthorizedError
+from poelis_sdk.exceptions import NotFoundError, RateLimitError, ServerError, UnauthorizedError
 
 if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
@@ -44,14 +44,14 @@ def test_401_raises_unauthorized() -> None:
     t = _SeqTransport([httpx.Response(401, json={"message": "bad token"})])
     c = _make_client_with_transport(t)
     with pytest.raises(UnauthorizedError):
-        c.search.products(q="x")
+        c.search.products(q="x", workspace_id="ws1")
 
 
 def test_404_raises_not_found() -> None:
     t = _SeqTransport([httpx.Response(404, json={"message": "not found"})])
     c = _make_client_with_transport(t)
     with pytest.raises(NotFoundError):
-        c.search.products(q="x")
+        c.search.products(q="x", workspace_id="ws1")
 
 
 def test_429_retries_then_raises(monkeypatch: "MonkeyPatch") -> None:
@@ -63,18 +63,17 @@ def test_429_retries_then_raises(monkeypatch: "MonkeyPatch") -> None:
     ])
     c = _make_client_with_transport(t)
     with pytest.raises(RateLimitError):
-        c.search.products(q="x")
+        c.search.products(q="x", workspace_id="ws1")
     assert t.calls == 3
 
 
-def test_5xx_retries_then_success() -> None:
+def test_5xx_does_not_retry_for_graphql_post() -> None:
     t = _SeqTransport([
         httpx.Response(500, json={"message": "oops"}),
-        httpx.Response(502, json={"message": "oops"}),
-        httpx.Response(200, json={"hits": [], "limit": 20, "offset": 0}),
+        httpx.Response(200, json={"data": {"products": []}}),
     ])
     c = _make_client_with_transport(t)
-    result = c.search.products(q="x")
-    assert result["hits"] == []
-
+    with pytest.raises(ServerError):
+        c.search.products(q="x", workspace_id="ws1")
+    assert t.calls == 1
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Optional
 
-from ..utils import _safe_key
+from ..utils import _is_visible_version_item, _safe_key
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..nodes import _Node
@@ -55,6 +55,8 @@ def load_children(node: "_Node") -> None:
                     offset=0,
                 )
                 for it in rows:
+                    if not _is_visible_version_item(it):
+                        continue
                     if it.get("parentId") is None:
                         display = it.get("readableId") or it.get("name") or str(it["id"])
                         nm = _safe_key(display)
@@ -103,6 +105,8 @@ def load_children(node: "_Node") -> None:
             )
 
         for it in rows:
+            if version_number is not None and not _is_visible_version_item(it):
+                continue
             if it.get("parentId") is None:
                 display = it.get("readableId") or it.get("name") or str(it["id"])
                 nm = _safe_key(display)
@@ -129,7 +133,7 @@ def load_children(node: "_Node") -> None:
                 limit=1000,
                 offset=0,
             )
-            rows = [it for it in all_items if it.get("parentId") == node._id]
+            rows = [it for it in all_items if _is_visible_version_item(it) and it.get("parentId") == node._id]
         else:
             q = (
                 "query($pid: ID!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
@@ -153,6 +157,5 @@ def load_children(node: "_Node") -> None:
             node._children_cache[nm] = child
 
     node._children_loaded_at = time.time()
-
 
 

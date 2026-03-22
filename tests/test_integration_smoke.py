@@ -16,7 +16,7 @@ from poelis_sdk import PoelisClient
 def test_smoke_list_workspaces() -> None:
     """List workspaces as a minimal live check if creds are provided."""
     api_key = os.getenv("POELIS_API_KEY")
-    base_url = os.getenv("POELIS_BASE_URL", "https://api.poelis.ai")
+    base_url = os.getenv("POELIS_BASE_URL", "https://poelis-be-py-753618215333.europe-west1.run.app")
 
     if not api_key:
         pytest.skip("Integration creds not set; skipping smoke test")
@@ -24,4 +24,3 @@ def test_smoke_list_workspaces() -> None:
     client = PoelisClient(api_key=api_key, base_url=base_url)
     # It is sufficient to verify that a call can be made without raising.
     _ = client.workspaces.list(limit=1, offset=0)
-

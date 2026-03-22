@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
-import warnings
-
+import pytest
 from poelis_sdk.browser import _PropWrapper
-from poelis_sdk.change_tracker import PropertyChangeTracker, PropertyValueChangedWarning
+from poelis_sdk.change_tracker import PropertyChangeTracker
 
 
 class _FakeClient:
@@ -18,8 +17,8 @@ class _FakeClient:
         self._change_tracker: PropertyChangeTracker = tracker
 
 
-def test_local_edit_emits_warning_and_updates_value() -> None:
-    """Setting `.value` on a property wrapper should warn and update raw value."""
+def test_local_edit_raises_and_leaves_state_unchanged() -> None:
+    """Setting `.value` should fail and direct callers to change_property()."""
 
     tracker = PropertyChangeTracker(enabled=True)
     prop_id = "prop-1"
@@ -37,24 +36,14 @@ def test_local_edit_emits_warning_and_updates_value() -> None:
     client = _FakeClient(tracker)
     wrapper = _PropWrapper(raw, client=client)
 
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always", PropertyValueChangedWarning)
+    with pytest.raises(AttributeError, match="change_property\\(\\.\\.\\.\\)"):
         wrapper.value = 20
 
-    # Raw payload should reflect the new value
-    assert raw["value"] == 20
-    # Getter should now return the new value
-    assert wrapper.value == 20
+    # Raw payload should remain unchanged
+    assert raw["value"] == 10
+    # Getter should still return the original value
+    assert wrapper.value == 10
 
-    # A warning should have been emitted
-    local_warnings = [w for w in caught if issubclass(w.category, PropertyValueChangedWarning)]
-    assert len(local_warnings) == 1
-
-    # The change tracker should have recorded the change with a path.
-    assert tracker._changes_this_session  # type: ignore[attr-defined]
-    change: Optional[dict[str, Any]] = tracker._changes_this_session[-1]  # type: ignore[attr-defined]
-    assert change is not None
-    assert change.get("property_id") == prop_id
-    assert change.get("property_path") == path
-
+    # The change tracker should not have recorded a local edit.
+    assert not tracker._changes_this_session  # type: ignore[attr-defined]
 
