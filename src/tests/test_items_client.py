@@ -25,7 +25,6 @@ class _Transport(httpx.BaseTransport):
             vars = payload.get("variables", {})
 
             if "items(productId:" in query:
-                limit = int(vars.get("limit", 100))
                 offset = int(vars.get("offset", 0))
                 product_id = vars.get("pid")
                 data = []
@@ -89,4 +88,3 @@ def test_items_iter_all() -> None:
     c = _client_with_transport(t)
     ids = [it["id"] for it in c.items.iter_all_by_product(product_id="p", page_size=2)]
     assert ids == ["i1", "i2", "i3"]
-
