@@ -34,6 +34,8 @@ fprintf('\n');
 fprintf('=== Example 2: Getting a Property Value ===\n');
 
 % TODO: Replace with your actual path
+% Note: Property paths must include an explicit item. Shorthand paths like
+% 'workspace.product.property' are not supported.
 path = 'demo_workspace.demo_product.demo_item.demo_sub_item.demo_property_mass';
 
 value = poelis.get_value(path);
@@ -85,6 +87,8 @@ fprintf('\n');
 
 fprintf('=== Example 5: Accessing Versioned Properties ===\n');
 
+% Note: Property paths must always include an explicit item.
+
 % Access property from a specific version (v1, v2, etc.)
 version_path = 'demo_workspace.demo_product.v1.demo_item.demo_sub_item.demo_property_mass';
 value_v1 = poelis.get_value(version_path);
@@ -127,4 +131,3 @@ fprintf('\n');
 text_property_path = 'demo_workspace.demo_product.draft.demo_item.property_string';
 poelis.change_property(text_property_path, 'New string text');
 fprintf('✓ Updated text property\n');
-

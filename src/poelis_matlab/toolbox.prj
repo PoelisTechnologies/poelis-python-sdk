@@ -3,8 +3,8 @@
     <metadata>
         <name>Poelis MATLAB Toolbox</name>
         <version>0.6.2</version>
-        <author>Matteo Braceschi</author>
-        <email>matteo@poelis.com</email>
+        <author>Michele Genoni</author>
+        <email>michele@poelis.com</email>
         <company>Poelis Technologies</company>
         <summary>MATLAB interface to Poelis API - Native MATLAB types with automatic Python-to-MATLAB conversions</summary>
         <description>Poelis MATLAB Toolbox provides a native MATLAB interface to the Poelis Python SDK. All type conversions between Python and MATLAB are handled automatically, so you can work with native MATLAB types (string arrays, doubles, structs) without manual conversions.
