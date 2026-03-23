@@ -252,8 +252,16 @@ def get_property(node: "_Node", readable_id: str) -> "_PropWrapper":
     return get_property_from_item_tree(node, readable_id)
 
 
-def get_property_from_item_tree(node: "_Node", readable_id: str) -> "_PropWrapper":
-    """Search for a property recursively starting from an item node."""
+def get_property_from_item_tree(
+    node: "_Node",
+    readable_id: str,
+    *,
+    search_descendants: bool = True,
+) -> "_PropWrapper":
+    """Search for a property starting from an item node.
+
+    When ``search_descendants`` is False, only the given item is queried (no subtree walk).
+    """
     anc = node
     pid: Optional[str] = None
     version_number: Optional[int] = None
@@ -278,7 +286,14 @@ def get_property_from_item_tree(node: "_Node", readable_id: str) -> "_PropWrappe
     if not pid:
         raise RuntimeError("Cannot determine product ID for item node")
 
-    return search_property_in_item_and_children(node, node._id, readable_id, pid, version_number)
+    return search_property_in_item_and_children(
+        node,
+        node._id,
+        readable_id,
+        pid,
+        version_number,
+        search_descendants=search_descendants,
+    )
 
 
 def search_property_in_item_and_children(
@@ -287,8 +302,55 @@ def search_property_in_item_and_children(
     readable_id: str,
     product_id: str,
     version_number: Optional[int],
+    *,
+    search_descendants: bool = True,
+    visited: Optional[set[str]] = None,
+    depth: int = 0,
+    max_depth: int = 500,
 ) -> "_PropWrapper":
-    """Recursively search for a property in an item and all its children."""
+    """Recursively search for a property in an item and optionally its descendants."""
+    if not item_id:
+        raise RuntimeError(f"Property with readableId '{readable_id}' not found")
+
+    if visited is None:
+        visited = set()
+    if item_id in visited:
+        raise RuntimeError(
+            f"Property with readableId '{readable_id}' not found in item tree"
+        )
+    if depth > max_depth:
+        raise RuntimeError(
+            f"Property with readableId '{readable_id}' not found in item tree"
+        )
+    visited.add(item_id)
+    try:
+        return _search_property_in_item_and_children_impl(
+            node,
+            item_id,
+            readable_id,
+            product_id,
+            version_number,
+            search_descendants=search_descendants,
+            visited=visited,
+            depth=depth,
+            max_depth=max_depth,
+        )
+    finally:
+        visited.discard(item_id)
+
+
+def _search_property_in_item_and_children_impl(
+    node: "_Node",
+    item_id: Optional[str],
+    readable_id: str,
+    product_id: str,
+    version_number: Optional[int],
+    *,
+    search_descendants: bool,
+    visited: set[str],
+    depth: int,
+    max_depth: int,
+) -> "_PropWrapper":
     if not item_id:
         raise RuntimeError(f"Property with readableId '{readable_id}' not found")
 
@@ -404,6 +466,9 @@ def search_property_in_item_and_children(
     except Exception:
         pass
 
+    if not search_descendants:
+        raise RuntimeError(f"Property with readableId '{readable_id}' not found in item tree")
+
     if version_number is not None:
         all_items = node._client.versions.list_items(
             product_id=product_id,
@@ -434,7 +499,17 @@ def search_property_in_item_and_children(
         child_id = child_item.get("id")
         if child_id:
             try:
-                return search_property_in_item_and_children(node, child_id, readable_id, product_id, version_number)
+                return search_property_in_item_and_children(
+                    node,
+                    child_id,
+                    readable_id,
+                    product_id,
+                    version_number,
+                    search_descendants=True,
+                    visited=visited,
+                    depth=depth + 1,
+                    max_depth=max_depth,
+                )
             except RuntimeError:
                 continue
 

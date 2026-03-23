@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 from .client import PoelisClient
 from .exceptions import NotFoundError, UnauthorizedError
+from ._browser.node.properties import get_property_from_item_tree
 
 
 def _ensure_matlab_compatible(value: Any) -> Any:
@@ -44,85 +45,77 @@ def _ensure_matlab_compatible(value: Any) -> Any:
     return str(value)
 
 
-def _resolve_property_from_node(node: Any, property_name: str) -> Any:
-    """Resolve a property from a node, avoiding product-level get_property.
-    
-    This function ensures MATLAB never calls get_property() directly on product nodes.
-    Instead, it routes through baseline/draft or uses item-level property access.
-    
-    Args:
-        node: The node to resolve the property from (product, version, or item).
-        property_name: The name/readableId of the property to resolve.
-    
-    Returns:
-        A _PropWrapper object for the property.
-    
-    Raises:
-        RuntimeError: If the property cannot be found.
-        AttributeError: If the node doesn't support property access.
-    """
-    # Check node level
-    node_level = getattr(node, "_level", None)
-    
-    # If we're at a product node, route through baseline (for reads)
-    if node_level == "product":
-        baseline = getattr(node, "baseline")
-        # Recursively resolve from baseline (which is a version node)
-        return _resolve_property_from_node(baseline, property_name)
-    
-    # If we're at a version node, we can't call get_property directly
-    # We need to search through items in the version
-    if node_level == "version":
-        # Load children (items) for this version
-        if hasattr(node, "_load_children"):
-            node._load_children()
-        # Try to find the property by searching through all items
-        for item_key, item_node in getattr(node, "_children_cache", {}).items():
-            try:
-                # Try to get the property from this item
-                return _resolve_property_from_node(item_node, property_name)
-            except (RuntimeError, AttributeError):
-                # Property not found in this item, try next
-                continue
-        # If we get here, property wasn't found in any item
-        raise RuntimeError(
-            f"Property '{property_name}' not found in any item of version '{getattr(node, '_name', 'unknown')}'. "
-            f"Specify the item in your path, e.g., 'workspace.product.baseline.<item>.{property_name}'"
+def _item_required_error(property_name: str, *, for_write: bool = False) -> ValueError:
+    """Return a consistent explicit-item-path error for MATLAB facade operations."""
+    if for_write:
+        return ValueError(
+            "Property paths must include an item before the property name. "
+            f"Use 'workspace.product.draft.<item>.{property_name}'."
         )
-    
-    # For item nodes, try to resolve the property
+    return ValueError(
+        "Property paths must include an item before the property name. "
+        f"Use 'workspace.product.<item>.{property_name}' or "
+        f"'workspace.product.baseline.<item>.{property_name}'."
+    )
+
+
+def _resolve_property_on_item(node: Any, property_name: str) -> Any:
+    """Resolve a property directly on a single item node.
+
+    This helper never walks descendant items. It only checks the addressed item.
+    """
+    # Try direct attribute access (item.prop_name)
+    try:
+        prop_wrapper = getattr(node, property_name)
+        if hasattr(prop_wrapper, "value"):
+            return prop_wrapper
+    except AttributeError:
+        pass
+
+    # Try via props node (item.props.prop_name)
+    try:
+        props_node = getattr(node, "props")
+        prop_wrapper = getattr(props_node, property_name)
+        if hasattr(prop_wrapper, "value"):
+            return prop_wrapper
+    except AttributeError:
+        pass
+
+    item_name = getattr(node, "_name", None) or getattr(node, "_id", None) or "unknown"
+    try:
+        return get_property_from_item_tree(
+            node, property_name, search_descendants=False
+        )
+    except RuntimeError as e:
+        raise RuntimeError(
+            f"Property '{property_name}' not found on item '{item_name}'."
+        ) from e
+
+
+def _resolve_property_from_node(node: Any, property_name: str) -> Any:
+    """Resolve a property from a node using strict explicit-item semantics."""
+    node_level = getattr(node, "_level", None)
+
+    if node_level == "product":
+        raise _item_required_error(property_name)
+
+    if node_level == "version":
+        raise _item_required_error(property_name)
+
     if node_level == "item":
-        # Try direct attribute access (item.prop_name)
-        try:
-            prop_wrapper = getattr(node, property_name)
-            # Verify it's actually a property wrapper (has .value attribute)
-            if hasattr(prop_wrapper, "value"):
-                return prop_wrapper
-        except AttributeError:
-            pass
-        
-        # Try via props node (item.props.prop_name)
-        try:
-            props_node = getattr(node, "props")
-            prop_wrapper = getattr(props_node, property_name)
-            if hasattr(prop_wrapper, "value"):
-                return prop_wrapper
-        except AttributeError:
-            pass
-    
-    # Fallback: use get_property on item nodes only
-    if node_level == "item":
-        if hasattr(node, "get_property"):
-            return node.get_property(property_name)
-    
-    # If we get here, the node doesn't support property access
+        return _resolve_property_on_item(node, property_name)
+
     raise RuntimeError(
         f"Property '{property_name}' cannot be resolved from node level '{node_level}'. "
         f"Property access is only available on item nodes."
     )
 
 
-def _resolve_property_for_write(node: Any, property_name: str, path: str) -> Any:
+def _resolve_property_for_write(
+    node: Any,
+    property_name: str,
+    path: str,
+) -> Any:
     """Resolve a property for writing, ensuring we route through draft and prevent frozen version writes.
     
     This function ensures MATLAB never calls get_property() directly on product nodes for writes.
@@ -132,7 +125,6 @@ def _resolve_property_for_write(node: Any, property_name: str, path: str) -> Any
         node: The node to resolve the property from (product, version, or item).
         property_name: The name/readableId of the property to resolve.
         path: The full path for error messages.
-    
     Returns:
         A _PropWrapper object for the property (must be from draft).
     
@@ -144,39 +136,11 @@ def _resolve_property_for_write(node: Any, property_name: str, path: str) -> Any
     # Check node level
     node_level = getattr(node, "_level", None)
     
-    # If we're at a product node, route through draft (for writes)
     if node_level == "product":
-        draft = getattr(node, "draft")
-        # Recursively resolve from draft (which is a version node)
-        return _resolve_property_for_write(draft, property_name, path)
-    
-    # If we're at a version node, check if it's draft and search through items
+        raise _item_required_error(property_name, for_write=True)
+
     if node_level == "version":
-        version_name = getattr(node, "_name", None)
-        # Check if this is a frozen version (v1, v2, etc.) or baseline
-        if version_name and version_name != "draft":
-            if version_name == "baseline" or (version_name.startswith("v") and len(version_name) > 1 and version_name[1:].isdigit()):
-                raise ValueError(
-                    f"Cannot write to frozen version '{version_name}' at path '{path}'. "
-                    f"Only draft properties can be updated. Use 'draft' in your path, e.g., "
-                    f"'{path.replace(version_name, 'draft')}'"
-                )
-        # If it's draft, search through items to find the property
-        if hasattr(node, "_load_children"):
-            node._load_children()
-        # Try to find the property by searching through all items
-        for item_key, item_node in getattr(node, "_children_cache", {}).items():
-            try:
-                # Try to get the property from this item
-                return _resolve_property_for_write(item_node, property_name, path)
-            except (RuntimeError, AttributeError, ValueError):
-                # Property not found in this item or write blocked, try next
-                continue
-        # If we get here, property wasn't found in any item
-        raise RuntimeError(
-            f"Property '{property_name}' not found in any item of draft version. "
-            f"Specify the item in your path, e.g., 'workspace.product.draft.<item>.{property_name}'"
-        )
+        raise _item_required_error(property_name, for_write=True)
     
     # For item nodes, try to resolve the property
     # First, check if we're at an item node under a frozen version
@@ -195,30 +159,8 @@ def _resolve_property_for_write(node: Any, property_name: str, path: str) -> Any
                             f"'{path.replace(version_name, 'draft')}'"
                         )
         
-        # Try direct attribute access (item.prop_name)
-        try:
-            prop_wrapper = getattr(node, property_name)
-            # Verify it's actually a property wrapper (has .value attribute)
-            if hasattr(prop_wrapper, "value"):
-                return prop_wrapper
-        except AttributeError:
-            pass
-        
-        # Try via props node (item.props.prop_name)
-        try:
-            props_node = getattr(node, "props")
-            prop_wrapper = getattr(props_node, property_name)
-            if hasattr(prop_wrapper, "value"):
-                return prop_wrapper
-        except AttributeError:
-            pass
-    
-    # Fallback: use get_property on item nodes only
-    if node_level == "item":
-        if hasattr(node, "get_property"):
-            return node.get_property(property_name)
-    
-    # If we get here, the node doesn't support property access
+        return _resolve_property_on_item(node, property_name)
+
     raise RuntimeError(
         f"Property '{property_name}' cannot be resolved from node level '{node_level}'. "
         f"Property access is only available on item nodes."
@@ -241,11 +183,11 @@ class PoelisMatlab:
     
     Example usage from Python:
         pm = PoelisMatlab(api_key="your-api-key")
-        value = pm.get_value("workspace.product.property")
+        value = pm.get_value("workspace.product.item.property")
     
     Example usage from MATLAB:
         pm = py.poelis_sdk.PoelisMatlab('your-api-key');
-        value = double(pm.get_value('workspace.product.property'));
+        value = double(pm.get_value('workspace.product.item.property'));
     """
     
     def __init__(
@@ -275,8 +217,9 @@ class PoelisMatlab:
         accessing a property. Returns only the property value (not the wrapper object).
         
         Args:
-            path: Dot-separated path to the property, e.g., 
-                "workspace.product.property" or "workspace.product.v4.property"
+            path: Dot-separated path to the property, e.g.,
+                "workspace.product.item.property" or
+                "workspace.product.baseline.item.property"
         
         Returns:
             The property value as a native Python type (float, int, str, bool, dict, list).
@@ -290,7 +233,7 @@ class PoelisMatlab:
         
         Example:
             >>> pm = PoelisMatlab(api_key="test")
-            >>> value = pm.get_value("demo_workspace.demo_product.demo_property_mass")
+            >>> value = pm.get_value("demo_workspace.demo_product.demo_item.demo_property_mass")
             >>> print(value)  # e.g., 10.5
         """
         if not path or not path.strip():
@@ -775,4 +718,3 @@ class PoelisMatlab:
                             f"Path '{path}' failed: node '{name}' not found at '{partial_path}'. "
                             f"Available nodes can be listed using list_children() method."
                         ) from None
-

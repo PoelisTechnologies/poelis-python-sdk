@@ -1,105 +1,119 @@
 # Poelis MATLAB Toolbox
 
-## 1. Install the Poelis MATLAB Toolbox
+## Install or Update the Toolbox
 
-### Download the `.mltbx` file
+Download the latest `.mltbx` release artifact, then install it in MATLAB:
 
-Then, either:
-
-- **Double‑click** the `PoelisToolbox.mltbx` file in the Current Folder browser, **or**
-- Run this command in MatLab:
+- Double-click the `.mltbx` file in the Current Folder browser, or
+- Run:
 
 ```matlab
-matlab.addons.install('PoelisToolbox.mltbx');
+matlab.addons.toolbox.installToolbox('PoelisToolbox-1.0.8.mltbx');
 ```
 
----
+If you are updating from an older toolbox version, install the new `.mltbx` first and then restart MATLAB if the Add-On manager prompts you to do so.
 
-## 2. Create a Python virtualenv and install `poelis-sdk`
+## Install or Update the Python SDK
+
+The MATLAB toolbox is a wrapper around the Python SDK. Users must also install the latest published `poelis-sdk` in the Python environment that MATLAB uses.
 
 In a terminal:
 
 ```bash
-cd /path/to/poelis-python-sdk
 python3 -m venv .venv
 source .venv/bin/activate   # on Windows: .venv\Scripts\activate
 pip install --upgrade pip
 pip install -U poelis-sdk
 ```
 
-Note the full path of the Python inside the venv, e.g.:
-- macOS/Linux: `/path/to/.venv/bin/python`
-- Windows: `C:\path\to\.venv\Scripts\python.exe`
+To upgrade an existing environment:
 
----
+```bash
+pip install -U poelis-sdk
+```
 
-## 3. Point MATLAB to this Python environment
+## Point MATLAB to the Python Environment
 
 In MATLAB:
 
 ```matlab
-pyenv('Version', '/full/path/to/.venv/bin/python');  % adjust path
-pyenv   % optional: check it looks correct
+pyenv('Version', '/full/path/to/.venv/bin/python');
+pyenv
 ```
 
-You can quickly check everything with:
+If MATLAB was already using a different Python interpreter, restart the Python session first:
+
+```matlab
+terminate(pyenv)
+pyenv('Version', '/full/path/to/.venv/bin/python');
+```
+
+## Verify the Installation
+
+In MATLAB:
 
 ```matlab
 poelis_sdk.checkInstallation();
+mod = py.importlib.import_module('poelis_sdk');
+char(py.builtins.getattr(mod, '__version__'))
+char(py.builtins.getattr(mod, '__file__'))
 ```
 
----
+The version should match the latest PyPI release you expect, and the file path should point to the Python environment you configured with `pyenv(...)`.
 
-## 4. Run the example code
+## Run the Example Script
 
-In MATLAB:
+Open `try_poelis_matlab.m`, set your real API key, replace the demo paths with real Poelis paths, and run the script.
 
-Open the example script "try_poelis_matlab.m"
+The toolbox supports:
 
-Then in the script:
-1. Set your real API key:
+- Listing workspaces, products, and child nodes
+- Reading values and property metadata
+- Updating draft properties
+- MATLAB-native type conversion for common Python return values
+
+## Important Usage Notes
+
+- Property paths must include an explicit item before the final property name.
+- Read examples:
+  - `workspace.product.item.property`
+  - `workspace.product.baseline.item.property`
+- Write examples:
+  - `workspace.product.draft.item.property`
+  - `workspace.product.item.property` also works and is routed through draft
+- Versioned properties (`.v1`, `.v2`, `.baseline`) are read-only.
+- Write operations require `EDITOR` role access.
+
+## Maintainer Release Workflow
+
+Use a manual `.mltbx` release process and keep the toolbox version aligned with the Python SDK version in `pyproject.toml`.
+
+Before release:
+
+1. Merge the MATLAB wrapper changes.
+2. Bump `project.version` in `pyproject.toml`.
+3. Set the toolbox version in `toolbox.prj` to the same version number.
+4. Run the full Python test suite:
+
+```bash
+./.venv/bin/python -m pytest -q
+```
+
+In MATLAB R2025b, package the toolbox:
 
 ```matlab
-api_key = 'your-api-key';
+addpath("scripts");
+outputFile = package_matlab_toolbox()
 ```
 
-2. Adjust any demo paths like:
+Then:
 
-```matlab
-path = 'demo_workspace.demo_product.demo_item.demo_sub_item.demo_property_mass';
-```
+1. Upload the generated `.mltbx` to the GitHub release or your internal distribution channel.
+2. Let the existing GitHub Actions workflow publish the Python SDK to PyPI when `pyproject.toml` changes.
+3. Tell users to:
+   - install/update the new `.mltbx`
+   - run `pip install -U poelis-sdk`
+   - restart MATLAB Python with `terminate(pyenv)` if needed
+   - verify with `poelis_sdk.checkInstallation()`
 
-3. Run the script.
-
-You should see:
-- list of workspaces,
-- example property values,
-- property updates,
-- and basic error‑handling output.
-
----
-
-## 5. Example: Updating Property Values
-
-The toolbox supports updating property values for draft properties:
-
-```matlab
-% Update a numeric property
-poelis.change_property('workspace.product.draft.item.property', 123.45);
-
-% Update with title and description
-poelis.change_property('workspace.product.draft.item.property', 123.45, 'Title of change (optional)', 'Description of change (optional)');
-
-% Update a text property
-poelis.change_property('workspace.product.draft.item.description', 'New text');
-```
-
-**Important Notes:**
-- Only **draft properties** can be updated (use `.draft` in the path)
-- Versioned properties (`.v1`, `.v2`, `.baseline`) are read-only
-- **Requires EDITOR role**: Write operations require EDITOR role for the workspace or product
-  - Users with VIEWER role can only read data and will receive a permission error
-- Numeric values can be numbers or 1D arrays. Matrix values are 2D arrays. Formula properties are read-only.
-- Text values must be strings
-- Date values must be in ISO 8601 format (YYYY-MM-DD)
-
+`package_matlab_toolbox` reads the metadata from `src/poelis_matlab/toolbox.prj`, checks that the toolbox version matches `pyproject.toml`, and writes `dist/PoelisToolbox-<version>.mltbx`.

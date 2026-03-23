@@ -266,6 +266,79 @@ class _MockTransport(httpx.BaseTransport):
         return httpx.Response(404, request=request)
 
 
+class _DescendantPropertyTransport(httpx.BaseTransport):
+    """Mock transport to verify explicit item misses do not search descendants."""
+
+    def __init__(self) -> None:
+        self.requests: list[httpx.Request] = []
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:  # type: ignore[override]
+        self.requests.append(request)
+
+        def _response(data: Dict[str, Any], status_code: int = 200) -> httpx.Response:
+            return httpx.Response(status_code, json=data, request=request)
+
+        if request.method == "POST" and request.url.path == "/v1/graphql":
+            payload = json.loads(request.content.decode("utf-8"))
+            query: str = payload.get("query", "")
+            vars: Dict[str, Any] = payload.get("variables", {})
+
+            if "workspaces(" in query:
+                return _response({"data": {"workspaces": [
+                    {"id": "w1", "orgId": "o", "name": "uh2", "projectLimit": 10},
+                ]}})
+
+            if "products(" in query:
+                return _response({"data": {"products": [
+                    {"id": "p1", "name": "Widget Pro", "workspaceId": "w1", "code": "WP", "description": ""},
+                ]}})
+
+            if "productVersions(" in query:
+                return _response({"data": {"productVersions": [
+                    {"productId": "p1", "versionNumber": 1, "title": "version 1", "description": "First version", "createdAt": "2024-01-01T00:00:00Z"},
+                ]}})
+
+            if ("sdkItems(productId:" in query and "version:" in query) or ("items(productId:" in query and "version:" in query):
+                return _response({"data": {"sdkItems": [
+                    {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "position": 1, "deleted": False},
+                    {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "position": 1, "deleted": False},
+                ], "items": [
+                    {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "position": 1, "deleted": False},
+                    {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "position": 1, "deleted": False},
+                ]}})
+
+            if "items(productId:" in query and "parentItemId" not in query and "sdkItems(" not in query:
+                return _response({"data": {"items": [
+                    {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "position": 1},
+                    {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "position": 1},
+                ]}})
+
+            if "properties(itemId:" in query or "sdkProperties(itemId:" in query:
+                item_id = vars.get("iid")
+                if item_id == "i1":
+                    props = [
+                        {"__typename": "TextProperty", "id": "p1", "name": "Color", "readableId": "Color", "value": "Red", "parsedValue": "Red", "deleted": False},
+                    ]
+                    return _response({"data": {"properties": props, "sdkProperties": props}})
+                if item_id == "i2":
+                    props = [
+                        {"__typename": "NumericProperty", "id": "p2", "name": "Mass", "readableId": "demo_property_mass", "category": "Mass", "displayUnit": "kg", "value": "10.5", "parsedValue": 10.5, "deleted": False},
+                    ]
+                    return _response({"data": {"properties": props, "sdkProperties": props}})
+                return _response({"data": {"properties": [], "sdkProperties": []}})
+
+            if "parentItemId" in query:
+                if vars.get("filter", {}).get("parentItemId") == "i1":
+                    return _response({"data": {"items": [
+                        {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "position": 1},
+                    ]}})
+                return _response({"data": {"items": []}})
+
+            return _response({"data": {}})
+
+        return httpx.Response(404, request=request)
+
+
 def _client_with_mock_transport(t: httpx.BaseTransport, **client_kwargs: Any) -> Any:
     """Create a PoelisClient with mocked transport."""
     from poelis_sdk.client import Transport as _T
@@ -365,6 +438,55 @@ def test_get_nonexistent_property() -> None:
     
     with pytest.raises(RuntimeError, match="Property 'nonexistent' not found"):
         pm.get_value("uh2.Widget_Pro.gadget_a.nonexistent")
+
+
+def test_get_value_requires_explicit_item_path() -> None:
+    """Shorthand product-level property reads should fail immediately."""
+    t = _MockTransport()
+    client = _client_with_mock_transport(t)
+
+    pm = PoelisMatlab.__new__(PoelisMatlab)
+    pm.client = client
+
+    with pytest.raises(ValueError, match="must include an item"):
+        pm.get_value("uh2.Widget_Pro.demo_property_mass")
+
+
+def test_get_value_requires_explicit_item_for_version_path() -> None:
+    """Version-level shorthand property reads should fail immediately."""
+    t = _MockTransport()
+    client = _client_with_mock_transport(t)
+
+    pm = PoelisMatlab.__new__(PoelisMatlab)
+    pm.client = client
+
+    with pytest.raises(ValueError, match="must include an item"):
+        pm.get_value("uh2.Widget_Pro.v1.demo_property_mass")
+
+
+def test_get_nonexistent_property_on_explicit_item_does_not_search_descendants() -> None:
+    """Missing properties on an explicit item should not recurse into child items."""
+    t = _DescendantPropertyTransport()
+    client = _client_with_mock_transport(t)
+
+    pm = PoelisMatlab.__new__(PoelisMatlab)
+    pm.client = client
+
+    with pytest.raises(RuntimeError, match="Property 'demo_property_mass' not found"):
+        pm.get_value("uh2.Widget_Pro.gadget_a.demo_property_mass")
+
+    queried_child_property = False
+    for request in t.requests:
+        if request.method != "POST" or request.url.path != "/v1/graphql":
+            continue
+        payload = json.loads(request.content.decode("utf-8"))
+        query = payload.get("query", "")
+        variables = payload.get("variables", {})
+        if ("properties(itemId:" in query or "sdkProperties(itemId:" in query) and variables.get("iid") == "i2":
+            queried_child_property = True
+            break
+
+    assert not queried_child_property
 
 
 def test_list_children_root() -> None:
@@ -593,7 +715,7 @@ class _MockResponse:
 
 
 def test_get_value_implicit_baseline() -> None:
-    """Test that get_value routes through baseline when path ends at product level."""
+    """Test that get_value routes through baseline when version is omitted."""
     t = _MockTransport()
     client = _client_with_mock_transport(t)
     
@@ -638,7 +760,7 @@ def test_get_value_explicit_draft() -> None:
 
 
 def test_get_property_implicit_baseline() -> None:
-    """Test that get_property routes through baseline when path ends at product level."""
+    """Test that get_property routes through baseline when version is omitted."""
     t = _MockTransport()
     client = _client_with_mock_transport(t)
     
@@ -655,8 +777,20 @@ def test_get_property_implicit_baseline() -> None:
     assert info["unit"] == "kg"
 
 
+def test_get_property_requires_explicit_item_path() -> None:
+    """Shorthand product-level property info reads should fail immediately."""
+    t = _MockTransport()
+    client = _client_with_mock_transport(t)
+
+    pm = PoelisMatlab.__new__(PoelisMatlab)
+    pm.client = client
+
+    with pytest.raises(ValueError, match="must include an item"):
+        pm.get_property("uh2.Widget_Pro.demo_property_mass")
+
+
 def test_change_property_implicit_draft() -> None:
-    """Test that change_property routes through draft when path ends at product level."""
+    """Test that change_property routes through draft when version is omitted."""
     t = _MockTransport()
     client = _client_with_mock_transport(t)
     
@@ -688,6 +822,18 @@ def test_change_property_implicit_draft() -> None:
     pm.change_property("uh2.Widget_Pro.Gadget_A.demo_property_mass", 123.45, title="Updated mass")
     
     # If no exception was raised, the test passes
+
+
+def test_change_property_requires_explicit_item_path() -> None:
+    """Shorthand product-level property writes should fail immediately."""
+    t = _MockTransport()
+    client = _client_with_mock_transport(t)
+
+    pm = PoelisMatlab.__new__(PoelisMatlab)
+    pm.client = client
+
+    with pytest.raises(ValueError, match="must include an item"):
+        pm.change_property("uh2.Widget_Pro.demo_property_mass", 123.45)
 
 
 def test_change_property_frozen_version_error() -> None:
