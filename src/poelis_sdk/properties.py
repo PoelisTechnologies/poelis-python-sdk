@@ -307,7 +307,24 @@ class PropertiesClient:
         description: Optional[str] = None,
         changed_via: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Update a matrix property via GraphQL mutation."""
+        """Update a matrix property via GraphQL mutation.
+
+        Args:
+            id: Property ID (required).
+            value: New matrix value as a JSON string.
+            item_id: Optional item ID to move property to.
+            name: Optional property name.
+            readable_id: Optional readable ID.
+            position: Optional position for ordering.
+            category: Optional category (auto-normalized by the backend).
+            display_unit: Optional display unit.
+            reason: Optional reason for history tracking.
+            description: Optional description for history tracking.
+            changed_via: Optional source of the change.
+
+        Returns:
+            Dict[str, Any]: Updated property object from backend.
+        """
         if changed_via is not None:
             mutation = (
                 "mutation UpdateMatrixProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
