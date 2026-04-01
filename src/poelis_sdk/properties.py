@@ -292,6 +292,125 @@ class PropertiesClient:
 
         return property_data
 
+    def update_matrix_property(
+        self,
+        *,
+        id: str,  # noqa: A002
+        value: Optional[str] = None,
+        item_id: Optional[str] = None,
+        name: Optional[str] = None,
+        readable_id: Optional[str] = None,
+        position: Optional[float] = None,
+        category: Optional[str] = None,
+        display_unit: Optional[str] = None,
+        reason: Optional[str] = None,
+        description: Optional[str] = None,
+        changed_via: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update a matrix property via GraphQL mutation."""
+        if changed_via is not None:
+            mutation = (
+                "mutation UpdateMatrixProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
+                "$position: Float, $value: String, $category: String, $displayUnit: String, "
+                "$reason: String, $description: String, $changedVia: ChangedVia) {\n"
+                "  updateMatrixProperty(\n"
+                "    id: $id\n"
+                "    itemId: $itemId\n"
+                "    name: $name\n"
+                "    readableId: $readableId\n"
+                "    position: $position\n"
+                "    value: $value\n"
+                "    category: $category\n"
+                "    displayUnit: $displayUnit\n"
+                "    reason: $reason\n"
+                "    description: $description\n"
+                "    changedVia: $changedVia\n"
+                "  ) {\n"
+                "    id\n"
+                "    readableId\n"
+                "    itemId\n"
+                "    name\n"
+                "    position\n"
+                "    value\n"
+                "    draftPropertyId\n"
+                "    deleted\n"
+                "    hasChanges\n"
+                "    parsedValue\n"
+                "    category\n"
+                "    displayUnit\n"
+                "  }\n"
+                "}"
+            )
+        else:
+            mutation = (
+                "mutation UpdateMatrixProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
+                "$position: Float, $value: String, $category: String, $displayUnit: String, "
+                "$reason: String, $description: String) {\n"
+                "  updateMatrixProperty(\n"
+                "    id: $id\n"
+                "    itemId: $itemId\n"
+                "    name: $name\n"
+                "    readableId: $readableId\n"
+                "    position: $position\n"
+                "    value: $value\n"
+                "    category: $category\n"
+                "    displayUnit: $displayUnit\n"
+                "    reason: $reason\n"
+                "    description: $description\n"
+                "  ) {\n"
+                "    id\n"
+                "    readableId\n"
+                "    itemId\n"
+                "    name\n"
+                "    position\n"
+                "    value\n"
+                "    draftPropertyId\n"
+                "    deleted\n"
+                "    hasChanges\n"
+                "    parsedValue\n"
+                "    category\n"
+                "    displayUnit\n"
+                "  }\n"
+                "}"
+            )
+
+        variables: Dict[str, Any] = {"id": id}
+        if item_id is not None:
+            variables["itemId"] = item_id
+        if name is not None:
+            variables["name"] = name
+        if readable_id is not None:
+            variables["readableId"] = readable_id
+        if position is not None:
+            variables["position"] = position
+        if value is not None:
+            variables["value"] = value
+        if category is not None:
+            variables["category"] = category
+        if display_unit is not None:
+            variables["displayUnit"] = display_unit
+        if reason is not None:
+            variables["reason"] = reason
+        if description is not None:
+            variables["description"] = description
+        if changed_via is not None:
+            variables["changedVia"] = changed_via
+
+        resp = self._t.graphql(query=mutation, variables=variables)
+        resp.raise_for_status()
+        payload = resp.json()
+
+        if "errors" in payload:
+            self._handle_graphql_errors(payload["errors"])
+
+        property_data = payload.get("data", {}).get("updateMatrixProperty")
+        if property_data is None:
+            if "errors" in payload:
+                self._handle_graphql_errors(payload["errors"])
+            raise RuntimeError("Malformed GraphQL response: missing 'updateMatrixProperty' field")
+
+        return property_data
+
     def update_date_property(
         self,
         *,
@@ -641,4 +760,3 @@ class PropertiesClient:
         if value not in valid_statuses:
             raise ValueError(f"Status must be one of: DRAFT, UNDER_REVIEW, DONE. Got: {value}")
         return value
-

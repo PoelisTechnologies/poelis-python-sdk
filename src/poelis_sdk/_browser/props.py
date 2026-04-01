@@ -387,7 +387,7 @@ class _PropWrapper:
             if property_type == "numeric":
                 updated_property = properties_client.update_numeric_property(**mutation_params)
             elif property_type == "matrix":
-                updated_property = properties_client.update_numeric_property(**mutation_params)
+                updated_property = properties_client.update_matrix_property(**mutation_params)
             elif property_type == "text":
                 updated_property = properties_client.update_text_property(**mutation_params)
             elif property_type == "date":
@@ -575,4 +575,3 @@ class _PropWrapper:
             str: The best-effort display name, or an empty string if unknown.
         """
         return self.name or ""
-
