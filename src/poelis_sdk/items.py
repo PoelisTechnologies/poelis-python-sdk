@@ -48,7 +48,7 @@ class ItemsClient:
 
         query = (
             "query($pid: ID!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, filter: $filter, limit: $limit, offset: $offset) { id name readableId productId parentId position }\n"
+            "  items(productId: $pid, filter: $filter, limit: $limit, offset: $offset) { id name description readableId productId parentId position }\n"
             "}"
         )
         variables = {"pid": product_id, "filter": {"q": q} if q else None, "limit": int(limit), "offset": int(offset)}
@@ -82,7 +82,7 @@ class ItemsClient:
 
         query = (
             "query($id: ID!) {\n"
-            "  item(id: $id) { id name readableId productId parentId position }\n"
+            "  item(id: $id) { id name description readableId productId parentId position }\n"
             "}"
         )
         resp = self._t.graphql(query=query, variables={"id": item_id})
