@@ -42,6 +42,9 @@ extend-exclude = [
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
+markers = [
+    "integration: live SDK checks that require configured Poelis credentials",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/poelis_sdk"]

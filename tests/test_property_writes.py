@@ -140,6 +140,42 @@ def test_change_property_numeric_array(mock_client: PoelisClient) -> None:
     assert variables["value"] == "[4, 5, 6]"  # Should be JSON string
 
 
+def test_change_property_matrix_value_uses_matrix_mutation(mock_client: PoelisClient) -> None:
+    """Matrix properties must use the dedicated backend mutation."""
+    raw_prop: Dict[str, Any] = {
+        "id": "prop-m1",
+        "__typename": "MatrixProperty",
+        "readableId": "mass_matrix",
+        "value": "[[1, 2], [3, 4]]",
+        "parsedValue": [[1, 2], [3, 4]],
+        "category": "Mass",
+        "displayUnit": "kg",
+        "productVersionNumber": None,
+    }
+
+    updated_prop = {
+        "id": "prop-m1",
+        "readableId": "mass_matrix",
+        "value": "[[5, 6], [7, 8]]",
+        "parsedValue": [[5, 6], [7, 8]],
+        "category": "Mass",
+        "displayUnit": "kg",
+        "type": "matrix",
+    }
+    mock_client._transport.set_response({"data": {"updateMatrixProperty": updated_prop}})  # type: ignore[attr-defined]
+
+    wrapper = _PropWrapper(raw_prop, client=mock_client)
+    wrapper.change_property([[5, 6], [7, 8]])
+
+    request = mock_client._transport.requests[0]  # type: ignore[attr-defined]
+    variables = request["variables"]
+
+    assert variables["id"] == "prop-m1"
+    assert variables["value"] == "[[5, 6], [7, 8]]"
+    assert "updateMatrixProperty" in request["query"]
+    assert "updateNumericProperty" not in request["query"]
+
+
 def test_change_property_text_value(mock_client: PoelisClient) -> None:
     """Test updating text property value."""
     raw_prop: Dict[str, Any] = {
@@ -257,6 +293,23 @@ def test_change_property_status_invalid_value(mock_client: PoelisClient) -> None
 
     with pytest.raises(ValueError, match="Status must be one of"):
         wrapper.change_property("INVALID_STATUS")
+
+
+def test_change_property_formula_value_is_rejected(mock_client: PoelisClient) -> None:
+    """Formula properties remain read-only after the numeric/matrix split."""
+    raw_prop: Dict[str, Any] = {
+        "id": "prop-f1",
+        "__typename": "FormulaProperty",
+        "readableId": "computed_mass",
+        "value": "42",
+        "formulaExpression": "@{dep-1}",
+        "productVersionNumber": None,
+    }
+
+    wrapper = _PropWrapper(raw_prop, client=mock_client)
+
+    with pytest.raises(ValueError, match="Formula properties cannot be updated"):
+        wrapper.change_property(99)
 
 
 def test_change_property_versioned_property(mock_client: PoelisClient) -> None:
