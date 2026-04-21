@@ -193,7 +193,7 @@ class PoelisMatlab:
     def __init__(
         self,
         api_key: str,
-        base_url: str = "https://poelis-be-py-753618215333.europe-west1.run.app",
+        base_url: str = "https://api.poelis.com",
         timeout_seconds: float = 30.0,
     ) -> None:
         """Initialize the MATLAB facade with API credentials.

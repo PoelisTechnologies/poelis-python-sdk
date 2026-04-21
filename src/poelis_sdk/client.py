@@ -34,7 +34,7 @@ class ClientConfig(BaseModel):
         timeout_seconds: Request timeout in seconds.
     """
 
-    base_url: HttpUrl = Field(default="https://poelis-be-py-753618215333.europe-west1.run.app")
+    base_url: HttpUrl = Field(default="https://api.poelis.com")
     api_key: str = Field(min_length=1)
     timeout_seconds: float = 30.0
 
@@ -50,7 +50,7 @@ class PoelisClient:
     def __init__(
         self,
         api_key: str,
-        base_url: str = "https://poelis-be-py-753618215333.europe-west1.run.app",
+        base_url: str = "https://api.poelis.com",
         timeout_seconds: float = 30.0,
         org_id: Optional[str] = None,
         enable_change_detection: bool = True,
@@ -126,7 +126,7 @@ class PoelisClient:
         - POELIS_API_KEY
         """
 
-        base_url = os.environ.get("POELIS_BASE_URL", "https://poelis-be-py-753618215333.europe-west1.run.app")
+        base_url = os.environ.get("POELIS_BASE_URL", "https://api.poelis.com")
         api_key = os.environ.get("POELIS_API_KEY")
 
         if not api_key:

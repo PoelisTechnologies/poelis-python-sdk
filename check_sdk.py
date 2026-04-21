@@ -54,7 +54,7 @@ def run_live_checks() -> bool:
         print("Set POELIS_API_KEY to run live checks")
         return False
 
-    base_url = os.environ.get("POELIS_BASE_URL", "https://poelis-be-py-753618215333.europe-west1.run.app")
+    base_url = os.environ.get("POELIS_BASE_URL", "https://api.poelis.com")
     user_id = os.environ.get("POELIS_USER_ID")
     client = PoelisClient(api_key=api_key, base_url=base_url, enable_change_detection=False)
     ws_id: Optional[str] = None

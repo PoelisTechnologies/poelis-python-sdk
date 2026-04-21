@@ -30,7 +30,7 @@ classdef PoelisClient < handle
             % Args:
             %   api_key (string, required): API key for Poelis API authentication
             %   base_url (string, optional): Base URL of the Poelis API. 
-            %       Default: 'https://poelis-be-py-753618215333.europe-west1.run.app'
+            %       Default: 'https://api.poelis.com'
             %   timeout_seconds (double, optional): Network timeout in seconds.
             %       Default: 30.0
             %
@@ -49,7 +49,7 @@ classdef PoelisClient < handle
             
             % Create Python PoelisMatlab object
             if nargin < 2
-                base_url = 'https://poelis-be-py-753618215333.europe-west1.run.app';
+                base_url = 'https://api.poelis.com';
             end
             if nargin < 3
                 timeout_seconds = 30.0;
