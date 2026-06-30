@@ -7,7 +7,13 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from .._graphql_errors import _handle_graphql_read_errors
 from ..props import _PropWrapper
-from ..utils import _is_visible_version_item, _is_visible_version_property, _safe_key
+from ..utils import _is_visible_version_property, _safe_key
+from .item_queries import (
+    _child_node_draft_id,
+    _direct_child_rows,
+    _list_draft_items,
+    _list_versioned_items,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..nodes import _Node
@@ -286,6 +292,11 @@ def get_property_from_item_tree(
     if not pid:
         raise RuntimeError("Cannot determine product ID for item node")
 
+    found = _lookup_property_via_search(node, readable_id, pid, version_number)
+    if found is not None:
+        return found
+
+    item_draft_id = getattr(node, "_draft_item_id", None)
     return search_property_in_item_and_children(
         node,
         node._id,
@@ -293,6 +304,7 @@ def get_property_from_item_tree(
         pid,
         version_number,
         search_descendants=search_descendants,
+        item_draft_id=str(item_draft_id) if item_draft_id is not None else None,
     )
 
 
@@ -304,6 +316,7 @@ def search_property_in_item_and_children(
     version_number: Optional[int],
     *,
     search_descendants: bool = True,
+    item_draft_id: str | None = None,
     visited: Optional[set[str]] = None,
     depth: int = 0,
     max_depth: int = 500,
@@ -324,13 +337,14 @@ def search_property_in_item_and_children(
         )
     visited.add(item_id)
     try:
-        return _search_property_in_item_and_children_impl(
+        return _fetch_property_from_item_and_children_impl(
             node,
             item_id,
             readable_id,
             product_id,
             version_number,
             search_descendants=search_descendants,
+            item_draft_id=item_draft_id,
             visited=visited,
             depth=depth,
             max_depth=max_depth,
@@ -339,21 +353,76 @@ def search_property_in_item_and_children(
         visited.discard(item_id)
 
 
-def _search_property_in_item_and_children_impl(
+def _lookup_property_via_search(
     node: "_Node",
-    item_id: Optional[str],
     readable_id: str,
     product_id: str,
     version_number: Optional[int],
-    *,
-    search_descendants: bool,
-    visited: set[str],
-    depth: int,
-    max_depth: int,
-) -> "_PropWrapper":
-    if not item_id:
-        raise RuntimeError(f"Property with readableId '{readable_id}' not found")
+) -> Optional["_PropWrapper"]:
+    """Resolve a property with one indexed search query instead of tree walking."""
+    try:
+        offset = 0
+        while True:
+            page = node._client.search.properties(
+                q=readable_id,
+                product_id=product_id,
+                limit=50,
+                offset=offset,
+            )
+            hits = page.get("hits") or []
+            for hit in hits:
+                hit_readable = hit.get("readableId") or hit.get("name")
+                if hit_readable != readable_id:
+                    continue
+                item_id = hit.get("itemId")
+                if not item_id:
+                    continue
+                wrapper = _load_property_on_item(
+                    node,
+                    str(item_id),
+                    readable_id,
+                    product_id,
+                    version_number,
+                )
+                if wrapper is not None:
+                    return wrapper
+            total = page.get("total")
+            if total is None or offset + len(hits) >= int(total) or not hits:
+                break
+            offset += len(hits)
+    except Exception:
+        return None
+    return None
 
+
+def _load_property_on_item(
+    node: "_Node",
+    item_id: str,
+    readable_id: str,
+    product_id: str,
+    version_number: Optional[int],
+) -> Optional["_PropWrapper"]:
+    """Load a single property by readableId on a known item."""
+    try:
+        return _fetch_property_from_item(
+            node,
+            item_id,
+            readable_id,
+            product_id,
+            version_number,
+        )
+    except Exception:
+        return None
+
+
+def _fetch_property_from_item(
+    node: "_Node",
+    item_id: str,
+    readable_id: str,
+    product_id: str,
+    version_number: Optional[int],
+) -> "_PropWrapper":
+    """Load one property from a single item without descending into children."""
     use_sdk_properties = False
     try:
         change_tracker = getattr(node._client, "_change_tracker", None)
@@ -397,72 +466,104 @@ def _search_property_in_item_and_children_impl(
         )
         prop_variables = {"iid": item_id}
 
-    try:
-        r = node._client._transport.graphql(prop_query, prop_variables)
-        r.raise_for_status()
-        data = r.json()
-        if "errors" in data:
-            if use_sdk_properties:
-                if version_number is not None:
-                    fallback_query = (
-                        "query($iid: ID!, $version: VersionInput!) {\n"
-                        "  properties(itemId: $iid, version: $version) {\n"
-                        "    __typename\n"
-                        "    ... on NumericProperty { id name readableId deleted category displayUnit numericValue: value parsedValue }\n"
-                        "    ... on FormulaProperty { id name readableId deleted numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
-                        "    ... on MatrixProperty { id name readableId deleted category displayUnit value parsedValue }\n"
-                        "    ... on TextProperty { id name readableId deleted value parsedValue }\n"
-                        "    ... on DateProperty { id name readableId deleted value }\n"
-                        "  }\n"
-                        "}"
-                    )
-                    fallback_vars = {"iid": item_id, "version": {"productId": product_id, "versionNumber": version_number}}
-                else:
-                    fallback_query = (
-                        "query($iid: ID!) {\n"
-                        "  properties(itemId: $iid) {\n"
-                        "    __typename\n"
-                        "    ... on NumericProperty { id name readableId deleted category displayUnit numericValue: value parsedValue }\n"
-                        "    ... on FormulaProperty { id name readableId deleted numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
-                        "    ... on MatrixProperty { id name readableId deleted category displayUnit value parsedValue }\n"
-                        "    ... on TextProperty { id name readableId deleted value parsedValue }\n"
-                        "    ... on DateProperty { id name readableId deleted value }\n"
-                        "  }\n"
-                        "}"
-                    )
-                    fallback_vars = {"iid": item_id}
+    props = _query_item_properties(node, prop_query, prop_variables, query_name, use_sdk_properties, product_id, version_number)
+    props = _filter_visible_version_properties(props, version_number)
+    for prop in props:
+        if prop.get("readableId") == readable_id:
+            return _PropWrapper(prop, client=node._client)
+    raise RuntimeError(f"Property with readableId '{readable_id}' not found")
 
-                try:
-                    r_fb = node._client._transport.graphql(fallback_query, fallback_vars)
-                    r_fb.raise_for_status()
-                    data = r_fb.json()
-                    if "errors" in data:
-                        raise RuntimeError(data["errors"])
-                except Exception:
-                    data = {"data": {}}
+
+def _query_item_properties(
+    node: "_Node",
+    prop_query: str,
+    prop_variables: dict[str, Any],
+    query_name: str,
+    use_sdk_properties: bool,
+    product_id: str,
+    version_number: Optional[int],
+) -> list[dict[str, Any]]:
+    r = node._client._transport.graphql(prop_query, prop_variables)
+    r.raise_for_status()
+    data = r.json()
+    if "errors" in data:
+        if use_sdk_properties:
+            if version_number is not None:
+                fallback_query = (
+                    "query($iid: ID!, $version: VersionInput!) {\n"
+                    "  properties(itemId: $iid, version: $version) {\n"
+                    "    __typename\n"
+                    "    ... on NumericProperty { id name readableId deleted category displayUnit numericValue: value parsedValue }\n"
+                    "    ... on FormulaProperty { id name readableId deleted numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
+                    "    ... on MatrixProperty { id name readableId deleted category displayUnit value parsedValue }\n"
+                    "    ... on TextProperty { id name readableId deleted value parsedValue }\n"
+                    "    ... on DateProperty { id name readableId deleted value }\n"
+                    "  }\n"
+                    "}"
+                )
+                fallback_vars = {"iid": prop_variables["iid"], "version": {"productId": product_id, "versionNumber": version_number}}
             else:
+                fallback_query = (
+                    "query($iid: ID!) {\n"
+                    "  properties(itemId: $iid) {\n"
+                    "    __typename\n"
+                    "    ... on NumericProperty { id name readableId deleted category displayUnit numericValue: value parsedValue }\n"
+                    "    ... on FormulaProperty { id name readableId deleted numericValue: value parsedValue formulaExpression formulaDependencies { id name value displayUnit itemId productId } hasFormulaDependencyChanges }\n"
+                    "    ... on MatrixProperty { id name readableId deleted category displayUnit value parsedValue }\n"
+                    "    ... on TextProperty { id name readableId deleted value parsedValue }\n"
+                    "    ... on DateProperty { id name readableId deleted value }\n"
+                    "  }\n"
+                    "}"
+                )
+                fallback_vars = {"iid": prop_variables["iid"]}
+            r_fb = node._client._transport.graphql(fallback_query, fallback_vars)
+            r_fb.raise_for_status()
+            data = r_fb.json()
+            if "errors" in data:
                 raise RuntimeError(data["errors"])
+            return data.get("data", {}).get("properties", []) or []
+        raise RuntimeError(data["errors"])
 
-        props = data.get("data", {}).get(query_name, []) or []
-        if not props:
-            props = data.get("data", {}).get("properties", []) or []
-        props = _filter_visible_version_properties(props, version_number)
+    props = data.get("data", {}).get(query_name, []) or []
+    if not props:
+        props = data.get("data", {}).get("properties", []) or []
+    return props
 
-        for prop in props:
-            if prop.get("readableId") == readable_id:
-                wrapper = _PropWrapper(prop, client=node._client)
-                if node._client is not None:
-                    try:
-                        change_tracker2 = getattr(node._client, "_change_tracker", None)
-                        if change_tracker2 is not None and change_tracker2.is_enabled():
-                            property_path = node._build_path(readable_id)
-                            if property_path:
-                                prop_name = prop.get("readableId") or prop.get("name") or readable_id
-                                prop_id = prop.get("id")
-                                change_tracker2.record_accessed_property(property_path, prop_name, prop_id)
-                    except Exception:
-                        pass
-                return wrapper
+
+def _fetch_property_from_item_and_children_impl(
+    node: "_Node",
+    item_id: Optional[str],
+    readable_id: str,
+    product_id: str,
+    version_number: Optional[int],
+    *,
+    search_descendants: bool,
+    item_draft_id: str | None,
+    visited: set[str],
+    depth: int,
+    max_depth: int,
+) -> "_PropWrapper":
+    if not item_id:
+        raise RuntimeError(f"Property with readableId '{readable_id}' not found")
+
+    try:
+        wrapper = _fetch_property_from_item(node, str(item_id), readable_id, product_id, version_number)
+        if node._client is not None:
+            try:
+                change_tracker2 = getattr(node._client, "_change_tracker", None)
+                if change_tracker2 is not None and change_tracker2.is_enabled():
+                    property_path = node._build_path(readable_id)
+                    if property_path:
+                        prop_name = (
+                            getattr(wrapper, "_raw", {}).get("readableId")
+                            or getattr(wrapper, "_raw", {}).get("name")
+                            or readable_id
+                        )
+                        prop_id = getattr(wrapper, "_raw", {}).get("id")
+                        change_tracker2.record_accessed_property(property_path, prop_name, prop_id)
+            except Exception:
+                pass
+        return wrapper
     except Exception:
         pass
 
@@ -470,30 +571,22 @@ def _search_property_in_item_and_children_impl(
         raise RuntimeError(f"Property with readableId '{readable_id}' not found in item tree")
 
     if version_number is not None:
-        all_items = node._client.versions.list_items(
+        parent_filter_id = item_draft_id or item_id
+        rows = _list_versioned_items(
+            node,
             product_id=product_id,
             version_number=version_number,
-            limit=1000,
-            offset=0,
+            parent_item_id=str(parent_filter_id) if parent_filter_id else None,
         )
-        child_items = [it for it in all_items if _is_visible_version_item(it) and it.get("parentId") == item_id]
+        child_items = _direct_child_rows(rows, parent_node_id=str(item_id))
     else:
-        child_query = (
-            "query($pid: ID!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
-            "  items(productId: $pid, filter: $filter, limit: $limit, offset: $offset) { id name readableId productId parentId position }\n"
-            "}"
+        parent_filter_id = item_draft_id or item_id
+        rows = _list_draft_items(
+            node,
+            product_id=product_id,
+            parent_item_id=str(parent_filter_id) if parent_filter_id else None,
         )
-        try:
-            r = node._client._transport.graphql(
-                child_query, {"pid": product_id, "filter": {"parentItemId": item_id}, "limit": 1000, "offset": 0}
-            )
-            r.raise_for_status()
-            data = r.json()
-            if "errors" in data:
-                raise RuntimeError(f"Property with readableId '{readable_id}' not found")
-            child_items = data.get("data", {}).get("items", []) or []
-        except Exception:
-            raise RuntimeError(f"Property with readableId '{readable_id}' not found")
+        child_items = _direct_child_rows(rows, parent_node_id=str(item_id))
 
     for child_item in child_items:
         child_id = child_item.get("id")
@@ -506,6 +599,7 @@ def _search_property_in_item_and_children_impl(
                     product_id,
                     version_number,
                     search_descendants=True,
+                    item_draft_id=_child_node_draft_id(child_item),
                     visited=visited,
                     depth=depth + 1,
                     max_depth=max_depth,
