@@ -79,3 +79,67 @@ def test_versions_list_items_returns_deleted_rows_without_filtering() -> None:
     assert rows[0]["deleted"] is False
     assert rows[1]["deleted"] is True
     assert t.queries and any("deleted" in query for query in t.queries)
+
+
+class _PagingTransport(httpx.BaseTransport):
+    def __init__(self) -> None:
+        self.offsets: list[int] = []
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:  # type: ignore[override]
+        payload = json.loads(request.content.decode("utf-8"))
+        variables = payload.get("variables", {})
+        offset = int(variables.get("offset", 0))
+        self.offsets.append(offset)
+        if offset == 0:
+            data = [
+                {
+                    "id": "vi1",
+                    "name": "A",
+                    "readableId": "a",
+                    "productId": "p1",
+                    "parentId": None,
+                    "draftItemId": "i1",
+                    "position": 1,
+                    "deleted": False,
+                },
+                {
+                    "id": "vi2",
+                    "name": "B",
+                    "readableId": "b",
+                    "productId": "p1",
+                    "parentId": None,
+                    "draftItemId": "i2",
+                    "position": 2,
+                    "deleted": False,
+                },
+            ]
+        elif offset == 2:
+            data = [
+                {
+                    "id": "vi3",
+                    "name": "C",
+                    "readableId": "c",
+                    "productId": "p1",
+                    "parentId": None,
+                    "draftItemId": "i3",
+                    "position": 3,
+                    "deleted": True,
+                },
+            ]
+        else:
+            data = []
+        return httpx.Response(200, json={"data": {"sdkItems": data}}, request=request)
+
+
+def test_versions_iter_items_paginates() -> None:
+    """iter_items should walk offset pages until a short or empty page."""
+    from tests.conftest import client_with_transport
+
+    t = _PagingTransport()
+    c = client_with_transport(t)
+    ids = [
+        row["id"]
+        for row in c.versions.iter_items(product_id="p1", version_number=2, page_size=2)
+    ]
+    assert ids == ["vi1", "vi2", "vi3"]
+    assert t.offsets == [0, 2]
