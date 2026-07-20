@@ -29,3 +29,10 @@ def item_draft_id(item: dict[str, Any]) -> str:
     if draft_id is not None:
         return str(draft_id)
     return str(item["id"])
+
+
+def parent_item_filter_id(*, node_id: str, draft_item_id: str | None) -> str:
+    """Id to pass as ItemFilter.parentItemId (always draft-scoped)."""
+    if draft_item_id is not None:
+        return str(draft_item_id)
+    return str(node_id)

@@ -5,12 +5,13 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Optional
 
+from poelis_sdk._item_filter import item_draft_id
+
 from .item_queries import (
-    _child_node_draft_id,
     _direct_child_rows,
     _list_draft_items,
     _list_versioned_items,
-    _node_draft_item_id,
+    _node_parent_filter_id,
 )
 from .version_cache import _resolve_baseline_version_number
 from ..utils import _safe_key
@@ -19,7 +20,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from ..nodes import _Node
 
 
-def _append_item_child(node: "_Node", parent: "_Node", item_row: dict, *, version_number: Optional[int]) -> None:
+def _append_item_child(parent: "_Node", item_row: dict, *, version_number: Optional[int]) -> None:
     display = item_row.get("readableId") or item_row.get("name") or str(item_row["id"])
     nm = _safe_key(display)
     child = parent.__class__(
@@ -29,7 +30,7 @@ def _append_item_child(node: "_Node", parent: "_Node", item_row: dict, *, versio
         item_row["id"],
         display,
         version_number=version_number,
-        draft_item_id=_child_node_draft_id(item_row),
+        draft_item_id=item_draft_id(item_row),
     )
     child._cache_ttl = parent._cache_ttl
     parent._children_cache[nm] = child
@@ -73,7 +74,7 @@ def load_children(node: "_Node") -> None:
                     root_only=True,
                 )
                 for it in rows:
-                    _append_item_child(node, node, it, version_number=version_number)
+                    _append_item_child(node, it, version_number=version_number)
                 node._children_loaded_at = time.time()
                 return
         except (AttributeError, KeyError, TypeError, ValueError):
@@ -84,7 +85,7 @@ def load_children(node: "_Node") -> None:
         if not node._children_cache:
             rows = _list_draft_items(node, product_id=node._id, root_only=True)
             for it in rows:
-                _append_item_child(node, node, it, version_number=None)
+                _append_item_child(node, it, version_number=None)
     elif node._level == "version":
         anc = node
         pid: Optional[str] = None
@@ -111,7 +112,7 @@ def load_children(node: "_Node") -> None:
             )
 
         for it in rows:
-            _append_item_child(node, node, it, version_number=version_number)
+            _append_item_child(node, it, version_number=version_number)
     elif node._level == "item":
         anc = node
         pid: Optional[str] = None
@@ -124,25 +125,24 @@ def load_children(node: "_Node") -> None:
             return
 
         version_number = getattr(node, "_version_number", None)
-        parent_draft_id = _node_draft_item_id(node)
+        parent_filter_id = _node_parent_filter_id(node)
 
         if version_number is not None:
             rows = _list_versioned_items(
                 node,
                 product_id=pid,
                 version_number=version_number,
-                parent_item_id=parent_draft_id,
+                parent_item_id=parent_filter_id,
             )
-            rows = _direct_child_rows(rows, parent_node_id=str(node._id))
         else:
             rows = _list_draft_items(
                 node,
                 product_id=pid,
-                parent_item_id=parent_draft_id,
+                parent_item_id=parent_filter_id,
             )
-            rows = _direct_child_rows(rows, parent_node_id=str(node._id))
+        rows = _direct_child_rows(rows, parent_node_id=str(node._id))
 
         for it2 in rows:
-            _append_item_child(node, node, it2, version_number=version_number)
+            _append_item_child(node, it2, version_number=version_number)
 
     node._children_loaded_at = time.time()

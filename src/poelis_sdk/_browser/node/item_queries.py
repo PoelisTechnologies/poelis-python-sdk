@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from poelis_sdk._item_filter import item_draft_id
+from poelis_sdk._item_filter import parent_item_filter_id
 
 from ..utils import _is_visible_version_item
 
@@ -64,12 +64,9 @@ def _direct_child_rows(
     return children
 
 
-def _node_draft_item_id(node: "_Node") -> str:
-    draft_id = getattr(node, "_draft_item_id", None)
-    if draft_id is not None:
-        return str(draft_id)
-    return str(node._id)
-
-
-def _child_node_draft_id(item_row: dict[str, Any]) -> str:
-    return item_draft_id(item_row)
+def _node_parent_filter_id(node: "_Node") -> str:
+    """Draft-scoped id for ItemFilter.parentItemId on a browser node."""
+    return parent_item_filter_id(
+        node_id=str(node._id),
+        draft_item_id=getattr(node, "_draft_item_id", None),
+    )
