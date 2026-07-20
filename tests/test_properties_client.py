@@ -1,4 +1,4 @@
-"""Direct PropertiesClient GraphQL wiring tests."""
+"""Tests for PropertiesClient GraphQL update mutations."""
 
 from __future__ import annotations
 

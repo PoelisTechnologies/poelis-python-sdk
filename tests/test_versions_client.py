@@ -8,6 +8,7 @@ from typing import Any
 import httpx
 
 from poelis_sdk import PoelisClient
+from tests.conftest import client_with_transport
 
 
 class _MockTransport(httpx.BaseTransport):
@@ -132,9 +133,6 @@ class _PagingTransport(httpx.BaseTransport):
 
 
 def test_versions_iter_items_paginates() -> None:
-    """iter_items should walk offset pages until a short or empty page."""
-    from tests.conftest import client_with_transport
-
     t = _PagingTransport()
     c = client_with_transport(t)
     ids = [

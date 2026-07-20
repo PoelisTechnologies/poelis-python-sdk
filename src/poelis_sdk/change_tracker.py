@@ -210,9 +210,7 @@ class PropertyChangeTracker:
         for change in self._changes_this_session:
             property_id = change.get("property_id")
             if property_id:
-                # Later entries overwrite earlier ones for the same property_id
                 latest_changes[property_id] = change
-
         return latest_changes
 
     def _normalize_value(self, value: Any) -> Any:

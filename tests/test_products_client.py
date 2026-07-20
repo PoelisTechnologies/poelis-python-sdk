@@ -1,4 +1,4 @@
-"""Unit tests for ProductsClient GraphQL reads."""
+"""Tests for ProductsClient list and version queries."""
 
 from __future__ import annotations
 

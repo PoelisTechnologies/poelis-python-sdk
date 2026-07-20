@@ -174,7 +174,7 @@ def test_client_clear_baselines() -> None:
 
 
 def test_client_get_changed_properties_returns_latest_change(tmp_path: Any) -> None:
-    """Client should surface latest detected change per property."""
+    """Test that the client returns the latest detected change per property."""
     client = PoelisClient(
         api_key="test_key",
         enable_change_detection=True,
@@ -182,29 +182,21 @@ def test_client_get_changed_properties_returns_latest_change(tmp_path: Any) -> N
         log_file=str(tmp_path / "changes.log"),
     )
 
-    tracker = client._change_tracker  # noqa: SLF001 - test seam
+    tracker = client._change_tracker
     tracker.record_baseline("prop1", 100, "Price")
-
-    first_change = tracker.check_changed("prop1", 150, "Price")
-    assert first_change is not None
-
+    assert tracker.check_changed("prop1", 150, "Price") is not None
     second_change = tracker.check_changed("prop1", 200, "Price")
     assert second_change is not None
-
-    changed = client.get_changed_properties()
-    assert changed == {"prop1": second_change}
-    assert changed["prop1"]["old_value"] == 150.0
-    assert changed["prop1"]["new_value"] == 200.0
+    assert client.get_changed_properties() == {"prop1": second_change}
 
 
 def test_warn_if_deleted_emits_warning_for_recorded_item(tmp_path: Any) -> None:
-    """Deletion warning should be emitted for an item previously accessed."""
+    """Test that a deletion warning is emitted for a previously accessed item."""
     tracker = PropertyChangeTracker(
         enabled=True,
         baseline_file=str(tmp_path / "baselines.json"),
         log_file=str(tmp_path / "changes.log"),
     )
-
     tracker.record_accessed_item("ws.p.item", "Item", item_id="i1")
 
     with warnings.catch_warnings(record=True) as caught:

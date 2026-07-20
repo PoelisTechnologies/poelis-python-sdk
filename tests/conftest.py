@@ -1,5 +1,3 @@
-"""Shared pytest helpers for GraphQL transport mocking."""
-
 from __future__ import annotations
 
 import httpx
@@ -9,8 +7,6 @@ from poelis_sdk.client import Transport
 
 
 def client_with_transport(transport: httpx.BaseTransport) -> PoelisClient:
-    """Build a PoelisClient whose Transport uses the given httpx transport."""
-
     def _init(self: Transport, base_url: str, api_key: str, timeout_seconds: float) -> None:
         self._client = httpx.Client(base_url=base_url, transport=transport, timeout=timeout_seconds)
         self._api_key = api_key

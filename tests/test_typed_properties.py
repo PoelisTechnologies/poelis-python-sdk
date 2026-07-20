@@ -143,8 +143,6 @@ class TestTypedPropertyModels:
             "value": "10 kg",
             "parsedValue": 10.0,
             "formulaExpression": "a + b",
-            "category": None,
-            "displayUnit": None,
         }
 
         prop = FormulaProperty(**prop_data)

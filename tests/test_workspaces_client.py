@@ -1,4 +1,4 @@
-"""Unit tests for WorkspacesClient."""
+"""Tests for WorkspacesClient list and get."""
 
 from __future__ import annotations
 
