@@ -257,7 +257,7 @@ class _PropWrapper:
         return current_value
 
     @value.setter
-    def value(self, new_value: Any) -> None:
+    def value(self, _new_value: Any) -> None:
         """Reject direct assignment and require backend-backed updates."""
         raise AttributeError(
             "Property values are read-only. Use change_property(...) to persist an update."

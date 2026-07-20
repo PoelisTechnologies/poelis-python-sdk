@@ -77,6 +77,8 @@ class PoelisClient:
                 and this is None, defaults to `poelis_changes.log`. Defaults to None
                 (no file logging).
         """
+        # Deprecated kwarg retained for backwards compatibility; ignored.
+        _ = org_id
 
         # Configure quiet logging by default for production use
         quiet_logging()
@@ -198,9 +200,4 @@ class PoelisClient:
         this method does nothing.
         """
         self._change_tracker.write_change_log()
-
-
-class _Deprecated:  # pragma: no cover
-    pass
-
 

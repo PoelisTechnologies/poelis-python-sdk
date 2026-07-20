@@ -42,8 +42,7 @@ class Transport:
 
         self._client = httpx.Client(base_url=base_url, timeout=timeout_seconds)
         self._api_key = api_key
-        self._timeout = timeout_seconds
-        
+
 
     def _headers(self, extra: Optional[Mapping[str, str]] = None) -> Dict[str, str]:
         headers: Dict[str, str] = {
@@ -58,15 +57,6 @@ class Transport:
 
     def get(self, path: str, params: Optional[Mapping[str, Any]] = None) -> httpx.Response:
         return self._request("GET", path, params=params)
-
-    def post(self, path: str, json: Any = None) -> httpx.Response:  # noqa: A003
-        return self._request("POST", path, json=json)
-
-    def patch(self, path: str, json: Any = None) -> httpx.Response:
-        return self._request("PATCH", path, json=json)
-
-    def delete(self, path: str) -> httpx.Response:
-        return self._request("DELETE", path)
 
     def graphql(self, query: str, variables: Optional[Mapping[str, Any]] = None) -> httpx.Response:
         """Post a GraphQL operation to /v1/graphql.
