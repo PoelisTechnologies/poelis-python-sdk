@@ -32,7 +32,8 @@ def test_smoke_read_chain() -> None:
     if not api_key:
         pytest.skip("POELIS_API_KEY not set")
 
-    client = PoelisClient(api_key=api_key, enable_change_detection=False)
+    base_url = os.environ.get("POELIS_BASE_URL", "https://api.poelis.com")
+    client = PoelisClient(api_key=api_key, base_url=base_url, enable_change_detection=False)
     workspaces = client.workspaces.list(limit=1)
     assert workspaces
     ws_id = workspaces[0]["id"]
