@@ -11,6 +11,7 @@ from poelis_sdk.models import (
     MatrixProperty,
     NumericProperty,
     PropertySearchResult,
+    StatusProperty,
     TextProperty,
 )
 
@@ -111,6 +112,49 @@ class TestTypedPropertyModels:
         assert prop.typed_value == "2024-01-15"
         assert isinstance(prop.typed_value, str)
         assert prop.value == "2024-01-15"
+
+    def test_status_property_with_parsed_value(self) -> None:
+        """StatusProperty uses display wire values from GraphQL."""
+        prop = StatusProperty(
+            **{
+                "id": "ps1",
+                "itemId": "item1",
+                "position": 1.0,
+                "name": "Workflow",
+                "value": "Draft",
+                "type": "status",
+                "parsedValue": "Draft",
+            }
+        )
+        assert prop.typed_value == "Draft"
+        assert prop.value == "Draft"
+        assert prop.type == "status"
+
+    def test_status_property_without_parsed_value(self) -> None:
+        """StatusProperty falls back to raw value when parsedValue missing."""
+        prop = StatusProperty(
+            **{
+                "id": "ps2",
+                "itemId": "item1",
+                "position": 2.0,
+                "name": "Workflow",
+                "value": "Under Review",
+                "type": "status",
+            }
+        )
+        assert prop.typed_value == "Under Review"
+
+    def test_status_property_done(self) -> None:
+        prop = StatusProperty(
+            id="ps3",
+            item_id="item1",
+            position=3.0,
+            name="Workflow",
+            value="Done",
+            type="status",
+            parsed_value="Done",
+        )
+        assert prop.typed_value == "Done"
 
     def test_property_search_result_with_parsed_value(self) -> None:
         """Test PropertySearchResult model with parsedValue field."""

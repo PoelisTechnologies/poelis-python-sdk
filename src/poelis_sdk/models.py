@@ -187,6 +187,35 @@ class DateProperty(BaseModel):
         return self.parsed_value if self.parsed_value is not None else self.value
 
 
+StatusPropertyWireValue = Literal["Draft", "Under Review", "Done"]
+
+
+class StatusProperty(BaseModel):
+    """Status workflow property.
+
+    GraphQL responses use display values: Draft, Under Review, Done.
+    Mutations accept enum names: DRAFT, UNDER_REVIEW, DONE
+    (see PropertiesClient.update_status_property / _validate_status_value).
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str = Field(min_length=1)
+    product_id: Optional[str] = Field(alias="productId", default=None)
+    product_version_number: Optional[int] = Field(alias="productVersionNumber", default=None)
+    item_id: str = Field(alias="itemId", min_length=1)
+    position: float
+    name: str = Field(min_length=1)
+    value: str
+    type: str = Field(min_length=1)
+    parsed_value: Optional[str] = Field(alias="parsedValue", default=None)
+
+    @property
+    def typed_value(self) -> str:
+        """Prefer parsedValue; fall back to raw value string."""
+        return self.parsed_value if self.parsed_value is not None else self.value
+
+
 class FormulaProperty(BaseModel):
     """Formula property representation (read-only, computed from expression and dependencies).
 
