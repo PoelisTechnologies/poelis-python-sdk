@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, List
 
 from ..props import _NodeList
+from .version_cache import _get_product_versions
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..nodes import _Node
@@ -17,9 +18,7 @@ def get_version_names(node: "_Node") -> List[str]:
 
     version_names: List[str] = []
     try:
-        page = node._client.products.list_product_versions(product_id=node._id, limit=100, offset=0)
-        versions_data = getattr(page, "data", []) or []
-        for v in versions_data:
+        for v in _get_product_versions(node):
             version_number = getattr(v, "version_number", None)
             if version_number is not None:
                 version_names.append(f"v{version_number}")
@@ -43,8 +42,7 @@ def list_product_versions(node: "_Node") -> "_NodeList":
     names.append("draft")
 
     try:
-        page = node._client.products.list_product_versions(product_id=node._id, limit=100, offset=0)
-        for v in getattr(page, "data", []) or []:
+        for v in _get_product_versions(node):
             version_number = getattr(v, "version_number", None)
             if version_number is None:
                 continue
@@ -65,8 +63,7 @@ def get_version(node: "_Node", version_name: str) -> "_Node":
         raise AttributeError("get_version() method is only available on product nodes")
 
     try:
-        page = node._client.products.list_product_versions(product_id=node._id, limit=100, offset=0)
-        versions = getattr(page, "data", []) or []
+        versions = _get_product_versions(node)
 
         search_term = version_name.strip().lower()
 
@@ -120,7 +117,3 @@ def get_version(node: "_Node", version_name: str) -> "_Node":
         if isinstance(e, ValueError):
             raise
         raise ValueError(f"Error retrieving versions: {e}")
-
-
-
-

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Generator
 
+from ._item_filter import build_item_filter
 from ._transport import Transport
 
 """Versions resource client.
@@ -29,10 +30,12 @@ class VersionsClient:
         *,
         product_id: str,
         version_number: int,
-        q: Optional[str] = None,
+        q: str | None = None,
+        root_only: bool | None = None,
+        parent_item_id: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List versioned items for a specific product version via GraphQL.
 
         This method returns the snapshot of items as they were frozen in the
@@ -42,7 +45,9 @@ class VersionsClient:
         Args:
             product_id: Identifier of the parent product.
             version_number: Version number of the product whose items to list.
-            q: Optional free-text filter applied to item name/description.
+            q: Optional free-text filter applied to item name.
+            root_only: When True, return only root items (no parent).
+            parent_item_id: Draft-scoped parent id; returns parent and direct children.
             limit: Maximum number of items to return.
             offset: Offset for pagination.
 
@@ -61,6 +66,7 @@ class VersionsClient:
             "    readableId\n"
             "    productId\n"
             "    parentId\n"
+            "    draftItemId\n"
             "    position\n"
             "    deleted\n"
             "  }\n"
@@ -69,7 +75,7 @@ class VersionsClient:
         variables = {
             "pid": product_id,
             "version": {"productId": product_id, "versionNumber": int(version_number)},
-            "filter": {"q": q} if q else None,
+            "filter": build_item_filter(q=q, root_only=root_only, parent_item_id=parent_item_id),
             "limit": int(limit),
             "offset": int(offset),
         }
@@ -88,16 +94,20 @@ class VersionsClient:
         *,
         product_id: str,
         version_number: int,
-        q: Optional[str] = None,
+        q: str | None = None,
+        root_only: bool | None = None,
+        parent_item_id: str | None = None,
         page_size: int = 100,
         start_offset: int = 0,
-    ) -> Generator[Dict[str, Any], None, None]:
+    ) -> Generator[dict[str, Any], None, None]:
         """Iterate versioned items for a specific product version.
 
         Args:
             product_id: Identifier of the parent product.
             version_number: Version number whose items to iterate.
-            q: Optional free-text filter applied to item name/description.
+            q: Optional free-text filter applied to item name.
+            root_only: When True, return only root items (no parent).
+            parent_item_id: Draft-scoped parent id; returns parent and direct children.
             page_size: Page size for each GraphQL request.
             start_offset: Initial offset for pagination.
 
@@ -111,6 +121,8 @@ class VersionsClient:
                 product_id=product_id,
                 version_number=version_number,
                 q=q,
+                root_only=root_only,
+                parent_item_id=parent_item_id,
                 limit=page_size,
                 offset=offset,
             )
@@ -119,4 +131,6 @@ class VersionsClient:
             for item in page:
                 yield item
             offset += len(page)
+            if len(page) < page_size:
+                break
 

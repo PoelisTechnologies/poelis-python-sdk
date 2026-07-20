@@ -14,6 +14,7 @@ from .children import load_children
 from .lists import list_items, list_products, list_properties, list_workspaces
 from .properties import get_property, get_property_from_item_tree, properties, props_key_map
 from .properties import search_property_in_item_and_children
+from .version_cache import _get_product_versions, _resolve_baseline_version_number
 from .versions import get_version, get_version_names, list_product_versions
 from ..props import _NodeList, _PropsNode
 from ..utils import _safe_key
@@ -32,6 +33,7 @@ class _Node:
         name: Optional[str],
         version_number: Optional[int] = None,
         baseline_version_number: Optional[int] = None,
+        draft_item_id: Optional[str] = None,
     ) -> None:
         self._client = client
         self._level = level
@@ -40,11 +42,14 @@ class _Node:
         self._name = name
         self._version_number: Optional[int] = version_number
         self._baseline_version_number: Optional[int] = baseline_version_number
+        self._draft_item_id: Optional[str] = draft_item_id
         self._children_cache: Dict[str, "_Node"] = {}
         self._props_cache: Optional[List[Dict[str, Any]]] = None
         self._children_loaded_at: Optional[float] = None
         self._props_loaded_at: Optional[float] = None
         self._cache_ttl: float = 30.0
+        self._versions_cache: Optional[list[Any]] = None
+        self._versions_loaded_at: Optional[float] = None
 
     def __repr__(self) -> str:  # pragma: no cover - notebook UX
         path = []
@@ -213,17 +218,8 @@ class _Node:
                 node._cache_ttl = self._cache_ttl
                 return node
             elif attr == "baseline":
-                # Return the configured baseline version if available, otherwise latest.
                 try:
-                    # Prefer configured baseline_version_number from the product model
-                    version_number: Optional[int] = getattr(self, "_baseline_version_number", None)
-                    if version_number is None:
-                        # Fallback to latest version from backend if no baseline is configured
-                        page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
-                        versions = getattr(page, "data", []) or []
-                        if versions:
-                            latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
-                            version_number = getattr(latest_version, "version_number", None)
+                    version_number: Optional[int] = _resolve_baseline_version_number(self)
                     if version_number is not None:
                         node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
                         node._cache_ttl = self._cache_ttl
@@ -239,10 +235,8 @@ class _Node:
                     return node
             elif attr.startswith("v") and attr[1:].isdigit():
                 version_number = int(attr[1:])
-                # Verify that this version actually exists before creating the node
                 try:
-                    page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
-                    versions = getattr(page, "data", []) or []
+                    versions = _get_product_versions(self)
                     version_numbers = [getattr(v, "version_number", None) for v in versions]
                     if version_number not in version_numbers:
                         available_versions = [v for v in version_numbers if v is not None]
@@ -262,13 +256,7 @@ class _Node:
                 return node
             if attr not in ("list_items", "list_product_versions"):
                 try:
-                    version_number: Optional[int] = getattr(self, "_baseline_version_number", None)
-                    if version_number is None:
-                        page = self._client.products.list_product_versions(product_id=self._id, limit=100, offset=0)
-                        versions = getattr(page, "data", []) or []
-                        if versions:
-                            latest_version = max(versions, key=lambda v: getattr(v, "version_number", 0))
-                            version_number = getattr(latest_version, "version_number", None)
+                    version_number = _resolve_baseline_version_number(self)
                     if version_number is not None:
                         latest_node = _Node(self._client, "version", self, str(version_number), f"v{version_number}")
                         latest_node._cache_ttl = self._cache_ttl
