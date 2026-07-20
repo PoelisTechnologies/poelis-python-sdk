@@ -69,3 +69,12 @@ def test_update_text_date_status_mutations() -> None:
     assert "updateTextProperty" in joined
     assert "updateDateProperty" in joined
     assert "updateStatusProperty" in joined
+
+
+def test_update_status_property_requests_parsed_value() -> None:
+    t = _Transport()
+    c = client_with_transport(t)
+    c.properties.update_status_property(id="ps1", value="DONE")
+    assert len(t.queries) == 1
+    assert "updateStatusProperty" in t.queries[0]
+    assert "parsedValue" in t.queries[0]

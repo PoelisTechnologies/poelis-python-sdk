@@ -63,6 +63,7 @@ def _item_properties_gql(
         f"    ... on {prefix}MatrixProperty {{ id name readableId deleted category displayUnit value parsedValue{updated} }}\n"
         f"    ... on {prefix}TextProperty {{ id name readableId deleted value parsedValue{updated} }}\n"
         f"    ... on {prefix}DateProperty {{ id name readableId deleted value{updated} }}\n"
+        f"    ... on {prefix}StatusProperty {{ id name readableId deleted value parsedValue{updated} }}\n"
     )
 
     if version_number is not None and product_id is not None:
