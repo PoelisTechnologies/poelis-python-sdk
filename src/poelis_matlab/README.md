@@ -86,34 +86,29 @@ The toolbox supports:
 
 ## Maintainer Release Workflow
 
-Use a manual `.mltbx` release process and keep the toolbox version aligned with the Python SDK version in `pyproject.toml`.
-
-Before release:
+Keep the toolbox version aligned with the Python SDK version in `pyproject.toml`.
 
 1. Merge the MATLAB wrapper changes.
 2. Bump `project.version` in `pyproject.toml`.
 3. Set the toolbox version in `toolbox.prj` to the same version number.
-4. Run the full Python test suite:
+4. Merge to `main`.
 
-```bash
-./.venv/bin/python -m pytest -q
-```
+Publish CI then:
+- uploads `poelis-sdk` to PyPI
+- creates git tag `vX.Y.Z` and a GitHub Release
+- packages `dist/PoelisToolbox-<version>.mltbx` with MATLAB on the runner and attaches it to that release
 
-In MATLAB R2025b, package the toolbox:
+Tell users to:
+- download/install the new `.mltbx` from the GitHub Release
+- run `pip install -U poelis-sdk`
+- restart MATLAB Python with `terminate(pyenv)` if needed
+- verify with `poelis_sdk.checkInstallation()`
+
+Local packaging (optional):
 
 ```matlab
 addpath("scripts");
 outputFile = package_matlab_toolbox()
 ```
-
-Then:
-
-1. Upload the generated `.mltbx` to the GitHub release or your internal distribution channel.
-2. Let the existing GitHub Actions workflow publish the Python SDK to PyPI when `pyproject.toml` changes.
-3. Tell users to:
-   - install/update the new `.mltbx`
-   - run `pip install -U poelis-sdk`
-   - restart MATLAB Python with `terminate(pyenv)` if needed
-   - verify with `poelis_sdk.checkInstallation()`
 
 `package_matlab_toolbox` reads the metadata from `src/poelis_matlab/toolbox.prj`, checks that the toolbox version matches `pyproject.toml`, and writes `dist/PoelisToolbox-<version>.mltbx`.

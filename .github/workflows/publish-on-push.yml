@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      version: ${{ steps.v.outputs.version }}
 
     steps:
     - name: Checkout
@@ -85,3 +87,47 @@ jobs:
       run: |
         uv run twine upload --skip-existing --verbose dist/*
 
+    - name: Create GitHub Release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        TAG="v${{ steps.v.outputs.version }}"
+        if gh release view "$TAG" >/dev/null 2>&1; then
+          echo "GitHub Release $TAG already exists"
+        else
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --generate-notes \
+            --latest
+        fi
+
+  package-matlab-toolbox:
+    needs: build-and-publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Set up MATLAB
+      uses: matlab-actions/setup-matlab@v3
+
+    - name: Package MATLAB toolbox
+      uses: matlab-actions/run-command@v3
+      with:
+        command: addpath("scripts"), package_matlab_toolbox
+
+    - name: Upload .mltbx to GitHub Release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        TAG="v${{ needs.build-and-publish.outputs.version }}"
+        MLTBX="dist/PoelisToolbox-${{ needs.build-and-publish.outputs.version }}.mltbx"
+        if [ ! -f "$MLTBX" ]; then
+          echo "Expected toolbox artifact missing: $MLTBX"
+          ls -la dist/ || true
+          exit 1
+        fi
+        gh release upload "$TAG" "$MLTBX" --clobber
