@@ -12,8 +12,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from .cache import is_children_cache_stale, is_props_cache_stale, node_refresh
 from .children import load_children
 from .lists import list_items, list_products, list_properties, list_workspaces
-from .properties import get_property, get_property_from_item_tree, properties, props_key_map
-from .properties import search_property_in_item_and_children
+from .properties import get_property, properties, props_key_map
 from .version_cache import _get_product_versions, _resolve_baseline_version_number
 from .versions import get_version, get_version_names, list_product_versions
 from ..props import _NodeList, _PropsNode
@@ -141,20 +140,6 @@ class _Node:
     def _get_property(self, readable_id: str) -> "_PropWrapper":
         """Get a property by readableId from this node context."""
         return get_property(self, readable_id)
-
-    def _get_property_from_item_tree(self, readable_id: str) -> "_PropWrapper":
-        """Get a property by readableId from this item and its descendants."""
-        return get_property_from_item_tree(self, readable_id)
-
-    def _search_property_in_item_and_children(
-        self,
-        item_id: Optional[str],
-        readable_id: str,
-        product_id: str,
-        version_number: Optional[int],
-    ) -> "_PropWrapper":
-        """Recursive property search helper used by item-level get_property()."""
-        return search_property_in_item_and_children(self, item_id, readable_id, product_id, version_number)
 
     def _load_children(self) -> None:
         load_children(self)
