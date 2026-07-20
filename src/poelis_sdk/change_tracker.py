@@ -347,7 +347,7 @@ class PropertyChangeTracker:
             
             # Use a custom format that only shows the message (no file path/line number)
             original_format = warnings.formatwarning
-            def simple_format(message, category, filename, lineno, line=None):
+            def simple_format(message, category, _filename, _lineno, _line=None):
                 return f"{category.__name__}: {message}\n"
             
             warnings.formatwarning = simple_format
@@ -610,7 +610,7 @@ class PropertyChangeTracker:
             
             # Use a custom format that only shows the message (no file path/line number)
             original_format = warnings.formatwarning
-            def simple_format(message, category, filename, lineno, line=None):
+            def simple_format(message, category, _filename, _lineno, _line=None):
                 return f"{category.__name__}: {message}\n"
             
             warnings.formatwarning = simple_format
