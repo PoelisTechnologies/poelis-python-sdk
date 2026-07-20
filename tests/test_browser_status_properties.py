@@ -11,9 +11,10 @@ def test_item_properties_gql_includes_status_fragments() -> None:
         version_number=None,
     )
     assert name_sdk == "sdkProperties"
-    assert "... on SdkStatusProperty" in query_sdk
-    assert "value parsedValue" in query_sdk
-    assert "updatedAt updatedBy" in query_sdk
+    assert (
+        "... on SdkStatusProperty { id name readableId deleted value parsedValue updatedAt updatedBy }"
+        in query_sdk
+    )
 
     query, _, name = _item_properties_gql(
         use_sdk=False,
@@ -22,5 +23,8 @@ def test_item_properties_gql_includes_status_fragments() -> None:
         version_number=None,
     )
     assert name == "properties"
-    assert "... on StatusProperty" in query
+    assert (
+        "... on StatusProperty { id name readableId deleted value parsedValue }"
+        in query
+    )
     assert "... on SdkStatusProperty" not in query

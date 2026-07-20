@@ -206,9 +206,9 @@ class StatusProperty(BaseModel):
     item_id: str = Field(alias="itemId", min_length=1)
     position: float
     name: str = Field(min_length=1)
-    value: str
+    value: StatusPropertyWireValue
     type: str = Field(min_length=1)
-    parsed_value: Optional[str] = Field(alias="parsedValue", default=None)
+    parsed_value: Optional[StatusPropertyWireValue] = Field(alias="parsedValue", default=None)
 
     @property
     def typed_value(self) -> str:
