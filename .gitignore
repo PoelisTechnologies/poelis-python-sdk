@@ -218,5 +218,3 @@ tmp/
 !/.github/
 !/.github/workflows/
 !/.github/workflows/*.yml
-# Git worktrees
-.worktrees/
