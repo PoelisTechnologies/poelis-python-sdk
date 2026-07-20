@@ -203,9 +203,17 @@ class PropertyChangeTracker:
         Returns:
             Dict[str, Dict[str, Any]]: Dictionary mapping property_id to change info.
         """
-        # This would require tracking which properties were checked, which we don't do yet.
-        # For now, return empty dict. Can be enhanced later if needed.
-        return {}
+        if not self._enabled or not self._changes_this_session:
+            return {}
+
+        latest_changes: Dict[str, Dict[str, Any]] = {}
+        for change in self._changes_this_session:
+            property_id = change.get("property_id")
+            if property_id:
+                # Later entries overwrite earlier ones for the same property_id
+                latest_changes[property_id] = change
+
+        return latest_changes
 
     def _normalize_value(self, value: Any) -> Any:
         """Normalize a value for comparison.
