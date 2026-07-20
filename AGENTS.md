@@ -9,6 +9,7 @@ Poelis **Python SDK** — a client library for the Poelis REST/GraphQL API. Publ
 ### Development
 
 - `uv sync` installs all dependencies (including dev group: pytest, ruff).
+- All tests live under `tests/` (`testpaths` in `pyproject.toml`).
 - `uv run pytest -q -m "not integration"` runs unit tests (integration tests need a live API + credentials).
 - `uv run ruff check .` for linting.
 - No services to start — this is a pure library.
