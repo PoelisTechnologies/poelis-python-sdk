@@ -8,7 +8,13 @@ import httpx
 import pytest
 
 from poelis_sdk import PoelisClient
-from poelis_sdk.exceptions import NotFoundError, RateLimitError, ServerError, UnauthorizedError
+from poelis_sdk.exceptions import (
+    ClientError,
+    NotFoundError,
+    RateLimitError,
+    ServerError,
+    UnauthorizedError,
+)
 
 if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
@@ -45,6 +51,14 @@ def test_401_raises_unauthorized() -> None:
     c = _make_client_with_transport(t)
     with pytest.raises(UnauthorizedError):
         c.search.products(q="x", workspace_id="ws1")
+
+
+def test_400_raises_client_error() -> None:
+    t = _SeqTransport([httpx.Response(400, json={"message": "bad request"})])
+    c = _make_client_with_transport(t)
+    with pytest.raises(ClientError) as exc_info:
+        c.search.products(q="x", workspace_id="ws1")
+    assert exc_info.value.status_code == 400
 
 
 def test_404_raises_not_found() -> None:
