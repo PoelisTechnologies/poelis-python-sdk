@@ -11,7 +11,11 @@ from typing import TYPE_CHECKING, Any
 
 
 from poelis_sdk import PoelisClient
-from poelis_sdk.change_tracker import PropertyChangeTracker, PropertyValueChangedWarning
+from poelis_sdk.change_tracker import (
+    ItemOrPropertyDeletedWarning,
+    PropertyChangeTracker,
+    PropertyValueChangedWarning,
+)
 
 if TYPE_CHECKING:
     pass
@@ -167,6 +171,40 @@ def test_client_clear_baselines() -> None:
     # Clear baselines
     client.clear_property_baselines()
     assert "prop1" not in client._change_tracker._baselines
+
+
+def test_client_get_changed_properties_returns_latest_change(tmp_path: Any) -> None:
+    """Test that the client returns the latest detected change per property."""
+    client = PoelisClient(
+        api_key="test_key",
+        enable_change_detection=True,
+        baseline_file=str(tmp_path / "baselines.json"),
+        log_file=str(tmp_path / "changes.log"),
+    )
+
+    tracker = client._change_tracker
+    tracker.record_baseline("prop1", 100, "Price")
+    assert tracker.check_changed("prop1", 150, "Price") is not None
+    second_change = tracker.check_changed("prop1", 200, "Price")
+    assert second_change is not None
+    assert client.get_changed_properties() == {"prop1": second_change}
+
+
+def test_warn_if_deleted_emits_warning_for_recorded_item(tmp_path: Any) -> None:
+    """Test that a deletion warning is emitted for a previously accessed item."""
+    tracker = PropertyChangeTracker(
+        enabled=True,
+        baseline_file=str(tmp_path / "baselines.json"),
+        log_file=str(tmp_path / "changes.log"),
+    )
+    tracker.record_accessed_item("ws.p.item", "Item", item_id="i1")
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        tracker.warn_if_deleted(item_path="ws.p.item")
+
+    assert any(issubclass(w.category, ItemOrPropertyDeletedWarning) for w in caught)
+    assert tracker._deletions_this_session[-1]["path"] == "ws.p.item"
 
 
 def test_property_wrapper_change_detection() -> None:

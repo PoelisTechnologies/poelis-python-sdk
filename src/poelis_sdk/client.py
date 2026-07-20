@@ -184,11 +184,10 @@ class PoelisClient:
         self._change_tracker.clear_baselines()
 
     def get_changed_properties(self) -> Dict[str, Dict[str, Any]]:
-        """Get information about properties that have changed.
+        """Get information about properties that have changed in this session.
 
         Returns:
             Dict[str, Dict[str, Any]]: Dictionary mapping property_id to change info.
-                Currently returns empty dict as change tracking is per-access.
         """
         return self._change_tracker.get_changed_properties()
 

@@ -5,7 +5,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from poelis_sdk.browser import _PropWrapper
-from poelis_sdk.models import DateProperty, NumericProperty, PropertySearchResult, TextProperty
+from poelis_sdk.models import (
+    DateProperty,
+    FormulaProperty,
+    MatrixProperty,
+    NumericProperty,
+    PropertySearchResult,
+    TextProperty,
+)
 
 if TYPE_CHECKING:
     from _pytest.capture import CaptureFixture  # noqa: F401
@@ -127,6 +134,52 @@ class TestTypedPropertyModels:
         assert result.typed_value == 25.3
         assert isinstance(result.typed_value, float)
         assert result.value == "25.3"  # Raw value remains string
+
+    def test_formula_property_with_parsed_value(self) -> None:
+        """Test FormulaProperty model with parsedValue and formulaExpression fields."""
+        prop_data = {
+            "id": "f1",
+            "name": "Mass total",
+            "value": "10 kg",
+            "parsedValue": 10.0,
+            "formulaExpression": "a + b",
+        }
+
+        prop = FormulaProperty(**prop_data)
+        assert prop.typed_value == 10.0
+        assert isinstance(prop.typed_value, float)
+        assert prop.formula_expression == "a + b"
+        assert prop.category is None
+        assert prop.value == "10 kg"
+
+    def test_formula_property_invalid_falls_back(self) -> None:
+        """Test FormulaProperty model falls back when parsedValue is missing."""
+        prop_data = {
+            "id": "f2",
+            "name": "Broken",
+            "value": None,
+            "parsedValue": None,
+        }
+
+        prop = FormulaProperty(**prop_data)
+        assert prop.typed_value is None
+
+    def test_matrix_property_with_parsed_value(self) -> None:
+        """Test MatrixProperty model with parsed 2D array value."""
+        prop_data = {
+            "id": "m1",
+            "name": "Grid",
+            "value": "[[1, 2], [3, 4]]",
+            "parsedValue": [[1, 2], [3, 4]],
+            "category": "LENGTH",
+            "displayUnit": "mm",
+        }
+
+        prop = MatrixProperty(**prop_data)
+        assert prop.typed_value == [[1, 2], [3, 4]]
+        assert isinstance(prop.typed_value, list)
+        assert prop.display_unit == "mm"
+        assert prop.value == "[[1, 2], [3, 4]]"
 
 
 class TestPropWrapper:
