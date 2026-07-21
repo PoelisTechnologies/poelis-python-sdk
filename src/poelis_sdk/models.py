@@ -328,7 +328,7 @@ class ProductAccess(BaseModel):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     readable_id: Optional[str] = Field(alias="readableId", default=None)
-    role: str = Field(min_length=1)  # Role enum: EDITOR, VIEWER, NO_ACCESS, etc.
+    role: str = Field(min_length=1)  # Role enum: ADMIN, EDITOR, VIEWER, NO_ACCESS, etc.
 
 
 class WorkspaceWithProducts(BaseModel):
@@ -347,7 +347,7 @@ class WorkspaceWithProducts(BaseModel):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     readable_id: Optional[str] = Field(alias="readableId", default=None)
-    role: str = Field(min_length=1)  # Role enum: EDITOR, VIEWER, etc.
+    role: str = Field(min_length=1)  # Role enum: ADMIN, EDITOR, VIEWER, etc.
     products: List[ProductAccess] = Field(default_factory=list)
 
 

@@ -40,7 +40,7 @@ def handle_graphql_read_errors(errors: list[dict[str, Any]]) -> None:
         enhanced_message = (
             f"{error_message}. "
             "You do not have access to this workspace or product. "
-            "Access is determined by your role (EDITOR, VIEWER, or NO_ACCESS). "
+            "Access is determined by your role (ADMIN, EDITOR, VIEWER, or NO_ACCESS). "
             "Contact your administrator if you need access."
         )
         raise UnauthorizedError(403, message=enhanced_message)
