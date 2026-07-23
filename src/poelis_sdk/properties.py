@@ -705,7 +705,7 @@ class PropertiesClient:
             # Enhanced error message for permission issues
             enhanced_message = (
                 f"{error_message}. "
-                "Write operations require EDITOR role for the workspace or product. "
+                "Write operations require ADMIN or EDITOR role for the workspace or product. "
                 "Users with VIEWER role can only read data."
             )
             raise UnauthorizedError(403, message=enhanced_message)
