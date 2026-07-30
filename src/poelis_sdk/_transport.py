@@ -18,17 +18,17 @@ from .exceptions import (
 """HTTP transport abstraction for the Poelis SDK.
 
 Provides a thin wrapper around httpx with sensible defaults for timeouts,
-retries, and headers including authentication and optional org scoping.
+retries, and authentication headers.
 """
 
 
 class Transport:
     """Synchronous HTTP transport using httpx.Client.
 
-    This wrapper centralizes auth headers, tenant scoping, timeouts, and
-    retry behavior. Retries are implemented here in a simple, explicit way to
-    avoid external dependencies, following the professional defaults defined
-    in the SDK planning document.
+    This wrapper centralizes auth headers, timeouts, and retry behavior.
+    Retries are implemented here in a simple, explicit way to avoid external
+    dependencies, following the professional defaults defined in the SDK
+    planning document.
     """
 
     def __init__(self, base_url: str, api_key: str, timeout_seconds: float) -> None:

@@ -64,7 +64,6 @@ def test_client_api_key_headers(monkeypatch: "MonkeyPatch") -> None:
         assert t.last.headers.get("Authorization") == "Bearer poelis_live_abc"
         assert "X-API-Key" not in t.last.headers
         assert "X-Poelis-Api-Key" not in t.last.headers
-        assert "X-Poelis-Org" not in t.last.headers
     finally:
         _T.__init__ = orig  # type: ignore[assignment]
 

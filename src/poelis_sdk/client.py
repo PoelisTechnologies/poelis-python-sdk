@@ -19,7 +19,7 @@ from .versions import VersionsClient
 """Core client for the Poelis Python SDK.
 
 This module exposes the `PoelisClient` which configures base URL, authentication,
-tenant scoping, and provides accessors for resource clients. The initial
+and provides accessors for resource clients. The initial
 implementation is sync-first and keeps the transport layer swappable for
 future async parity.
 """
