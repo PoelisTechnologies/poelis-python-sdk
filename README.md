@@ -84,10 +84,6 @@ item_unit = item.some_property.unit  # Access property units directly
 
 For property type `formula`, `property.category` and `property.unit` is always `None`. The unit is part of the value itself: the value is the computed result of the expression (e.g. `"10 kg"`), so there is no separate unit field. For invalid formulas, `property.value` is `None`.
 
-## Breaking changes
-
-Property update mutations no longer select GraphQL `hasChanges`. Pair this SDK with [backend PR 1101](https://github.com/PoelisTechnologies/poelis-be-py/pull/1101), which dropped that schema field; older packages that still select it get HTTP 400. Typed Python models never exposed `hasChanges`. `update_*_property` return dicts no longer include that key.
-
 ## Property Change Detection
 
 The SDK can automatically warn you when property values change between script/notebook runs. This is useful when you're using property values for calculations and want to be notified if a colleague changes them in the webapp.
