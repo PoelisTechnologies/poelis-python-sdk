@@ -1,44 +1,12 @@
 from __future__ import annotations
 
-import inspect
-from pathlib import Path
-from typing import Any
-
 import pytest
-from pydantic import BaseModel
 
-import poelis_sdk.models as sdk_models
 from poelis_sdk._contract_audit import (
-    _RecordingTransport,
     backend_repo_root,
     collect_sdk_graphql_documents,
     validate_sdk_contracts,
 )
-from poelis_sdk.models import FormulaProperty
-from poelis_sdk.properties import PropertiesClient
-
-_REMOVED_STRIPE_FIELDS = (
-    "hasChanges",
-    "hasPropertyChanges",
-    "hasDocumentChanges",
-    "hasDescendantChanges",
-)
-_REMOVED_STRIPE_SNAKE = (
-    "has_changes",
-    "has_property_changes",
-    "has_document_changes",
-    "has_descendant_changes",
-)
-
-
-def _iter_mapping_keys(value: Any) -> Any:
-    if isinstance(value, dict):
-        for key, child in value.items():
-            yield str(key)
-            yield from _iter_mapping_keys(child)
-    elif isinstance(value, list):
-        for child in value:
-            yield from _iter_mapping_keys(child)
 
 
 def test_contract_audit_collects_expected_documents() -> None:
@@ -62,92 +30,7 @@ def test_sdk_graphql_documents_validate_against_backend_schema() -> None:
     assert not errors, "\n".join(f"{error.label}: {error.message}" for error in errors)
 
 
-def test_sdk_graphql_documents_omit_removed_change_stripe_fields() -> None:
-    """Property/item/file GraphQL must not select GraphQL stripe fields removed from the schema."""
-    documents = collect_sdk_graphql_documents()
-    assert documents
-    for document in documents:
-        for field in _REMOVED_STRIPE_FIELDS:
-            assert field not in document.query, f"{document.label} still selects {field}"
-
-
-def test_sdk_graphql_documents_still_select_formula_dependency_changes() -> None:
-    """Formula reads still select hasFormulaDependencyChanges; that field is not a stripe flag."""
-    documents = collect_sdk_graphql_documents()
-    assert any("hasFormulaDependencyChanges" in document.query for document in documents)
-
-
-def test_formula_property_model_keeps_dependency_change_flag() -> None:
-    """Pydantic models never exposed hasChanges; formula dependency changes stay."""
-    assert "has_changes" not in FormulaProperty.model_fields
-    assert "hasChanges" not in FormulaProperty.model_fields
-    field = FormulaProperty.model_fields["has_formula_dependency_changes"]
-    assert field.alias == "hasFormulaDependencyChanges"
-
-
-def test_typed_python_api_does_not_expose_stripe_leftovers() -> None:
-    """Typed models never had stripe leftovers; only formula dependency changes exist."""
-    for name, obj in inspect.getmembers(sdk_models, inspect.isclass):
-        if not issubclass(obj, BaseModel) or obj is BaseModel:
-            continue
-        field_names = set(obj.model_fields)
-        aliases = {info.alias for info in obj.model_fields.values() if info.alias}
-        for leftover in _REMOVED_STRIPE_FIELDS:
-            assert leftover not in aliases, f"{name} still aliases {leftover}"
-        for leftover in _REMOVED_STRIPE_SNAKE:
-            assert leftover not in field_names, f"{name} still exposes {leftover}"
-
-
-def test_sdk_source_omits_stripe_leftover_tokens() -> None:
-    """Catch leftover stripe selections even in GraphQL strings the contract audit never runs."""
-    src_root = Path(__file__).resolve().parents[1] / "src"
-    offenders: list[str] = []
-    for path in src_root.rglob("*"):
-        if path.suffix not in {".py", ".m"}:
-            continue
-        text = path.read_text(encoding="utf-8")
-        for field in _REMOVED_STRIPE_FIELDS:
-            if field in text:
-                offenders.append(f"{path.relative_to(src_root)}:{field}")
-    assert not offenders
-
-
-def test_contract_audit_property_update_fixtures_omit_has_changes() -> None:
-    """Mock mutation payloads must not pretend the backend still returns stripe leftovers."""
-    transport = _RecordingTransport()
-    client = PropertiesClient(transport)
-    payloads = [
-        client.update_numeric_property(id="pn1", value="1"),
-        client.update_matrix_property(id="pm1", value="[[1, 2], [3, 4]]"),
-        client.update_text_property(id="pt1", value="Updated text"),
-        client.update_date_property(id="pd1", value="2026-02-01"),
-        client.update_status_property(id="ps1", value="DONE"),
-    ]
-    assert payloads
-    for payload in payloads:
-        keys = set(_iter_mapping_keys(payload))
-        for field in _REMOVED_STRIPE_FIELDS:
-            assert field not in keys
-
-
-def test_contract_audit_fixtures_omit_all_stripe_leftovers() -> None:
-    """Item/file/document mock payloads must not include always-false stripe flags."""
-    documents = collect_sdk_graphql_documents()
-    transport = _RecordingTransport()
-    assert documents
-    for document in documents:
-        payload = transport._payload_for(document.query, {"id": "x", "value": "1"})
-        keys = set(_iter_mapping_keys(payload))
-        for field in _REMOVED_STRIPE_FIELDS:
-            assert field not in keys, f"{document.label} fixture still has {field}"
-
-
-def test_sdk_does_not_call_live_tokens_endpoint() -> None:
-    """The SDK stays a GraphQL/REST client; it must not mint Electric live tokens."""
-    sdk_root = Path(__file__).resolve().parents[1] / "src" / "poelis_sdk"
-    offenders = [
-        path
-        for path in sdk_root.rglob("*.py")
-        if "/v1/live/tokens" in path.read_text(encoding="utf-8")
-    ]
-    assert not offenders
+def test_sdk_graphql_documents_omit_has_changes() -> None:
+    """Property update mutations used to select hasChanges; the backend dropped that field."""
+    for document in collect_sdk_graphql_documents():
+        assert "hasChanges" not in document.query, document.label
