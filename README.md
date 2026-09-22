@@ -84,6 +84,14 @@ item_unit = item.some_property.unit  # Access property units directly
 
 For property type `formula`, `property.category` and `property.unit` is always `None`. The unit is part of the value itself: the value is the computed result of the expression (e.g. `"10 kg"`), so there is no separate unit field. For invalid formulas, `property.value` is `None`.
 
+## Breaking changes
+
+Property update mutations no longer select GraphQL `hasChanges`. The SDK also does not select item/file stripe fields (`hasPropertyChanges`, `hasDocumentChanges`, `hasDescendantChanges`). This matches [backend PR 1101](https://github.com/PoelisTechnologies/poelis-be-py/pull/1101), which removes those schema fields.
+
+Old SDK versions that still query `hasChanges` return HTTP 400 against a backend that has dropped the fields. Upgrade this SDK together with that backend change.
+
+Formula properties still expose `hasFormulaDependencyChanges`. The SDK does not call `/v1/live/tokens` or include an Electric live client.
+
 ## Property Change Detection
 
 The SDK can automatically warn you when property values change between script/notebook runs. This is useful when you're using property values for calculations and want to be notified if a colleague changes them in the webapp.

@@ -362,7 +362,6 @@ class _RecordingTransport:
                         "value": variables.get("value"),
                         "draftPropertyId": None,
                         "deleted": False,
-                        "hasChanges": True,
                         "parsedValue": json.loads(variables.get("value", "0")),
                         "category": "MASS",
                         "displayUnit": "kg",
@@ -382,7 +381,6 @@ class _RecordingTransport:
                         "value": variables.get("value"),
                         "draftPropertyId": None,
                         "deleted": False,
-                        "hasChanges": True,
                         "parsedValue": json.loads(variables.get("value", "[]")),
                         "category": "MASS",
                         "displayUnit": "kg",
@@ -402,7 +400,6 @@ class _RecordingTransport:
                         "value": variables.get("value"),
                         "draftPropertyId": None,
                         "deleted": False,
-                        "hasChanges": True,
                         "parsedValue": variables.get("value"),
                     }
                 }
@@ -420,7 +417,6 @@ class _RecordingTransport:
                         "value": variables.get("value"),
                         "draftPropertyId": None,
                         "deleted": False,
-                        "hasChanges": True,
                     }
                 }
             }
@@ -437,7 +433,6 @@ class _RecordingTransport:
                         "value": variables.get("value"),
                         "draftPropertyId": None,
                         "deleted": False,
-                        "hasChanges": True,
                     }
                 }
             }
