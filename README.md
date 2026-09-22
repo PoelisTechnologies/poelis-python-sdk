@@ -86,7 +86,7 @@ For property type `formula`, `property.category` and `property.unit` is always `
 
 ## Breaking changes
 
-Property update mutations no longer select GraphQL `hasChanges`. Upgrade this SDK with the backend that dropped that field; older packages that still select it get HTTP 400.
+Property update mutations no longer select GraphQL `hasChanges`. Pair this SDK with [backend PR 1101](https://github.com/PoelisTechnologies/poelis-be-py/pull/1101), which dropped that schema field; older packages that still select it get HTTP 400. Typed Python models never exposed `hasChanges`. `update_*_property` return dicts no longer include that key.
 
 ## Property Change Detection
 
