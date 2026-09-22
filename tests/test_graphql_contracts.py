@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
+from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
+import poelis_sdk.models as sdk_models
 from poelis_sdk._contract_audit import (
     _RecordingTransport,
     backend_repo_root,
@@ -19,6 +23,22 @@ _REMOVED_STRIPE_FIELDS = (
     "hasDocumentChanges",
     "hasDescendantChanges",
 )
+_REMOVED_STRIPE_SNAKE = (
+    "has_changes",
+    "has_property_changes",
+    "has_document_changes",
+    "has_descendant_changes",
+)
+
+
+def _iter_mapping_keys(value: Any) -> Any:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            yield str(key)
+            yield from _iter_mapping_keys(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _iter_mapping_keys(child)
 
 
 def test_contract_audit_collects_expected_documents() -> None:
@@ -65,8 +85,35 @@ def test_formula_property_model_keeps_dependency_change_flag() -> None:
     assert field.alias == "hasFormulaDependencyChanges"
 
 
+def test_typed_python_api_does_not_expose_stripe_leftovers() -> None:
+    """Typed models never had stripe leftovers; only formula dependency changes exist."""
+    for name, obj in inspect.getmembers(sdk_models, inspect.isclass):
+        if not issubclass(obj, BaseModel) or obj is BaseModel:
+            continue
+        field_names = set(obj.model_fields)
+        aliases = {info.alias for info in obj.model_fields.values() if info.alias}
+        for leftover in _REMOVED_STRIPE_FIELDS:
+            assert leftover not in aliases, f"{name} still aliases {leftover}"
+        for leftover in _REMOVED_STRIPE_SNAKE:
+            assert leftover not in field_names, f"{name} still exposes {leftover}"
+
+
+def test_sdk_source_omits_stripe_leftover_tokens() -> None:
+    """Catch leftover stripe selections even in GraphQL strings the contract audit never runs."""
+    src_root = Path(__file__).resolve().parents[1] / "src"
+    offenders: list[str] = []
+    for path in src_root.rglob("*"):
+        if path.suffix not in {".py", ".m"}:
+            continue
+        text = path.read_text(encoding="utf-8")
+        for field in _REMOVED_STRIPE_FIELDS:
+            if field in text:
+                offenders.append(f"{path.relative_to(src_root)}:{field}")
+    assert not offenders
+
+
 def test_contract_audit_property_update_fixtures_omit_has_changes() -> None:
-    """Mock mutation payloads must not pretend the backend still returns hasChanges."""
+    """Mock mutation payloads must not pretend the backend still returns stripe leftovers."""
     transport = _RecordingTransport()
     client = PropertiesClient(transport)
     payloads = [
@@ -78,7 +125,21 @@ def test_contract_audit_property_update_fixtures_omit_has_changes() -> None:
     ]
     assert payloads
     for payload in payloads:
-        assert "hasChanges" not in payload
+        keys = set(_iter_mapping_keys(payload))
+        for field in _REMOVED_STRIPE_FIELDS:
+            assert field not in keys
+
+
+def test_contract_audit_fixtures_omit_all_stripe_leftovers() -> None:
+    """Item/file/document mock payloads must not include always-false stripe flags."""
+    documents = collect_sdk_graphql_documents()
+    transport = _RecordingTransport()
+    assert documents
+    for document in documents:
+        payload = transport._payload_for(document.query, {"id": "x", "value": "1"})
+        keys = set(_iter_mapping_keys(payload))
+        for field in _REMOVED_STRIPE_FIELDS:
+            assert field not in keys, f"{document.label} fixture still has {field}"
 
 
 def test_sdk_does_not_call_live_tokens_endpoint() -> None:

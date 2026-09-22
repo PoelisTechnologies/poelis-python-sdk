@@ -86,9 +86,11 @@ For property type `formula`, `property.category` and `property.unit` is always `
 
 ## Breaking changes
 
-Property update mutations no longer select GraphQL `hasChanges`. The SDK also does not select item/file stripe fields (`hasPropertyChanges`, `hasDocumentChanges`, `hasDescendantChanges`). This matches [backend PR 1101](https://github.com/PoelisTechnologies/poelis-be-py/pull/1101), which removes those schema fields.
+Property update mutations no longer select GraphQL `hasChanges`. The typed Python API never exposed `hasChanges` on Pydantic models; only mutation/query documents used to select it.
 
-Old SDK versions that still query `hasChanges` return HTTP 400 against a backend that has dropped the fields. Upgrade this SDK together with that backend change.
+This SDK also does not select item/file stripe leftovers (`hasPropertyChanges`, `hasDocumentChanges`, `hasDescendantChanges`) or always-false document flags. There is no files/documents GraphQL client. This matches [backend PR 1101](https://github.com/PoelisTechnologies/poelis-be-py/pull/1101), which removes those schema fields.
+
+An old published package that still selects any of those GraphQL fields returns HTTP 400 against a backend that has dropped them. Upgrade this SDK together with that backend change.
 
 Formula properties still expose `hasFormulaDependencyChanges`. The SDK does not call `/v1/live/tokens` or include an Electric live client.
 
