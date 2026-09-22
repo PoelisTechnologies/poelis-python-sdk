@@ -32,5 +32,14 @@ def test_sdk_graphql_documents_validate_against_backend_schema() -> None:
 
 def test_sdk_graphql_documents_omit_has_changes() -> None:
     """Property update mutations used to select hasChanges; the backend dropped that field."""
-    for document in collect_sdk_graphql_documents():
+    documents = collect_sdk_graphql_documents()
+    assert documents
+    update_queries = [
+        document.query
+        for document in documents
+        if "update" in document.query and "Property(" in document.query
+    ]
+    assert any("$changedVia" in query for query in update_queries)
+    assert any("$changedVia" not in query for query in update_queries)
+    for document in documents:
         assert "hasChanges" not in document.query, document.label

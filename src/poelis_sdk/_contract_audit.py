@@ -494,10 +494,15 @@ def collect_sdk_graphql_documents() -> List[GraphQLDocument]:
         sort="updated_at",
     )
 
+    client.properties.update_numeric_property(id="pn1", value="123.5")
     client.properties.update_numeric_property(id="pn1", value="123.5", changed_via="PYTHON_SDK")
+    client.properties.update_matrix_property(id="pm1", value="[[1, 2], [3, 4]]")
     client.properties.update_matrix_property(id="pm1", value="[[1, 2], [3, 4]]", changed_via="PYTHON_SDK")
+    client.properties.update_text_property(id="pt1", value="Updated text")
     client.properties.update_text_property(id="pt1", value="Updated text", changed_via="PYTHON_SDK")
+    client.properties.update_date_property(id="pd1", value="2026-02-01")
     client.properties.update_date_property(id="pd1", value="2026-02-01", changed_via="PYTHON_SDK")
+    client.properties.update_status_property(id="ps1", value="DONE")
     client.properties.update_status_property(id="ps1", value="DONE", changed_via="PYTHON_SDK")
 
     workspace = client.browser["workspace_main"]
