@@ -23,6 +23,8 @@ class _Transport(httpx.BaseTransport):
 
         if "updateNumericProperty" in query:
             key = "updateNumericProperty"
+        elif "updateFormulaProperty" in query:
+            key = "updateFormulaProperty"
         elif "updateMatrixProperty" in query:
             key = "updateMatrixProperty"
         elif "updateTextProperty" in query:
@@ -52,6 +54,16 @@ def test_update_numeric_property_sends_changed_via() -> None:
     assert t.variables[0]["changedVia"] == "PYTHON_SDK"
 
 
+def test_update_formula_property_sends_expression() -> None:
+    t = _Transport()
+    c = client_with_transport(t)
+    result = c.properties.update_formula_property(id="pf1", formula_expression="@{pn1} * 2")
+    assert result["id"] == "pf1"
+    assert "updateFormulaProperty" in t.queries[0]
+    assert "numericValue: value" in t.queries[0]
+    assert t.variables[0]["formulaExpression"] == "@{pn1} * 2"
+
+
 def test_update_matrix_property_mutation_name() -> None:
     t = _Transport()
     c = client_with_transport(t)
@@ -78,3 +90,20 @@ def test_update_status_property_requests_parsed_value() -> None:
     assert len(t.queries) == 1
     assert "updateStatusProperty" in t.queries[0]
     assert "parsedValue" in t.queries[0]
+
+
+def test_property_update_mutations_do_not_select_has_changes() -> None:
+    t = _Transport()
+    c = client_with_transport(t)
+    c.properties.update_numeric_property(id="pn1", value="1.5")
+    c.properties.update_numeric_property(id="pn1", value="1.5", changed_via="PYTHON_SDK")
+    c.properties.update_matrix_property(id="pm1", value="[[1,2],[3,4]]")
+    c.properties.update_matrix_property(id="pm1", value="[[1,2],[3,4]]", changed_via="PYTHON_SDK")
+    c.properties.update_text_property(id="pt1", value="hi")
+    c.properties.update_text_property(id="pt1", value="hi", changed_via="PYTHON_SDK")
+    c.properties.update_date_property(id="pd1", value="2026-07-20")
+    c.properties.update_date_property(id="pd1", value="2026-07-20", changed_via="PYTHON_SDK")
+    c.properties.update_status_property(id="ps1", value="DONE")
+    c.properties.update_status_property(id="ps1", value="DONE", changed_via="PYTHON_SDK")
+    assert len(t.queries) == 10
+    assert all("hasChanges" not in query for query in t.queries)

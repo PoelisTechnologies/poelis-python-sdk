@@ -16,6 +16,7 @@ def test_contract_audit_collects_expected_documents() -> None:
 
     assert any("updateMatrixProperty" in query for query in queries)
     assert any("updateNumericProperty" in query for query in queries)
+    assert any("updateFormulaProperty" in query for query in queries)
     assert any("sdkProperties" in query for query in queries)
     assert any("searchProperties" in query for query in queries)
 
@@ -28,3 +29,18 @@ def test_sdk_graphql_documents_validate_against_backend_schema() -> None:
 
     errors = validate_sdk_contracts()
     assert not errors, "\n".join(f"{error.label}: {error.message}" for error in errors)
+
+
+def test_sdk_graphql_documents_omit_has_changes() -> None:
+    """Property update mutations used to select hasChanges; the backend dropped that field."""
+    documents = collect_sdk_graphql_documents()
+    assert documents
+    update_queries = [
+        document.query
+        for document in documents
+        if "update" in document.query and "Property(" in document.query
+    ]
+    assert any("$changedVia" in query for query in update_queries)
+    assert any("$changedVia" not in query for query in update_queries)
+    for document in documents:
+        assert "hasChanges" not in document.query, document.label

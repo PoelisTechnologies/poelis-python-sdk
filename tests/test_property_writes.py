@@ -295,8 +295,7 @@ def test_change_property_status_invalid_value(mock_client: PoelisClient) -> None
         wrapper.change_property("INVALID_STATUS")
 
 
-def test_change_property_formula_value_is_rejected(mock_client: PoelisClient) -> None:
-    """Formula properties remain read-only after the numeric/matrix split."""
+def test_change_property_formula_expression(mock_client: PoelisClient) -> None:
     raw_prop: Dict[str, Any] = {
         "id": "prop-f1",
         "__typename": "FormulaProperty",
@@ -306,10 +305,74 @@ def test_change_property_formula_value_is_rejected(mock_client: PoelisClient) ->
         "productVersionNumber": None,
     }
 
+    updated_prop = {
+        "id": "prop-f1",
+        "readableId": "computed_mass",
+        "value": "42",
+        "formulaExpression": "@{dep-1} * 2",
+        "type": "formula",
+    }
+    mock_client._transport.set_response({"data": {"updateFormulaProperty": updated_prop}})  # type: ignore[attr-defined]
+
+    wrapper = _PropWrapper(raw_prop, client=mock_client)
+    wrapper.change_property("@{dep-1} * 2")
+
+    request = mock_client._transport.requests[0]  # type: ignore[attr-defined]
+    variables = request["variables"]
+
+    assert variables["id"] == "prop-f1"
+    assert variables["formulaExpression"] == "@{dep-1} * 2"
+    assert "updateFormulaProperty" in request["query"]
+
+
+def test_change_property_formula_rejects_non_string(mock_client: PoelisClient) -> None:
+    raw_prop: Dict[str, Any] = {
+        "id": "prop-f1",
+        "__typename": "FormulaProperty",
+        "readableId": "computed_mass",
+        "numericValue": "42",
+        "parsedValue": 42,
+        "formulaExpression": "@{dep-1}",
+        "productVersionNumber": None,
+    }
     wrapper = _PropWrapper(raw_prop, client=mock_client)
 
-    with pytest.raises(ValueError, match="Formula properties cannot be updated"):
-        wrapper.change_property(99)
+    with pytest.raises(ValueError, match="Formula value must be a string expression"):
+        wrapper.change_property(42)
+    with pytest.raises(ValueError, match="Formula value must be a string expression"):
+        wrapper.change_property(None)
+    assert mock_client._transport.requests == []  # type: ignore[attr-defined]
+
+
+def test_change_property_formula_clears_stale_numeric_value(mock_client: PoelisClient) -> None:
+    raw_prop: Dict[str, Any] = {
+        "id": "prop-f1",
+        "__typename": "FormulaProperty",
+        "readableId": "computed_mass",
+        "numericValue": "42",
+        "parsedValue": 42,
+        "formulaExpression": "@{dep-1}",
+        "productVersionNumber": None,
+    }
+    mock_client._transport.set_response(  # type: ignore[attr-defined]
+        {
+            "data": {
+                "updateFormulaProperty": {
+                    "id": "prop-f1",
+                    "readableId": "computed_mass",
+                    "numericValue": None,
+                    "formulaExpression": "@{missing}",
+                    "parsedValue": None,
+                }
+            }
+        }
+    )
+
+    wrapper = _PropWrapper(raw_prop, client=mock_client)
+    wrapper.change_property("@{missing}")
+
+    assert wrapper.value is None
+    assert wrapper._raw.get("numericValue") is None
 
 
 def test_change_property_versioned_property(mock_client: PoelisClient) -> None:
