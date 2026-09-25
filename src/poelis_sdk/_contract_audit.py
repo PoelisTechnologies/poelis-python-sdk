@@ -65,6 +65,7 @@ class _RecordingTransport:
             ("sdkProperties(", "browser.sdk_properties"),
             ("properties(itemId:", "browser.properties"),
             ("updateMatrixProperty(", "properties.update_matrix_property"),
+            ("updateFormulaProperty(", "properties.update_formula_property"),
             ("updateNumericProperty(", "properties.update_numeric_property"),
             ("updateTextProperty(", "properties.update_text_property"),
             ("updateDateProperty(", "properties.update_date_property"),

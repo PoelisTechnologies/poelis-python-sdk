@@ -288,6 +288,113 @@ class PropertiesClient:
 
         return property_data
 
+    def update_formula_property(
+        self,
+        *,
+        id: str,  # noqa: A002
+        value: Optional[str] = None,
+        formula_expression: Optional[str] = None,
+        item_id: Optional[str] = None,
+        name: Optional[str] = None,
+        readable_id: Optional[str] = None,
+        position: Optional[float] = None,
+        reason: Optional[str] = None,
+        description: Optional[str] = None,
+        changed_via: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Update a formula property via GraphQL mutation."""
+        if changed_via is not None:
+            mutation = (
+                "mutation UpdateFormulaProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
+                "$position: Float, $value: String, $formulaExpression: String, $reason: String, "
+                "$description: String, $changedVia: ChangedVia) {\n"
+                "  updateFormulaProperty(\n"
+                "    id: $id\n"
+                "    itemId: $itemId\n"
+                "    name: $name\n"
+                "    readableId: $readableId\n"
+                "    position: $position\n"
+                "    value: $value\n"
+                "    formulaExpression: $formulaExpression\n"
+                "    reason: $reason\n"
+                "    description: $description\n"
+                "    changedVia: $changedVia\n"
+                "  ) {\n"
+                "    id\n"
+                "    readableId\n"
+                "    itemId\n"
+                "    name\n"
+                "    position\n"
+                "    value\n"
+                "    formulaExpression\n"
+                "    draftPropertyId\n"
+                "    deleted\n"
+                "    parsedValue\n"
+                "  }\n"
+                "}"
+            )
+        else:
+            mutation = (
+                "mutation UpdateFormulaProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
+                "$position: Float, $value: String, $formulaExpression: String, $reason: String, "
+                "$description: String) {\n"
+                "  updateFormulaProperty(\n"
+                "    id: $id\n"
+                "    itemId: $itemId\n"
+                "    name: $name\n"
+                "    readableId: $readableId\n"
+                "    position: $position\n"
+                "    value: $value\n"
+                "    formulaExpression: $formulaExpression\n"
+                "    reason: $reason\n"
+                "    description: $description\n"
+                "  ) {\n"
+                "    id\n"
+                "    readableId\n"
+                "    itemId\n"
+                "    name\n"
+                "    position\n"
+                "    value\n"
+                "    formulaExpression\n"
+                "    draftPropertyId\n"
+                "    deleted\n"
+                "    parsedValue\n"
+                "  }\n"
+                "}"
+            )
+
+        variables: Dict[str, Any] = {"id": id}
+        if item_id is not None:
+            variables["itemId"] = item_id
+        if name is not None:
+            variables["name"] = name
+        if readable_id is not None:
+            variables["readableId"] = readable_id
+        if position is not None:
+            variables["position"] = position
+        if value is not None:
+            variables["value"] = value
+        if formula_expression is not None:
+            variables["formulaExpression"] = formula_expression
+        if reason is not None:
+            variables["reason"] = reason
+        if description is not None:
+            variables["description"] = description
+        if changed_via is not None:
+            variables["changedVia"] = changed_via
+
+        resp = self._t.graphql(query=mutation, variables=variables)
+        resp.raise_for_status()
+        payload = resp.json()
+        if "errors" in payload:
+            self._handle_graphql_errors(payload["errors"])
+        property_data = payload.get("data", {}).get("updateFormulaProperty")
+        if property_data is None:
+            if "errors" in payload:
+                self._handle_graphql_errors(payload["errors"])
+            raise RuntimeError("Malformed GraphQL response: missing 'updateFormulaProperty' field")
+        return property_data
+
     def update_matrix_property(
         self,
         *,
