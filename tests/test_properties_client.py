@@ -60,6 +60,7 @@ def test_update_formula_property_sends_expression() -> None:
     result = c.properties.update_formula_property(id="pf1", formula_expression="@{pn1} * 2")
     assert result["id"] == "pf1"
     assert "updateFormulaProperty" in t.queries[0]
+    assert "numericValue: value" in t.queries[0]
     assert t.variables[0]["formulaExpression"] == "@{pn1} * 2"
 
 

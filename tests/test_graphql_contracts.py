@@ -16,6 +16,7 @@ def test_contract_audit_collects_expected_documents() -> None:
 
     assert any("updateMatrixProperty" in query for query in queries)
     assert any("updateNumericProperty" in query for query in queries)
+    assert any("updateFormulaProperty" in query for query in queries)
     assert any("sdkProperties" in query for query in queries)
     assert any("searchProperties" in query for query in queries)
 

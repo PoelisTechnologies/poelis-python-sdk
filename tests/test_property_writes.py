@@ -325,6 +325,56 @@ def test_change_property_formula_expression(mock_client: PoelisClient) -> None:
     assert "updateFormulaProperty" in request["query"]
 
 
+def test_change_property_formula_rejects_non_string(mock_client: PoelisClient) -> None:
+    raw_prop: Dict[str, Any] = {
+        "id": "prop-f1",
+        "__typename": "FormulaProperty",
+        "readableId": "computed_mass",
+        "numericValue": "42",
+        "parsedValue": 42,
+        "formulaExpression": "@{dep-1}",
+        "productVersionNumber": None,
+    }
+    wrapper = _PropWrapper(raw_prop, client=mock_client)
+
+    with pytest.raises(ValueError, match="Formula value must be a string expression"):
+        wrapper.change_property(42)
+    with pytest.raises(ValueError, match="Formula value must be a string expression"):
+        wrapper.change_property(None)
+    assert mock_client._transport.requests == []  # type: ignore[attr-defined]
+
+
+def test_change_property_formula_clears_stale_numeric_value(mock_client: PoelisClient) -> None:
+    raw_prop: Dict[str, Any] = {
+        "id": "prop-f1",
+        "__typename": "FormulaProperty",
+        "readableId": "computed_mass",
+        "numericValue": "42",
+        "parsedValue": 42,
+        "formulaExpression": "@{dep-1}",
+        "productVersionNumber": None,
+    }
+    mock_client._transport.set_response(  # type: ignore[attr-defined]
+        {
+            "data": {
+                "updateFormulaProperty": {
+                    "id": "prop-f1",
+                    "readableId": "computed_mass",
+                    "value": None,
+                    "formulaExpression": "@{missing}",
+                    "parsedValue": None,
+                }
+            }
+        }
+    )
+
+    wrapper = _PropWrapper(raw_prop, client=mock_client)
+    wrapper.change_property("@{missing}")
+
+    assert wrapper.value is None
+    assert wrapper._raw.get("numericValue") is None
+
+
 def test_change_property_versioned_property(mock_client: PoelisClient) -> None:
     """Test that updating versioned property raises ValueError."""
     raw_prop: Dict[str, Any] = {

@@ -393,6 +393,11 @@ class _PropWrapper:
 
             # Update _raw with response from backend
             self._raw.update(updated_property)
+            if property_type == "formula":
+                if "numericValue" not in updated_property:
+                    self._raw["numericValue"] = updated_property.get("value")
+                if self._raw.get("parsedValue") is None:
+                    self._raw["numericValue"] = None
 
             # Update change tracking baseline after successful write
             if self._client is not None:
@@ -492,7 +497,7 @@ class _PropWrapper:
             return PropertiesClient._convert_numeric_value(value)
         elif property_type == "formula":
             if not isinstance(value, str):
-                return str(value)
+                raise ValueError("Formula value must be a string expression")
             return value
         elif property_type == "matrix":
             return PropertiesClient._convert_numeric_value(value)
