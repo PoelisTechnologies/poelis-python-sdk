@@ -360,7 +360,7 @@ def test_change_property_formula_clears_stale_numeric_value(mock_client: PoelisC
                 "updateFormulaProperty": {
                     "id": "prop-f1",
                     "readableId": "computed_mass",
-                    "value": None,
+                    "numericValue": None,
                     "formulaExpression": "@{missing}",
                     "parsedValue": None,
                 }
