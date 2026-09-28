@@ -304,9 +304,6 @@ class _PropWrapper:
     ) -> None:
         """Update the property value via the backend.
 
-        Formula writes send formulaExpression. A missing numericValue is filled from value, and a null parsedValue clears it.
-
-
         Updates the property value by calling the appropriate GraphQL mutation.
         Only draft properties can be updated. Requires EDITOR role for the workspace or product.
 
@@ -316,7 +313,7 @@ class _PropWrapper:
                 - Text: string
                 - Date: string in ISO 8601 format (YYYY-MM-DD)
                 - Status: string (DRAFT, UNDER_REVIEW, or DONE)
-                - Formula: formula expression string
+                - Formula: read-only
                 - Matrix: 2D array (will be converted to JSON string)
             title: Optional title/reason for history tracking (mapped to 'reason' in mutation).
             description: Optional description for history tracking.
@@ -355,17 +352,25 @@ class _PropWrapper:
         if properties_client is None:
             raise RuntimeError("Properties client not available. Cannot update property.")
 
+        if self._raw.get("formulaExpression") is not None or self._raw.get("formulaDependencies"):
+            raise ValueError(
+                "Formula properties cannot be updated via the SDK. "
+                "They are computed from their expression and dependencies."
+            )
+
         # Determine property type from _raw data
         property_type = self._get_property_type()
+        if property_type == "formula":
+            raise ValueError(
+                "Formula properties cannot be updated via the SDK. "
+                "They are computed from their expression and dependencies."
+            )
         # Build mutation parameters
         mutation_params: Dict[str, Any] = {"id": property_id}
 
         # Convert value based on property type
         converted_value = self._convert_value_for_mutation(value, property_type)
-        if property_type == "formula":
-            mutation_params["formula_expression"] = converted_value
-        else:
-            mutation_params["value"] = converted_value
+        mutation_params["value"] = converted_value
 
         # Add reason (from title) and description if provided
         if title is not None:
@@ -381,8 +386,6 @@ class _PropWrapper:
         try:
             if property_type == "numeric":
                 updated_property = properties_client.update_numeric_property(**mutation_params)
-            elif property_type == "formula":
-                updated_property = properties_client.update_formula_property(**mutation_params)
             elif property_type == "matrix":
                 updated_property = properties_client.update_matrix_property(**mutation_params)
             elif property_type == "text":
@@ -396,11 +399,6 @@ class _PropWrapper:
 
             # Update _raw with response from backend
             self._raw.update(updated_property)
-            if property_type == "formula":
-                if "numericValue" not in updated_property:
-                    self._raw["numericValue"] = updated_property.get("value")
-                if self._raw.get("parsedValue") is None:
-                    self._raw["numericValue"] = None
 
             # Update change tracking baseline after successful write
             if self._client is not None:
@@ -499,9 +497,10 @@ class _PropWrapper:
             # Convert to JSON string (handles numbers, arrays, matrices)
             return PropertiesClient._convert_numeric_value(value)
         elif property_type == "formula":
-            if not isinstance(value, str):
-                raise ValueError("Formula value must be a string expression")
-            return value
+            raise ValueError(
+                "Formula properties cannot be updated via the SDK. "
+                "They are computed from their expression and dependencies."
+            )
         elif property_type == "matrix":
             return PropertiesClient._convert_numeric_value(value)
         elif property_type == "text":

@@ -65,7 +65,6 @@ class _RecordingTransport:
             ("sdkProperties(", "browser.sdk_properties"),
             ("properties(itemId:", "browser.properties"),
             ("updateMatrixProperty(", "properties.update_matrix_property"),
-            ("updateFormulaProperty(", "properties.update_formula_property"),
             ("updateNumericProperty(", "properties.update_numeric_property"),
             ("updateTextProperty(", "properties.update_text_property"),
             ("updateDateProperty(", "properties.update_date_property"),
@@ -438,25 +437,6 @@ class _RecordingTransport:
                 }
             }
 
-        if "updateFormulaProperty(" in query:
-            expression = variables.get("formulaExpression", "@{pn1}")
-            return {
-                "data": {
-                    "updateFormulaProperty": {
-                        "id": variables["id"],
-                        "readableId": "computed_mass",
-                        "itemId": "i1",
-                        "name": "Computed Mass",
-                        "position": 6,
-                        "numericValue": "84",
-                        "formulaExpression": expression,
-                        "draftPropertyId": None,
-                        "deleted": False,
-                        "parsedValue": 84,
-                    }
-                }
-            }
-
         return {"data": {}}
 
 
@@ -524,10 +504,6 @@ def collect_sdk_graphql_documents() -> List[GraphQLDocument]:
     client.properties.update_date_property(id="pd1", value="2026-02-01", changed_via="PYTHON_SDK")
     client.properties.update_status_property(id="ps1", value="DONE")
     client.properties.update_status_property(id="ps1", value="DONE", changed_via="PYTHON_SDK")
-    client.properties.update_formula_property(id="pf1", formula_expression="@{pn1} * 2")
-    client.properties.update_formula_property(
-        id="pf1", formula_expression="@{pn1} * 2", changed_via="PYTHON_SDK"
-    )
 
     workspace = client.browser["workspace_main"]
     product = workspace["widget_product"]

@@ -610,7 +610,7 @@ class PoelisMatlab:
                 - Text: string
                 - Date: string in ISO 8601 format (YYYY-MM-DD)
                 - Status: string (DRAFT, UNDER_REVIEW, or DONE)
-                - Formula: formula expression string
+                - Formula: read-only
                 - Matrix: 2D array (will be converted to JSON string)
             title: Optional title/reason for history tracking.
             description: Optional description for history tracking.

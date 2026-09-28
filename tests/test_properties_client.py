@@ -23,8 +23,6 @@ class _Transport(httpx.BaseTransport):
 
         if "updateNumericProperty" in query:
             key = "updateNumericProperty"
-        elif "updateFormulaProperty" in query:
-            key = "updateFormulaProperty"
         elif "updateMatrixProperty" in query:
             key = "updateMatrixProperty"
         elif "updateTextProperty" in query:
@@ -52,16 +50,6 @@ def test_update_numeric_property_sends_changed_via() -> None:
     assert t.variables[0]["id"] == "pn1"
     assert t.variables[0]["value"] == "1.5"
     assert t.variables[0]["changedVia"] == "PYTHON_SDK"
-
-
-def test_update_formula_property_sends_expression() -> None:
-    t = _Transport()
-    c = client_with_transport(t)
-    result = c.properties.update_formula_property(id="pf1", formula_expression="@{pn1} * 2")
-    assert result["id"] == "pf1"
-    assert "updateFormulaProperty" in t.queries[0]
-    assert "numericValue: value" in t.queries[0]
-    assert t.variables[0]["formulaExpression"] == "@{pn1} * 2"
 
 
 def test_update_matrix_property_mutation_name() -> None:
