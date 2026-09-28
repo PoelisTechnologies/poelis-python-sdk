@@ -62,7 +62,7 @@ def _item_required_error(property_name: str, *, for_write: bool = False) -> Valu
 def _resolve_property_on_item(node: Any, property_name: str) -> Any:
     """Resolve a property directly on a single item node.
 
-    This helper never walks descendant items. It only checks the addressed item.
+    This helper only checks the addressed item.
     """
     # Try direct attribute access (item.prop_name)
     try:
@@ -214,7 +214,7 @@ class PoelisMatlab:
         
         Resolves a path starting from the browser root, navigating through
         workspace → product → (optional version) → item nodes, and finally
-        accessing a property. Returns only the property value (not the wrapper object).
+        accessing a property. Returns only the property value.
         
         Args:
             path: Dot-separated path to the property, e.g.,
@@ -616,7 +616,7 @@ class PoelisMatlab:
             description: Optional description for history tracking.
         
         Raises:
-            ValueError: If path is empty, invalid, or property is versioned (not draft).
+            ValueError: If path is empty, invalid, or property is versioned.
             AttributeError: If an intermediate node in the path doesn't exist.
             RuntimeError: If the property cannot be found or cannot be updated.
             UnauthorizedError: If permission denied (requires EDITOR role; VIEWER role is read-only).
@@ -694,7 +694,7 @@ class PoelisMatlab:
                 except (KeyError, AttributeError):
                     # If we're at a product node and access failed, try through draft automatically
                     # This allows paths like "workspace.product.item" to work for writes without specifying "draft"
-                    # For writes, we always route through draft (not baseline)
+                    # For writes, we always route through draft
                     if hasattr(obj, "_level") and obj._level == "product" and not is_version_like:
                         try:
                             # Try accessing through draft version (for writes)

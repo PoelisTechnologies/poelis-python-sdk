@@ -422,7 +422,7 @@ def test_change_property_value_only(mock_client: PoelisClient) -> None:
     # Check request
     request = mock_client._transport.requests[0]  # type: ignore[attr-defined]
     assert request["variables"]["value"] == "123.45"
-    # Verify only value is being updated, not other fields
+    # Verify only value is being updated
     assert "category" not in request["variables"] or request["variables"].get("category") is None
 
 
