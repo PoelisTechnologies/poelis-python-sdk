@@ -304,6 +304,9 @@ class _PropWrapper:
     ) -> None:
         """Update the property value via the backend.
 
+        Formula writes send formulaExpression. A missing numericValue is filled from value, and a null parsedValue clears it.
+
+
         Updates the property value by calling the appropriate GraphQL mutation.
         Only draft properties can be updated. Requires EDITOR role for the workspace or product.
 

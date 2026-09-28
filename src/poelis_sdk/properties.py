@@ -302,7 +302,10 @@ class PropertiesClient:
         description: Optional[str] = None,
         changed_via: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Update a formula property via GraphQL mutation."""
+        """Update a formula property.
+
+        The selection aliases the computed result as numericValue. changedVia is sent only when that argument is set.
+        """
         if changed_via is not None:
             mutation = (
                 "mutation UpdateFormulaProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
