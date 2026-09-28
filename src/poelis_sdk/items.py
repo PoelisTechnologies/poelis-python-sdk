@@ -11,10 +11,9 @@ from ._transport import Transport
 class ItemsClient:
     """Client for draft item resources.
 
-    This client is intended for accessing the current draft view of items,
-    i.e., items that are not bound to a specific product version. Versioned
-    (snapshot) items for a given product version should be accessed via the
-    `VersionsClient`.
+    This client is intended for accessing the current draft view of items.
+    Versioned (snapshot) items for a given product version should be accessed
+    via the `VersionsClient`.
     """
 
     def __init__(self, transport: Transport) -> None:
@@ -91,7 +90,7 @@ class ItemsClient:
 
         Returns the item only if it belongs to the client's configured
         organization. The returned representation reflects the current draft
-        state, not a specific historical product version.
+        state.
 
         Args:
             item_id: Identifier of the item to retrieve.

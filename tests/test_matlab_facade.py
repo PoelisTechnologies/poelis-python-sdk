@@ -616,7 +616,7 @@ def test_type_compatibility_numeric() -> None:
     
     value = pm.get_value("uh2.Widget_Pro.gadget_a.demo_property_mass")
     
-    # Verify it's a native type, not a custom object
+    # Verify it's a native type
     assert isinstance(value, (int, float))
     assert not hasattr(value, "__dict__") or not any(
         not k.startswith("_") for k in value.__dict__.keys()

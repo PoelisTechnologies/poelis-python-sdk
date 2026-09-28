@@ -198,7 +198,6 @@ class PropertyChangeTracker:
         """Get information about all properties that have changed.
 
         Note: This only returns properties that have been checked at least twice.
-        Properties that were recorded but never checked again won't appear here.
 
         Returns:
             Dict[str, Dict[str, Any]]: Dictionary mapping property_id to change info.
@@ -704,7 +703,7 @@ class PropertyChangeTracker:
             # Only keep baselines for properties that are currently being tracked
             # This keeps the baseline file clean and removes old/stale data
             # Note: We keep all baselines that exist, but we'll clean up deleted ones
-            # The filtering happens when items/properties are deleted, not here
+            # The filtering happens when items/properties are deleted
             filtered_baselines = self._baselines.copy()
             
             # Save to file

@@ -391,7 +391,7 @@ classdef PoelisClient < handle
             
             % Try to convert to double for native Python numeric types
             % _ensure_matlab_compatible returns native Python int/float which MATLAB
-            % receives as Python objects (not py.float/py.int wrappers)
+            % receives as Python objects
             try
                 % Attempt direct conversion - works for native Python numeric types
                 converted = double(py_value);

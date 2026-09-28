@@ -319,7 +319,7 @@ class _PropWrapper:
             description: Optional description for history tracking.
 
         Raises:
-            ValueError: If property is versioned (not draft), or if value format is invalid.
+            ValueError: If property is versioned, or if value format is invalid.
             NotFoundError: If property doesn't exist.
             UnauthorizedError: If permission denied (requires EDITOR role; VIEWER role is read-only).
             RuntimeError: For other GraphQL errors.

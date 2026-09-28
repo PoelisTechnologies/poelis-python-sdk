@@ -654,6 +654,6 @@ def test_change_tracking_with_get_property_records_id_and_path(tmp_path: Any) ->
     # Check that baseline and version are in dir()
     dir_items = dir(prod)
     assert "baseline" in dir_items
-    # Product nodes expose version shortcuts as v1/v2/... (not a literal "version" attribute).
+    # Product nodes expose version shortcuts as v1/v2/...
     assert "v1" in dir_items
     assert "draft" in dir_items
