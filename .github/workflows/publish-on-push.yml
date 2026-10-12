@@ -55,13 +55,9 @@ jobs:
         git tag v${{ steps.v.outputs.version }}
         git push origin v${{ steps.v.outputs.version }}
 
-    - name: Install build tooling
-      run: |
-        uv sync --dev
-
     - name: Build sdist and wheel
       run: |
-        uv run python -m build
+        uv build
 
     - name: List built packages
       run: |
@@ -76,16 +72,12 @@ jobs:
           fi
         done
 
-    - name: Install twine
-      run: |
-        uv add twine
-
     - name: Publish to PyPI with twine
       env:
         TWINE_USERNAME: __token__
         TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
       run: |
-        uv run twine upload --skip-existing --verbose dist/*
+        uvx twine upload --skip-existing --verbose dist/*
 
     - name: Create GitHub Release
       env:
