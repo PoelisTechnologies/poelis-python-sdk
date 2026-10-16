@@ -17,7 +17,7 @@ class SearchClient:
         """Search/list products via GraphQL products(workspaceId, filter: { q })."""
 
         query = (
-            "query($ws: ID!, $filter: ProductFilter, $limit: Int!, $offset: Int!) {\n"
+            "query SdkSearchProducts($ws: ID!, $filter: ProductFilter, $limit: Int!, $offset: Int!) {\n"
             "  products(workspaceId: $ws, filter: $filter, limit: $limit, offset: $offset) { id name workspaceId }\n"
             "}"
         )
@@ -34,7 +34,7 @@ class SearchClient:
         """Search/list items via GraphQL items(product_id, q, parent_item_id)."""
 
         query = (
-            "query($pid: ID!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
+            "query SdkSearchItems($pid: ID!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
             "  items(productId: $pid, filter: $filter, limit: $limit, offset: $offset) { id name productId parentId position }\n"
             "}"
         )
@@ -56,7 +56,7 @@ class SearchClient:
         """Search properties via GraphQL search_properties."""
 
         query = (
-            "query($q: String!, $ws: ID, $pid: ID, $iid: ID, $ptype: String, $cat: String, $limit: Int!, $offset: Int!, $sort: String) {\n"
+            "query SdkSearchProperties($q: String!, $ws: ID, $pid: ID, $iid: ID, $ptype: String, $cat: String, $limit: Int!, $offset: Int!, $sort: String) {\n"
             "  searchProperties(q: $q, workspaceId: $ws, productId: $pid, itemId: $iid, propertyType: $ptype, category: $cat, limit: $limit, offset: $offset, sort: $sort) {\n"
             "    query total limit offset processingTimeMs\n"
             "    hits { id workspaceId productId itemId propertyType name category value }\n"

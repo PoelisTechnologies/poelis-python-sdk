@@ -23,7 +23,7 @@ class WorkspacesClient:
         """
 
         query = (
-            "query($limit: Int!, $offset: Int!) {\n"
+            "query SdkListWorkspaces($limit: Int!, $offset: Int!) {\n"
             "  workspaces(limit: $limit, offset: $offset) { id orgId name readableId }\n"
             "}"
         )
@@ -40,7 +40,7 @@ class WorkspacesClient:
         """Get a single workspace by id via GraphQL."""
 
         query = (
-            "query($id: ID!) {\n"
+            "query SdkWorkspace($id: ID!) {\n"
             "  workspace(id: $id) { id orgId name readableId }\n"
             "}"
         )
@@ -73,7 +73,7 @@ class WorkspacesClient:
         """
         
         query = (
-            "query($userId: String!) {\n"
+            "query SdkUserAccessibleResources($userId: String!) {\n"
             "  userAccessibleResources(userId: $userId) {\n"
             "    id\n"
             "    name\n"
