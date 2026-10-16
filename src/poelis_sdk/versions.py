@@ -59,7 +59,7 @@ class VersionsClient:
         """
 
         query = (
-            "query($pid: ID!, $version: VersionInput!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
+            "query SdkListVersionItems($pid: ID!, $version: VersionInput!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
             "  sdkItems(productId: $pid, version: $version, filter: $filter, limit: $limit, offset: $offset) {\n"
             "    id\n"
             "    name\n"

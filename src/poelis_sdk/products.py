@@ -39,7 +39,7 @@ class ProductsClient:
         """
 
         query = (
-            "query($ws: ID!, $filter: ProductFilter, $limit: Int!, $offset: Int!) {\n"
+            "query SdkListProducts($ws: ID!, $filter: ProductFilter, $limit: Int!, $offset: Int!) {\n"
             "  products(workspaceId: $ws, filter: $filter, limit: $limit, offset: $offset) {\n"
             "    id\n"
             "    name\n"
@@ -78,7 +78,7 @@ class ProductsClient:
         """
 
         query = (
-            "query($pid: ID!) {\n"
+            "query SdkProductVersions($pid: ID!) {\n"
             "  productVersions(productId: $pid) {\n"
             "    productId\n"
             "    versionNumber\n"
@@ -117,7 +117,7 @@ class ProductsClient:
         """
 
         query = (
-            "mutation SetBaseline($productId: ID!, $versionNumber: Int!) {\n"
+            "mutation SdkSetBaseline($productId: ID!, $versionNumber: Int!) {\n"
             "  setProductBaselineVersion(productId: $productId, versionNumber: $versionNumber) {\n"
             "    id\n"
             "    name\n"
