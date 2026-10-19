@@ -18,6 +18,12 @@ def test_contract_audit_collects_expected_documents() -> None:
     assert any("updateNumericProperty" in query for query in queries)
     assert any("sdkProperties" in query for query in queries)
     assert any("searchProperties" in query for query in queries)
+    unnamed = [
+        query.lstrip()[:80]
+        for query in queries
+        if not query.lstrip().startswith(("query Sdk", "mutation Sdk"))
+    ]
+    assert unnamed == []
 
 
 def test_sdk_graphql_documents_validate_against_backend_schema() -> None:

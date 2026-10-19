@@ -60,7 +60,7 @@ class PropertiesClient:
         # Build mutation - include changedVia only if provided
         if changed_via is not None:
             mutation = (
-                "mutation UpdateNumericProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
+                "mutation SdkUpdateNumericProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
                 "$position: Float, $value: String, $category: String, $displayUnit: String, "
                 "$reason: String, $description: String, $changedVia: ChangedVia) {\n"
                 "  updateNumericProperty(\n"
@@ -92,7 +92,7 @@ class PropertiesClient:
             )
         else:
             mutation = (
-                "mutation UpdateNumericProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
+                "mutation SdkUpdateNumericProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
                 "$position: Float, $value: String, $category: String, $displayUnit: String, "
                 "$reason: String, $description: String) {\n"
                 "  updateNumericProperty(\n"
@@ -200,7 +200,7 @@ class PropertiesClient:
         # Build mutation - include changedVia only if provided
         if changed_via is not None:
             mutation = (
-                "mutation UpdateTextProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
+                "mutation SdkUpdateTextProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
                 "$position: Float, $value: String, $reason: String, $description: String, $changedVia: ChangedVia) {\n"
                 "  updateTextProperty(\n"
                 "    id: $id\n"
@@ -227,7 +227,7 @@ class PropertiesClient:
             )
         else:
             mutation = (
-                "mutation UpdateTextProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
+                "mutation SdkUpdateTextProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
                 "$position: Float, $value: String, $reason: String, $description: String) {\n"
                 "  updateTextProperty(\n"
                 "    id: $id\n"
@@ -323,7 +323,7 @@ class PropertiesClient:
         """
         if changed_via is not None:
             mutation = (
-                "mutation UpdateMatrixProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
+                "mutation SdkUpdateMatrixProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
                 "$position: Float, $value: String, $category: String, $displayUnit: String, "
                 "$reason: String, $description: String, $changedVia: ChangedVia) {\n"
                 "  updateMatrixProperty(\n"
@@ -355,7 +355,7 @@ class PropertiesClient:
             )
         else:
             mutation = (
-                "mutation UpdateMatrixProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
+                "mutation SdkUpdateMatrixProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
                 "$position: Float, $value: String, $category: String, $displayUnit: String, "
                 "$reason: String, $description: String) {\n"
                 "  updateMatrixProperty(\n"
@@ -459,7 +459,7 @@ class PropertiesClient:
         # Build mutation - include changedVia only if provided
         if changed_via is not None:
             mutation = (
-                "mutation UpdateDateProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
+                "mutation SdkUpdateDateProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
                 "$position: Float, $value: String, $reason: String, $description: String, $changedVia: ChangedVia) {\n"
                 "  updateDateProperty(\n"
                 "    id: $id\n"
@@ -485,7 +485,7 @@ class PropertiesClient:
             )
         else:
             mutation = (
-                "mutation UpdateDateProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
+                "mutation SdkUpdateDateProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
                 "$position: Float, $value: String, $reason: String, $description: String) {\n"
                 "  updateDateProperty(\n"
                 "    id: $id\n"
@@ -582,7 +582,7 @@ class PropertiesClient:
         # Build mutation - include changedVia only if provided
         if changed_via is not None:
             mutation = (
-                "mutation UpdateStatusProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
+                "mutation SdkUpdateStatusProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
                 "$position: Float, $value: StatusPropertyValue, $reason: String, $description: String, $changedVia: ChangedVia) {\n"
                 "  updateStatusProperty(\n"
                 "    id: $id\n"
@@ -609,7 +609,7 @@ class PropertiesClient:
             )
         else:
             mutation = (
-                "mutation UpdateStatusProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
+                "mutation SdkUpdateStatusProperty($id: ID!, $itemId: ID, $name: String, $readableId: String, "
                 "$position: Float, $value: StatusPropertyValue, $reason: String, $description: String) {\n"
                 "  updateStatusProperty(\n"
                 "    id: $id\n"

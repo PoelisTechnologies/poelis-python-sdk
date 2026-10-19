@@ -68,7 +68,7 @@ def _item_properties_gql(
 
     if version_number is not None and product_id is not None:
         query = (
-            f"query($iid: ID!, $version: VersionInput!) {{\n"
+            f"query SdkItemPropertiesVersion($iid: ID!, $version: VersionInput!) {{\n"
             f"  {query_name}(itemId: $iid, version: $version) {{\n"
             f"{selection}"
             f"  }}\n"
@@ -80,7 +80,7 @@ def _item_properties_gql(
         }
     else:
         query = (
-            f"query($iid: ID!) {{\n"
+            f"query SdkItemProperties($iid: ID!) {{\n"
             f"  {query_name}(itemId: $iid) {{\n"
             f"{selection}"
             f"  }}\n"
@@ -211,7 +211,7 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
 
     try:
         q2_parsed = (
-            "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
+            "query SdkSearchItemProperties($iid: ID!, $limit: Int!, $offset: Int!) {\n"
             "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
             "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value }\n"
             "  }\n"
@@ -227,7 +227,7 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
             node._props_loaded_at = time.time()
         except Exception:
             q2_min = (
-                "query($iid: ID!, $limit: Int!, $offset: Int!) {\n"
+                "query SdkSearchItemPropertiesMinimal($iid: ID!, $limit: Int!, $offset: Int!) {\n"
                 "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
                 "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value }\n"
                 "  }\n"

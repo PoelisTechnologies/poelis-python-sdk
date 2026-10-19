@@ -60,7 +60,7 @@ class ItemsClient:
         """
 
         query = (
-            "query($pid: ID!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
+            "query SdkListItems($pid: ID!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
             "  items(productId: $pid, filter: $filter, limit: $limit, offset: $offset) { id name description readableId productId parentId position draftItemId }\n"
             "}"
         )
@@ -104,7 +104,7 @@ class ItemsClient:
         """
 
         query = (
-            "query($id: ID!) {\n"
+            "query SdkItem($id: ID!) {\n"
             "  item(id: $id) { id name description readableId productId parentId position }\n"
             "}"
         )
