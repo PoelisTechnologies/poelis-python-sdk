@@ -37,6 +37,12 @@ extend-exclude = [
   "notebooks/",
 ]
 
+[tool.ruff.lint]
+# Ruff 0.16 changed the implicit default from the historical 59-rule set to
+# several hundred rules. Keep that previous default so this bump does not
+# widen the lint contract.
+select = ["E4", "E7", "E9", "F"]
+
 [tool.pytest.ini_options]
 addopts = "-q"
 testpaths = ["tests"]
@@ -55,5 +61,5 @@ include = [
 dev = [
     "pytest>=8.4.2",
     "pytest-cov>=4.0.0",
-    "ruff>=0.1.0",
+    "ruff>=0.17.1",
 ]
