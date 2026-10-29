@@ -239,7 +239,6 @@ class FormulaProperty(BaseModel):
     parsed_value: Optional[Union[int, float, List[Any], str]] = Field(alias="parsedValue", default=None)
     formula_expression: Optional[str] = Field(alias="formulaExpression", default=None)
     formula_dependencies: Optional[List[Dict[str, Any]]] = Field(alias="formulaDependencies", default=None)
-    has_formula_dependency_changes: Optional[bool] = Field(alias="hasFormulaDependencyChanges", default=None)
     updated_at: Optional[str] = Field(alias="updatedAt", default=None)
     updated_by: Optional[str] = Field(alias="updatedBy", default=None)
 

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
+from ._browser.node.core import _Node
 from .browser import Browser
 from .client import PoelisClient
 from .items import ItemsClient
@@ -340,7 +341,6 @@ class _RecordingTransport:
                             "hierarchyContext": [{"id": "i1", "name": "Widget Alpha"}],
                         }
                     ],
-                    "hasFormulaDependencyChanges": False,
                     "deleted": False,
                     "draftPropertyId": None,
                     "updatedAt": "2026-01-01T00:00:00Z",
@@ -528,7 +528,41 @@ def collect_sdk_graphql_documents() -> List[GraphQLDocument]:
     matlab.list_properties("workspace_main.widget_product.widget_alpha")
     matlab.change_property("workspace_main.widget_product.draft.widget_alpha.description", "Updated text")
 
-    return _dedupe_documents([*transport.documents, *sdk_transport.documents])
+    return _dedupe_documents(
+        [*transport.documents, *sdk_transport.documents, *_collect_browser_search_fallback()]
+    )
+
+
+def _collect_browser_search_fallback() -> list[GraphQLDocument]:
+    """Record the property search used when the properties query returns errors."""
+
+    class _Response:
+        def __init__(self, payload: dict[str, Any]) -> None:
+            self._payload = payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, Any]:
+            return self._payload
+
+    class _FallbackTransport:
+        def __init__(self) -> None:
+            self.documents: list[GraphQLDocument] = []
+
+        def graphql(self, query: str, variables: Optional[Dict[str, Any]] = None) -> _Response:
+            self.documents.append(GraphQLDocument(label="browser.search_fallback", query=query))
+            if "searchProperties" in query:
+                return _Response({"data": {"searchProperties": {"hits": []}}})
+            return _Response({"errors": [{"message": "schema rejected the properties query"}]})
+
+    transport = _FallbackTransport()
+    client = _configure_client(transport, enable_sdk_properties=True)
+    product = _Node(client, "product", None, "p1", "widget_product")
+    version = _Node(client, "version", product, "1", "v1")
+    item = _Node(client, "item", version, "i1", "wac", version_number=1)
+    item._list_properties()
+    return [document for document in transport.documents if "searchProperties" in document.query]
 
 
 def _dedupe_documents(documents: Iterable[GraphQLDocument]) -> List[GraphQLDocument]:

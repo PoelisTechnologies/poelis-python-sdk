@@ -49,3 +49,21 @@ def test_sdk_graphql_documents_omit_has_changes() -> None:
     assert any("$changedVia" not in query for query in update_queries)
     for document in documents:
         assert "hasChanges" not in document.query, document.label
+
+
+def test_property_list_queries_omit_removed_fields() -> None:
+    """Property reads must not select fields the backend schema dropped."""
+    documents = collect_sdk_graphql_documents()
+    property_reads = [
+        document
+        for document in documents
+        if "sdkProperties(" in document.query or "properties(itemId:" in document.query
+    ]
+    assert property_reads
+    for document in property_reads:
+        assert "hasFormulaDependencyChanges" not in document.query, document.label
+
+    fallbacks = [document for document in documents if document.label == "browser.search_fallback"]
+    assert fallbacks
+    for document in fallbacks:
+        assert "readableId" not in document.query, document.label

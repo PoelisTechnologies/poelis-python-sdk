@@ -59,7 +59,7 @@ def _item_properties_gql(
     selection = (
         f"    __typename\n"
         f"    ... on {prefix}NumericProperty {{ id name readableId deleted category displayUnit numericValue: value parsedValue{updated} }}\n"
-        f"    ... on {prefix}FormulaProperty {{ id name readableId deleted numericValue: value parsedValue{formula_extra} hasFormulaDependencyChanges{updated} }}\n"
+        f"    ... on {prefix}FormulaProperty {{ id name readableId deleted numericValue: value parsedValue{formula_extra}{updated} }}\n"
         f"    ... on {prefix}MatrixProperty {{ id name readableId deleted category displayUnit value parsedValue{updated} }}\n"
         f"    ... on {prefix}TextProperty {{ id name readableId deleted value parsedValue{updated} }}\n"
         f"    ... on {prefix}DateProperty {{ id name readableId deleted value{updated} }}\n"
@@ -213,7 +213,7 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
         q2_parsed = (
             "query SdkSearchItemProperties($iid: ID!, $limit: Int!, $offset: Int!) {\n"
             "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-            "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value }\n"
+            "    hits { id workspaceId productId itemId propertyType name category displayUnit value }\n"
             "  }\n"
             "}"
         )
@@ -229,7 +229,7 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
             q2_min = (
                 "query SdkSearchItemPropertiesMinimal($iid: ID!, $limit: Int!, $offset: Int!) {\n"
                 "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-                "    hits { id workspaceId productId itemId propertyType name readableId category displayUnit value }\n"
+                "    hits { id workspaceId productId itemId propertyType name category displayUnit value }\n"
                 "  }\n"
                 "}"
             )
