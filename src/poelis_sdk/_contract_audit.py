@@ -340,7 +340,6 @@ class _RecordingTransport:
                             "hierarchyContext": [{"id": "i1", "name": "Widget Alpha"}],
                         }
                     ],
-                    "hasFormulaDependencyChanges": False,
                     "deleted": False,
                     "draftPropertyId": None,
                     "updatedAt": "2026-01-01T00:00:00Z",
