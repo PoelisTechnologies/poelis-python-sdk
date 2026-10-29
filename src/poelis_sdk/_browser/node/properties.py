@@ -1,4 +1,4 @@
-"""Property loading/search logic for Browser `_Node` (internal)."""
+"""Property loading logic for Browser `_Node` (internal)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from poelis_sdk._item_filter import item_draft_id as row_draft_id
 from poelis_sdk._item_filter import parent_item_filter_id
 
-from .._graphql_errors import _handle_graphql_read_errors
 from ..props import _PropWrapper
 from ..utils import _is_visible_version_property, _safe_key
 from .item_queries import (
@@ -124,13 +123,8 @@ def _query_item_properties(
     return props
 
 
-def _is_unknown_version_error(errors: Any) -> bool:
-    error_msg = str(errors).lower()
-    return "version" in error_msg and ("unknown" in error_msg or "cannot" in error_msg)
-
-
 def properties(node: "_Node") -> List[Dict[str, Any]]:
-    """Return cached properties for an item node (behavior preserved)."""
+    """Return cached properties for an item node."""
     if not node._is_props_cache_stale():
         return node._props_cache or []
     if node._level != "item":
@@ -147,102 +141,15 @@ def properties(node: "_Node") -> List[Dict[str, Any]]:
             break
         anc = anc._parent  # type: ignore[assignment]
 
-    use_sdk = _sdk_properties_enabled(node)
-    query, variables, query_name = _item_properties_gql(
-        use_sdk=use_sdk,
+    props_data = _query_item_properties(
+        node,
         item_id=str(node._id),
         product_id=pid,
         version_number=version_number,
+        use_sdk=_sdk_properties_enabled(node),
     )
-
-    try:
-        r = node._client._transport.graphql(query, variables)
-        r.raise_for_status()
-        data = r.json()
-        if "errors" in data:
-            if use_sdk:
-                pass
-            else:
-                errors = data["errors"]
-                if version_number is not None and _is_unknown_version_error(errors):
-                    pass
-                else:
-                    raise RuntimeError(data["errors"])
-        else:
-            props_data = data.get("data", {}).get(query_name, []) or []
-            node._props_cache = _filter_visible_version_properties(props_data, version_number)
-            node._props_loaded_at = time.time()
-            return node._props_cache
-    except RuntimeError:
-        if not use_sdk:
-            raise
-    except Exception:
-        if not use_sdk:
-            raise
-
-    if use_sdk:
-        try:
-            fallback_query, fallback_vars, _ = _item_properties_gql(
-                use_sdk=False,
-                item_id=str(node._id),
-                product_id=pid,
-                version_number=version_number,
-            )
-            try:
-                r = node._client._transport.graphql(fallback_query, fallback_vars)
-                r.raise_for_status()
-                data = r.json()
-                if "errors" in data:
-                    errors = data["errors"]
-                    if version_number is not None and _is_unknown_version_error(errors):
-                        pass
-                    else:
-                        _handle_graphql_read_errors(errors)
-                props_data = data.get("data", {}).get("properties", []) or []
-                node._props_cache = _filter_visible_version_properties(props_data, version_number)
-                node._props_loaded_at = time.time()
-                return node._props_cache
-            except RuntimeError:
-                raise
-            except Exception:
-                pass
-        except Exception:
-            pass
-
-    try:
-        q2_parsed = (
-            "query SdkSearchItemProperties($iid: ID!, $limit: Int!, $offset: Int!) {\n"
-            "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-            "    hits { id workspaceId productId itemId propertyType name category displayUnit value }\n"
-            "  }\n"
-            "}"
-        )
-        try:
-            r2 = node._client._transport.graphql(q2_parsed, {"iid": node._id, "limit": 100, "offset": 0})
-            r2.raise_for_status()
-            data2 = r2.json()
-            if "errors" in data2:
-                _handle_graphql_read_errors(data2["errors"])
-            node._props_cache = data2.get("data", {}).get("searchProperties", {}).get("hits", []) or []
-            node._props_loaded_at = time.time()
-        except Exception:
-            q2_min = (
-                "query SdkSearchItemPropertiesMinimal($iid: ID!, $limit: Int!, $offset: Int!) {\n"
-                "  searchProperties(q: \"*\", itemId: $iid, limit: $limit, offset: $offset) {\n"
-                "    hits { id workspaceId productId itemId propertyType name category displayUnit value }\n"
-                "  }\n"
-                "}"
-            )
-            r3 = node._client._transport.graphql(q2_min, {"iid": node._id, "limit": 100, "offset": 0})
-            r3.raise_for_status()
-            data3 = r3.json()
-            if "errors" in data3:
-                _handle_graphql_read_errors(data3["errors"])
-            node._props_cache = data3.get("data", {}).get("searchProperties", {}).get("hits", []) or []
-            node._props_loaded_at = time.time()
-    except Exception:
-        node._props_cache = []
-        node._props_loaded_at = time.time()
+    node._props_cache = _filter_visible_version_properties(props_data, version_number)
+    node._props_loaded_at = time.time()
     return node._props_cache
 
 
