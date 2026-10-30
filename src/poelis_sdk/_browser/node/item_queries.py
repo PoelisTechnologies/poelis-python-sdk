@@ -52,14 +52,18 @@ def _direct_child_rows(
     rows: list[dict[str, Any]],
     *,
     parent_node_id: str,
+    parent_draft_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """Keep only direct children; parentItemId filter also returns the parent row."""
+    parent_ids = {str(parent_node_id)}
+    if parent_draft_id:
+        parent_ids.add(str(parent_draft_id))
     children: list[dict[str, Any]] = []
     for row in rows:
-        if str(row.get("id")) == parent_node_id:
+        if str(row.get("id")) in parent_ids:
             continue
         parent_id = row.get("parentId")
-        if parent_id is not None and str(parent_id) == parent_node_id:
+        if parent_id is not None and str(parent_id) in parent_ids:
             children.append(row)
     return children
 

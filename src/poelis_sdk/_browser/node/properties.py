@@ -365,7 +365,11 @@ def _fetch_property_from_item_and_children_impl(
             product_id=product_id,
             parent_item_id=filter_id,
         )
-    child_items = _direct_child_rows(rows, parent_node_id=str(item_id))
+    child_items = _direct_child_rows(
+        rows,
+        parent_node_id=str(item_id),
+        parent_draft_id=item_draft_id,
+    )
 
     for child_item in child_items:
         child_id = child_item.get("id")

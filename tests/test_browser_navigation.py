@@ -303,6 +303,55 @@ def test_deleted_version_items_hidden_from_browser_navigation() -> None:
     assert "deleted_child" not in child_names
 
 
+class _DraftParentIdTransport(httpx.BaseTransport):
+    def handle_request(self, request: httpx.Request) -> httpx.Response:  # type: ignore[override]
+        payload = json.loads(request.content.decode("utf-8"))
+        query: str = payload.get("query", "")
+        variables: Dict[str, Any] = payload.get("variables", {})
+        filt = variables.get("filter") or {}
+
+        if "workspaces(" in query:
+            data = {"data": {"workspaces": [
+                {"id": "w1", "orgId": "o", "name": "OG3", "readableId": "og3"},
+            ]}}
+            return httpx.Response(200, json=data)
+        if "products(" in query:
+            data = {"data": {"products": [
+                {"id": "p1", "name": "OG003 Technical Data", "readableId": "og003_technical_data", "workspaceId": "w1", "baselineVersionNumber": 7},
+            ]}}
+            return httpx.Response(200, json=data)
+        if "sdkItems(" in query or ("items(productId:" in query and "version:" in query):
+            parent = filt.get("parentItemId")
+            if filt.get("rootOnly") or parent is None:
+                rows = [{"id": "snap-system", "name": "System", "readableId": "system", "productId": "p1", "parentId": None, "draftItemId": "draft-system", "deleted": False}]
+            elif parent == "draft-system":
+                rows = [{"id": "snap-payload", "name": "Payload", "readableId": "payload", "productId": "p1", "parentId": "draft-system", "draftItemId": "draft-payload", "deleted": False}]
+            elif parent == "draft-payload":
+                rows = [{"id": "snap-wac", "name": "WAC", "readableId": "wac", "productId": "p1", "parentId": "draft-payload", "draftItemId": "draft-wac", "deleted": False}]
+            else:
+                rows = []
+            return httpx.Response(200, json={"data": {"sdkItems": rows, "items": rows}})
+        if "properties(itemId:" in query or "sdkProperties(itemId:" in query:
+            props = []
+            if variables.get("iid") == "snap-wac":
+                props = [{"__typename": "NumericProperty", "id": "prop-mass", "name": "Mass", "readableId": "mass", "value": "12.5", "parsedValue": 12.5, "deleted": False}]
+            return httpx.Response(200, json={"data": {"properties": props, "sdkProperties": props}})
+        return httpx.Response(200, json={"data": {}})
+
+
+def test_versioned_path_lists_properties_when_parent_id_is_draft() -> None:
+    """Baseline navigation still lists properties when parentId is the draft id."""
+
+    t = _DraftParentIdTransport()
+    c = _client_with_graphql_mock(t)
+
+    wac = c.browser.og3.og003_technical_data.system.payload.wac
+    assert wac.name == "wac"
+    names = wac.list_properties().names
+    assert names == ["mass"]
+    assert wac.list_properties()[0].value == 12.5
+
+
 def test_deleted_version_properties_hidden_from_browser_navigation() -> None:
     """Versioned sdkProperties reads should hide deleted properties."""
 
