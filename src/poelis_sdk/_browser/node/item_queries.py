@@ -54,11 +54,7 @@ def _direct_child_rows(
     parent_node_id: str,
     parent_draft_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Keep only direct children; parentItemId filter also returns the parent row.
-
-    A version snapshot is a different id from its draft. Child queries are
-    filtered by the draft id, and that draft id is what comes back as parentId.
-    """
+    """Keep only direct children; parentItemId filter also returns the parent row."""
     parent_ids = {str(parent_node_id)}
     if parent_draft_id:
         parent_ids.add(str(parent_draft_id))
