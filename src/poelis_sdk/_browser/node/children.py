@@ -140,7 +140,11 @@ def load_children(node: "_Node") -> None:
                 product_id=pid,
                 parent_item_id=parent_filter_id,
             )
-        rows = _direct_child_rows(rows, parent_node_id=str(node._id))
+        rows = _direct_child_rows(
+            rows,
+            parent_node_id=str(node._id),
+            parent_draft_id=getattr(node, "_draft_item_id", None),
+        )
 
         for it2 in rows:
             _append_item_child(node, it2, version_number=version_number)
