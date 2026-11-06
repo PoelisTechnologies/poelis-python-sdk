@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import mimetypes
 from pathlib import Path
+from typing import NamedTuple
 
 import httpx
 
@@ -62,15 +63,13 @@ class FilesClient:
         started = self._t.post_json("/v1/storage/uploads/signed-put", initiate, retry=False).json()
         upload_url = started["upload_url"]
         object_path = started["object_path"]
-        required_headers = started.get("required_headers") or {}
-        expected_type = required_headers.get("Content-Type", prepared.content_type)
-
+        required_headers = started["required_headers"]
         with prepared.path.open("rb") as handle:
             self._t.put_stream(
                 upload_url,
                 handle,
                 required_headers,
-                upload_timeout(prepared.size_bytes),
+                _upload_timeout(prepared.size_bytes),
             )
 
         completed = self._t.post_json(
@@ -79,7 +78,7 @@ class FilesClient:
                 **target,
                 "object_path": object_path,
                 "expected_size_bytes": prepared.size_bytes,
-                "expected_content_type": expected_type,
+                "expected_content_type": required_headers["Content-Type"],
                 "allow_duplicate": allow_duplicate,
             },
             retry=False,
@@ -107,7 +106,7 @@ def prepare_upload(path: str | Path) -> PreparedUpload:
     )
 
 
-def upload_timeout(size_bytes: int) -> httpx.Timeout:
+def _upload_timeout(size_bytes: int) -> httpx.Timeout:
     seconds = min(
         _UPLOAD_TIMEOUT_CAP_SECONDS,
         60.0 + (size_bytes / _SLOW_BYTES_PER_SECOND),
@@ -115,19 +114,11 @@ def upload_timeout(size_bytes: int) -> httpx.Timeout:
     return httpx.Timeout(connect=30.0, read=seconds, write=seconds, pool=30.0)
 
 
-class PreparedUpload:
-    def __init__(
-        self,
-        *,
-        path: Path,
-        filename: str,
-        size_bytes: int,
-        content_type: str,
-    ) -> None:
-        self.path = path
-        self.filename = filename
-        self.size_bytes = size_bytes
-        self.content_type = content_type
+class PreparedUpload(NamedTuple):
+    path: Path
+    filename: str
+    size_bytes: int
+    content_type: str
 
 
 def _content_type_for_name(filename: str) -> str:

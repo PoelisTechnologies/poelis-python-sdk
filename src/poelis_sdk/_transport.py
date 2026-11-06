@@ -107,35 +107,18 @@ class Transport:
                 response = self._client.request(
                     method, path, headers=self._headers(), params=params, json=json
                 )
-                # Map common error codes
-                if 200 <= response.status_code < 300:
-                    return response
-                if response.status_code == 401:
-                    raise UnauthorizedError(401, message=_safe_message(response))
-                if response.status_code == 404:
-                    raise NotFoundError(404, message=_safe_message(response))
-                if response.status_code == 429:
+                if response.status_code == 429 and attempt < max_attempts:
                     retry_after = _retry_after_seconds(response)
-                    if attempt < max_attempts:
-                        if retry_after is not None:
-                            time.sleep(retry_after)
-                        else:
-                            # fallback exponential backoff with jitter
-                            time.sleep(_backoff_sleep(attempt))
-                        continue
-                    raise RateLimitError(
-                        429, message=_safe_message(response), retry_after_seconds=retry_after
-                    )
-                if 400 <= response.status_code < 500:
-                    raise ClientError(response.status_code, message=_safe_message(response))
-                if 500 <= response.status_code < 600:
-                    # Retry on idempotent
-                    if method in {"GET", "HEAD"} and attempt < max_attempts:
-                        time.sleep(_backoff_sleep(attempt))
-                        continue
-                    raise ServerError(response.status_code, message=_safe_message(response))
-                # Fallback
-                raise HTTPError(response.status_code, message=_safe_message(response))
+                    time.sleep(retry_after if retry_after is not None else _backoff_sleep(attempt))
+                    continue
+                if (
+                    500 <= response.status_code < 600
+                    and method in {"GET", "HEAD"}
+                    and attempt < max_attempts
+                ):
+                    time.sleep(_backoff_sleep(attempt))
+                    continue
+                return _raise_mapped(response)
             except httpx.HTTPError as exc:
                 last_exc = exc
                 if method not in {"GET", "HEAD"} or attempt == max_attempts:
