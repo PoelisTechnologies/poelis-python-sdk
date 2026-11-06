@@ -43,6 +43,7 @@ class Transport:
         self._client = httpx.Client(base_url=base_url, timeout=timeout_seconds)
         self._api_key = api_key
 
+
     def _headers(self, extra: Optional[Mapping[str, str]] = None) -> Dict[str, str]:
         headers: Dict[str, str] = {
             "Accept": "application/json",
@@ -114,13 +115,7 @@ class Transport:
                 if response.status_code == 404:
                     raise NotFoundError(404, message=_safe_message(response))
                 if response.status_code == 429:
-                    retry_after_header = response.headers.get("Retry-After")
-                    retry_after: Optional[float] = None
-                    if retry_after_header:
-                        try:
-                            retry_after = float(retry_after_header)
-                        except Exception:
-                            retry_after = None
+                    retry_after = _retry_after_seconds(response)
                     if attempt < max_attempts:
                         if retry_after is not None:
                             time.sleep(retry_after)

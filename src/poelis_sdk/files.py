@@ -62,7 +62,7 @@ class FilesClient:
         started = self._t.post_json("/v1/storage/uploads/signed-put", initiate, retry=False).json()
         upload_url = started["upload_url"]
         object_path = started["object_path"]
-        required_headers = dict(started.get("required_headers") or {})
+        required_headers = started.get("required_headers") or {}
         expected_type = required_headers.get("Content-Type", prepared.content_type)
 
         with prepared.path.open("rb") as handle:
@@ -92,8 +92,6 @@ def prepare_upload(path: str | Path) -> PreparedUpload:
     if not file_path.is_file():
         raise UploadError(f"Not a file: {file_path}")
     filename = file_path.name
-    if filename in {"", ".", ".."}:
-        raise UploadError("File name is empty")
     size_bytes = file_path.stat().st_size
     if size_bytes <= 0:
         raise UploadError("File is empty")
@@ -146,12 +144,8 @@ def _target_body(
     property_id: str | None,
     property_type: str | None,
 ) -> dict[str, str]:
-    has_item = item_id is not None
-    has_property = property_id is not None or property_type is not None
-    if has_item == has_property or (has_property and (not property_id or not property_type)):
-        raise UploadError("Pass item_id, or both property_id and property_type")
-    if has_item:
-        assert item_id is not None
+    if item_id is not None and property_id is None and property_type is None:
         return {"item_id": item_id}
-    assert property_id is not None and property_type is not None
-    return {"property_id": property_id, "property_type": property_type}
+    if item_id is None and property_id and property_type:
+        return {"property_id": property_id, "property_type": property_type}
+    raise UploadError("Pass item_id, or both property_id and property_type")

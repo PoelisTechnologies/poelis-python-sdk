@@ -43,9 +43,6 @@ class ServerError(HTTPError):
 
 
 class UploadError(PoelisError):
-    """Raised when a local file cannot be uploaded.
-
-    The request is not sent.
-    """
+    """Raised when a local file cannot be uploaded."""
 
 
