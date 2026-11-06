@@ -46,7 +46,7 @@ poelis_client = PoelisClient(
 
 ## Upload a file
 
-`files.upload` uses the same storage calls as the web app. It asks for a signed URL, sends the bytes to storage, then completes the upload. The API key on the client is the same key used for GraphQL. A file over 5 GiB, or an empty file, is refused before any request.
+`files.upload` asks for a signed URL, sends the file bytes to storage, then completes the upload. It uses the API key already set on the client. A file over 5 GiB, or an empty file, is refused before any request.
 
 Pass an item id, or a property id together with its type.
 
