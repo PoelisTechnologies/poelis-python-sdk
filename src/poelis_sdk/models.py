@@ -25,6 +25,18 @@ class ChangedByUser(BaseModel):
     image_url: Optional[str] = Field(alias="imageUrl", default=None)
 
 
+class UploadedFile(BaseModel):
+    """File recorded after a signed upload completes."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    file_id: str = Field(min_length=1)
+    document_id: str | None = None
+    object_path: str = Field(min_length=1)
+    size_bytes: int | None = None
+    content_type: str | None = None
+
+
 class Product(BaseModel):
     """Product resource representation.
     

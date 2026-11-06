@@ -42,3 +42,10 @@ class ServerError(HTTPError):
     """Raised on 5xx errors."""
 
 
+class UploadError(PoelisError):
+    """Raised when a local file cannot be uploaded.
+
+    The request is not sent.
+    """
+
+

@@ -44,6 +44,25 @@ poelis_client = PoelisClient(
 )
 ```
 
+## Upload a file
+
+`files.upload` uses the same storage calls as the web app. It asks for a signed URL, sends the bytes to storage, then completes the upload. The API key on the client is the same key used for GraphQL. A file over 5 GiB, or an empty file, is refused before any request.
+
+Pass an item id, or a property id together with its type.
+
+```python
+uploaded = poelis_client.files.upload("specs/drawing.pdf", item_id="item-id")
+uploaded.file_id
+
+uploaded = poelis_client.files.upload(
+    "notes.docx",
+    property_id="property-id",
+    property_type="text",
+)
+```
+
+A second file with the same size and content type in the workspace returns HTTP 409. Pass `allow_duplicate=True` to store it anyway.
+
 ## Browser Usage
 
 The browser lets you navigate your Poelis data with simple dot notation:
