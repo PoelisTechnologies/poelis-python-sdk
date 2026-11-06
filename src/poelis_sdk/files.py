@@ -12,8 +12,7 @@ from .models import UploadedFile
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
 
-_SLOW_BYTES_PER_SECOND = 256 * 1024
-_UPLOAD_TIMEOUT_CAP_SECONDS = 7200.0
+_UPLOAD_STALL_TIMEOUT_SECONDS = 60.0
 
 
 class FilesClient:
@@ -69,7 +68,7 @@ class FilesClient:
                 upload_url,
                 handle,
                 required_headers,
-                _upload_timeout(prepared.size_bytes),
+                _upload_timeout(),
             )
 
         completed = self._t.post_json(
@@ -106,12 +105,13 @@ def prepare_upload(path: str | Path) -> PreparedUpload:
     )
 
 
-def _upload_timeout(size_bytes: int) -> httpx.Timeout:
-    seconds = min(
-        _UPLOAD_TIMEOUT_CAP_SECONDS,
-        60.0 + (size_bytes / _SLOW_BYTES_PER_SECOND),
+def _upload_timeout() -> httpx.Timeout:
+    return httpx.Timeout(
+        connect=30.0,
+        read=_UPLOAD_STALL_TIMEOUT_SECONDS,
+        write=_UPLOAD_STALL_TIMEOUT_SECONDS,
+        pool=30.0,
     )
-    return httpx.Timeout(connect=30.0, read=seconds, write=seconds, pool=30.0)
 
 
 class PreparedUpload(NamedTuple):
