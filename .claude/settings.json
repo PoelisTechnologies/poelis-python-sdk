@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 scripts/sync_claude_rules.py --check-stdin"
+          }
+        ]
+      }
+    ]
+  }
+}
