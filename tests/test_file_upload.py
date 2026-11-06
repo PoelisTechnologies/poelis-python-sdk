@@ -1,5 +1,3 @@
-"""Signed upload follows the web app's storage endpoints and local size cap."""
-
 from __future__ import annotations
 
 import json

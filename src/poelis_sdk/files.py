@@ -1,5 +1,3 @@
-"""Upload files through the same signed PUT flow the web app uses."""
-
 from __future__ import annotations
 
 import mimetypes
@@ -11,8 +9,6 @@ from ._transport import Transport
 from .exceptions import UploadError
 from .models import UploadedFile
 
-# Same byte count as the web app DOCUMENT_MAX_FILE_SIZE_BYTES and the API
-# default storage_max_upload_size_mb (5120 * 1024 * 1024).
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
 
 _SLOW_BYTES_PER_SECOND = 256 * 1024
@@ -20,8 +16,6 @@ _UPLOAD_TIMEOUT_CAP_SECONDS = 7200.0
 
 
 class FilesClient:
-    """Upload a file onto an item or a property."""
-
     def __init__(self, transport: Transport) -> None:
         self._t = transport
 
@@ -94,8 +88,6 @@ class FilesClient:
 
 
 def prepare_upload(path: str | Path) -> PreparedUpload:
-    """Return the name, size, and content type to send for ``path``."""
-
     file_path = Path(path)
     if not file_path.is_file():
         raise UploadError(f"Not a file: {file_path}")
@@ -118,8 +110,6 @@ def prepare_upload(path: str | Path) -> PreparedUpload:
 
 
 def upload_timeout(size_bytes: int) -> httpx.Timeout:
-    """Timeout that allows a slow 256 KiB/s write, capped at two hours."""
-
     seconds = min(
         _UPLOAD_TIMEOUT_CAP_SECONDS,
         60.0 + (size_bytes / _SLOW_BYTES_PER_SECOND),
@@ -128,8 +118,6 @@ def upload_timeout(size_bytes: int) -> httpx.Timeout:
 
 
 class PreparedUpload:
-    """Local file facts checked before the signed URL is requested."""
-
     def __init__(
         self,
         *,

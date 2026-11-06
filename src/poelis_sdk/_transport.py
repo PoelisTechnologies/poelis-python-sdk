@@ -99,7 +99,6 @@ class Transport:
         json: Any = None,
         retry: bool = True,
     ) -> httpx.Response:
-        # Retries: up to 3 attempts on idempotent GET/HEAD and 429s respecting Retry-After.
         max_attempts = 3 if retry else 1
         last_exc: Optional[Exception] = None
         for attempt in range(1, max_attempts + 1):
