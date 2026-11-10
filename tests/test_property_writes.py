@@ -571,3 +571,12 @@ def test_change_property_updates_raw_data(mock_client: PoelisClient) -> None:
     # Verify original fields are preserved/updated
     assert wrapper._raw["id"] == original_raw["id"]
     assert wrapper._raw["readableId"] == original_raw["readableId"]
+
+
+@pytest.mark.parametrize("arg", ["key", "readable_id"])
+def test_update_property_sends_key_as_readable_id(arg: str) -> None:
+    """`key` sets the property's readableId; `readable_id` still works for existing code."""
+    transport = _MockTransport()
+    transport.set_response({"data": {"updateTextProperty": {"id": "prop-1", "readableId": "material"}}})
+    PropertiesClient(transport).update_text_property(id="prop-1", **{arg: "material"})  # type: ignore[arg-type]
+    assert transport.requests[0]["variables"]["readableId"] == "material"

@@ -137,9 +137,9 @@ class _Node:
     def _props_key_map(self) -> Dict[str, Dict[str, Any]]:
         return props_key_map(self)
 
-    def _get_property(self, readable_id: str) -> "_PropWrapper":
-        """Get a property by readableId from this node context."""
-        return get_property(self, readable_id)
+    def _get_property(self, key: str) -> "_PropWrapper":
+        """Get a property by key from this node context."""
+        return get_property(self, key)
 
     def _load_children(self) -> None:
         load_children(self)

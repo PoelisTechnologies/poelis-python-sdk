@@ -27,6 +27,7 @@ class PropertiesClient:
         value: Optional[str] = None,
         item_id: Optional[str] = None,
         name: Optional[str] = None,
+        key: Optional[str] = None,
         readable_id: Optional[str] = None,
         position: Optional[float] = None,
         category: Optional[str] = None,
@@ -42,7 +43,8 @@ class PropertiesClient:
             value: New value as JSON string (scalar, 1D array, or 2D matrix).
             item_id: Optional item ID to move property to.
             name: Optional property name.
-            readable_id: Optional readable ID.
+            key: Optional new key.
+            readable_id: Same as `key`. Kept for existing code.
             position: Optional position for ordering.
             category: Optional category (auto-normalized to uppercase snake_case).
             display_unit: Optional display unit.
@@ -127,8 +129,8 @@ class PropertiesClient:
             variables["itemId"] = item_id
         if name is not None:
             variables["name"] = name
-        if readable_id is not None:
-            variables["readableId"] = readable_id
+        if key is not None or readable_id is not None:
+            variables["readableId"] = key if key is not None else readable_id
         if position is not None:
             variables["position"] = position
         if value is not None:
@@ -171,6 +173,7 @@ class PropertiesClient:
         value: Optional[str] = None,
         item_id: Optional[str] = None,
         name: Optional[str] = None,
+        key: Optional[str] = None,
         readable_id: Optional[str] = None,
         position: Optional[float] = None,
         reason: Optional[str] = None,
@@ -184,7 +187,8 @@ class PropertiesClient:
             value: New text value.
             item_id: Optional item ID to move property to.
             name: Optional property name.
-            readable_id: Optional readable ID.
+            key: Optional new key.
+            readable_id: Same as `key`. Kept for existing code.
             position: Optional position for ordering.
             reason: Optional reason for history tracking.
             description: Optional description for history tracking.
@@ -257,8 +261,8 @@ class PropertiesClient:
             variables["itemId"] = item_id
         if name is not None:
             variables["name"] = name
-        if readable_id is not None:
-            variables["readableId"] = readable_id
+        if key is not None or readable_id is not None:
+            variables["readableId"] = key if key is not None else readable_id
         if position is not None:
             variables["position"] = position
         if value is not None:
@@ -295,6 +299,7 @@ class PropertiesClient:
         value: Optional[str] = None,
         item_id: Optional[str] = None,
         name: Optional[str] = None,
+        key: Optional[str] = None,
         readable_id: Optional[str] = None,
         position: Optional[float] = None,
         category: Optional[str] = None,
@@ -310,7 +315,8 @@ class PropertiesClient:
             value: New matrix value as a JSON string.
             item_id: Optional item ID to move property to.
             name: Optional property name.
-            readable_id: Optional readable ID.
+            key: Optional new key.
+            readable_id: Same as `key`. Kept for existing code.
             position: Optional position for ordering.
             category: Optional category (auto-normalized by the backend).
             display_unit: Optional display unit.
@@ -390,8 +396,8 @@ class PropertiesClient:
             variables["itemId"] = item_id
         if name is not None:
             variables["name"] = name
-        if readable_id is not None:
-            variables["readableId"] = readable_id
+        if key is not None or readable_id is not None:
+            variables["readableId"] = key if key is not None else readable_id
         if position is not None:
             variables["position"] = position
         if value is not None:
@@ -429,6 +435,7 @@ class PropertiesClient:
         value: Optional[str] = None,
         item_id: Optional[str] = None,
         name: Optional[str] = None,
+        key: Optional[str] = None,
         readable_id: Optional[str] = None,
         position: Optional[float] = None,
         reason: Optional[str] = None,
@@ -442,7 +449,8 @@ class PropertiesClient:
             value: New date value in ISO 8601 format (YYYY-MM-DD).
             item_id: Optional item ID to move property to.
             name: Optional property name.
-            readable_id: Optional readable ID.
+            key: Optional new key.
+            readable_id: Same as `key`. Kept for existing code.
             position: Optional position for ordering.
             reason: Optional reason for history tracking.
             description: Optional description for history tracking.
@@ -514,8 +522,8 @@ class PropertiesClient:
             variables["itemId"] = item_id
         if name is not None:
             variables["name"] = name
-        if readable_id is not None:
-            variables["readableId"] = readable_id
+        if key is not None or readable_id is not None:
+            variables["readableId"] = key if key is not None else readable_id
         if position is not None:
             variables["position"] = position
         if value is not None:
@@ -552,6 +560,7 @@ class PropertiesClient:
         value: Optional[str] = None,
         item_id: Optional[str] = None,
         name: Optional[str] = None,
+        key: Optional[str] = None,
         readable_id: Optional[str] = None,
         position: Optional[float] = None,
         reason: Optional[str] = None,
@@ -565,7 +574,8 @@ class PropertiesClient:
             value: New status value (DRAFT, UNDER_REVIEW, or DONE).
             item_id: Optional item ID to move property to.
             name: Optional property name.
-            readable_id: Optional readable ID.
+            key: Optional new key.
+            readable_id: Same as `key`. Kept for existing code.
             position: Optional position for ordering.
             reason: Optional reason for history tracking.
             description: Optional description for history tracking.
@@ -639,8 +649,8 @@ class PropertiesClient:
             variables["itemId"] = item_id
         if name is not None:
             variables["name"] = name
-        if readable_id is not None:
-            variables["readableId"] = readable_id
+        if key is not None or readable_id is not None:
+            variables["readableId"] = key if key is not None else readable_id
         if position is not None:
             variables["position"] = position
         if value is not None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
 
 from datetime import datetime
 
@@ -35,13 +35,25 @@ class UploadedFile(BaseModel):
     content_type: str | None = None
 
 
+class _KeyMixin:
+    """Adds `key`, the name the app now shows for `readable_id`."""
+
+    if TYPE_CHECKING:
+        readable_id: Optional[str]
+
+    @property
+    def key(self) -> Optional[str]:
+        """Unique key used to reference this entity in the SDK. Same value as `readable_id`."""
+        return self.readable_id
+
+
 class Product(BaseModel):
     """Product resource representation.
     
     Attributes:
         id: Product identifier.
         name: Product name.
-        readableId: Optional human-readable identifier.
+        readableId: Optional key. Also available as `key`.
         workspaceId: Identifier of the workspace containing this product.
         baseline_version_number: Optional baseline version number for this product.
         code: Optional product code.
@@ -67,6 +79,11 @@ class Product(BaseModel):
         alias="approvalMode",
         default=None,
     )
+
+    @property
+    def key(self) -> Optional[str]:
+        """Unique key used to reference this product in the SDK. Same value as `readableId`."""
+        return self.readableId
 
 
 class ProductVersion(BaseModel):
@@ -226,7 +243,7 @@ class StatusProperty(BaseModel):
         return self.parsed_value if self.parsed_value is not None else self.value
 
 
-class FormulaProperty(BaseModel):
+class FormulaProperty(_KeyMixin, BaseModel):
     """Formula property representation (read-only, computed from expression and dependencies).
 
     For formula properties, category and display_unit are typically unset.
@@ -258,7 +275,7 @@ class FormulaProperty(BaseModel):
         return self.parsed_value if self.parsed_value is not None else (self.value or self.numeric_value)
 
 
-class MatrixProperty(BaseModel):
+class MatrixProperty(_KeyMixin, BaseModel):
     """Matrix property representation (2D array values)."""
 
     model_config = ConfigDict(populate_by_name=True)
@@ -322,13 +339,13 @@ class PropertySearchResponse(BaseModel):
     processing_time_ms: int = Field(alias="processingTimeMs")
 
 
-class ProductAccess(BaseModel):
+class ProductAccess(_KeyMixin, BaseModel):
     """Product access information with role.
     
     Attributes:
         id: Product identifier.
         name: Product name.
-        readable_id: Optional human-readable identifier.
+        readable_id: Optional key. Also available as `key`.
         role: User's role for this product (product-level role or inherited workspace role).
     """
     
@@ -340,13 +357,13 @@ class ProductAccess(BaseModel):
     role: str = Field(min_length=1)  # Role enum: ADMIN, EDITOR, VIEWER, NO_ACCESS, etc.
 
 
-class WorkspaceWithProducts(BaseModel):
+class WorkspaceWithProducts(_KeyMixin, BaseModel):
     """Workspace with its accessible products and role information.
     
     Attributes:
         id: Workspace identifier.
         name: Workspace name.
-        readable_id: Optional human-readable identifier.
+        readable_id: Optional key. Also available as `key`.
         role: User's role for this workspace.
         products: List of products accessible in this workspace with their roles.
     """

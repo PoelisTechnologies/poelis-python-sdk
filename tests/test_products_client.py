@@ -82,3 +82,11 @@ def test_list_product_versions_parses_versions() -> None:
     assert page.data[0].title == "v2"
     variables = json.loads(t.calls[0].content.decode("utf-8"))["variables"]
     assert variables == {"pid": "p1"}
+
+
+def test_models_expose_readable_id_as_key() -> None:
+    """`key` is the name the app shows for the readable ID."""
+    from poelis_sdk.models import Product, WorkspaceWithProducts
+
+    assert Product(id="p1", name="Drone", readableId="drone").key == "drone"
+    assert WorkspaceWithProducts(id="w1", name="Main", readableId="main", role="ADMIN").key == "main"
