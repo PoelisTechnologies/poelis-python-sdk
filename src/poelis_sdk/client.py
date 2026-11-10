@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, HttpUrl
 from ._transport import Transport
 from .browser import Browser
 from .change_tracker import PropertyChangeTracker
+from .external import ExternalSourcesClient
 from .files import FilesClient
 from .items import ItemsClient
 from .logging import quiet_logging
@@ -114,6 +115,7 @@ class PoelisClient:
         # Resource clients
         self.workspaces = WorkspacesClient(self._transport)
         self.files = FilesClient(self._transport)
+        self.external = ExternalSourcesClient(self._transport)
         self.products = ProductsClient(self._transport, self.workspaces)
         self.items = ItemsClient(self._transport)
         self.versions = VersionsClient(self._transport)
