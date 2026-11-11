@@ -123,7 +123,7 @@ def _resolve_property_for_write(
     
     Args:
         node: The node to resolve the property from (product, version, or item).
-        property_name: The name/readableId of the property to resolve.
+        property_name: The name or key of the property to resolve.
         path: The full path for error messages.
     Returns:
         A _PropWrapper object for the property (must be from draft).
@@ -508,7 +508,7 @@ class PoelisMatlab:
                 The path should end at a node that supports properties.
         
         Returns:
-            List of property names (readableIds) available at this path.
+            List of property names (keys) available at this path.
             In MATLAB, access using Python indexing or convert with:
             cellArray = cell(properties); strArray = string(cellArray);
         

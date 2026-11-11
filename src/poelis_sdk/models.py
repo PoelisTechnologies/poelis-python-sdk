@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Union
 
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
 """Pydantic models for SDK resources."""
+
+_READABLE_ID_DEPRECATED = "Use `key` instead. This will be removed in a future version."
 
 
 class ChangedByUser(BaseModel):
@@ -35,13 +37,25 @@ class UploadedFile(BaseModel):
     content_type: str | None = None
 
 
+class _KeyMixin:
+    """Adds `key`, the name the app now shows for `readable_id`."""
+
+    if TYPE_CHECKING:
+        readable_id: Optional[str]
+
+    @property
+    def key(self) -> Optional[str]:
+        """Unique key used to reference this entity in the SDK."""
+        return self.__dict__.get("readable_id")
+
+
 class Product(BaseModel):
     """Product resource representation.
     
     Attributes:
         id: Product identifier.
         name: Product name.
-        readableId: Optional human-readable identifier.
+        readableId: Deprecated. Use `key`. This will be removed in a future version.
         workspaceId: Identifier of the workspace containing this product.
         baseline_version_number: Optional baseline version number for this product.
         code: Optional product code.
@@ -54,7 +68,7 @@ class Product(BaseModel):
 
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
-    readableId: Optional[str] = None
+    readableId: Optional[str] = Field(default=None, deprecated=_READABLE_ID_DEPRECATED)
     workspaceId: Optional[str] = None
     baseline_version_number: Optional[int] = Field(
         alias="baselineVersionNumber",
@@ -67,6 +81,11 @@ class Product(BaseModel):
         alias="approvalMode",
         default=None,
     )
+
+    @property
+    def key(self) -> Optional[str]:
+        """Unique key used to reference this product in the SDK."""
+        return self.__dict__.get("readableId")
 
 
 class ProductVersion(BaseModel):
@@ -226,7 +245,7 @@ class StatusProperty(BaseModel):
         return self.parsed_value if self.parsed_value is not None else self.value
 
 
-class FormulaProperty(BaseModel):
+class FormulaProperty(_KeyMixin, BaseModel):
     """Formula property representation (read-only, computed from expression and dependencies).
 
     For formula properties, category and display_unit are typically unset.
@@ -241,7 +260,11 @@ class FormulaProperty(BaseModel):
     item_id: Optional[str] = Field(alias="itemId", default=None)
     position: Optional[float] = None
     name: str = Field(min_length=1)
-    readable_id: Optional[str] = Field(alias="readableId", default=None)
+    readable_id: Optional[str] = Field(
+        alias="readableId",
+        default=None,
+        deprecated=_READABLE_ID_DEPRECATED,
+    )
     value: Optional[str] = None
     numeric_value: Optional[str] = Field(alias="numericValue", default=None)
     category: Optional[str] = None
@@ -258,7 +281,7 @@ class FormulaProperty(BaseModel):
         return self.parsed_value if self.parsed_value is not None else (self.value or self.numeric_value)
 
 
-class MatrixProperty(BaseModel):
+class MatrixProperty(_KeyMixin, BaseModel):
     """Matrix property representation (2D array values)."""
 
     model_config = ConfigDict(populate_by_name=True)
@@ -269,7 +292,11 @@ class MatrixProperty(BaseModel):
     item_id: Optional[str] = Field(alias="itemId", default=None)
     position: Optional[float] = None
     name: str = Field(min_length=1)
-    readable_id: Optional[str] = Field(alias="readableId", default=None)
+    readable_id: Optional[str] = Field(
+        alias="readableId",
+        default=None,
+        deprecated=_READABLE_ID_DEPRECATED,
+    )
     value: Optional[str] = None
     category: Optional[str] = None
     display_unit: Optional[str] = Field(alias="displayUnit", default=None)
@@ -322,13 +349,13 @@ class PropertySearchResponse(BaseModel):
     processing_time_ms: int = Field(alias="processingTimeMs")
 
 
-class ProductAccess(BaseModel):
+class ProductAccess(_KeyMixin, BaseModel):
     """Product access information with role.
     
     Attributes:
         id: Product identifier.
         name: Product name.
-        readable_id: Optional human-readable identifier.
+        readable_id: Deprecated. Use `key`. This will be removed in a future version.
         role: User's role for this product (product-level role or inherited workspace role).
     """
     
@@ -336,17 +363,21 @@ class ProductAccess(BaseModel):
     
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
-    readable_id: Optional[str] = Field(alias="readableId", default=None)
+    readable_id: Optional[str] = Field(
+        alias="readableId",
+        default=None,
+        deprecated=_READABLE_ID_DEPRECATED,
+    )
     role: str = Field(min_length=1)  # Role enum: ADMIN, EDITOR, VIEWER, NO_ACCESS, etc.
 
 
-class WorkspaceWithProducts(BaseModel):
+class WorkspaceWithProducts(_KeyMixin, BaseModel):
     """Workspace with its accessible products and role information.
     
     Attributes:
         id: Workspace identifier.
         name: Workspace name.
-        readable_id: Optional human-readable identifier.
+        readable_id: Deprecated. Use `key`. This will be removed in a future version.
         role: User's role for this workspace.
         products: List of products accessible in this workspace with their roles.
     """
@@ -355,7 +386,11 @@ class WorkspaceWithProducts(BaseModel):
     
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
-    readable_id: Optional[str] = Field(alias="readableId", default=None)
+    readable_id: Optional[str] = Field(
+        alias="readableId",
+        default=None,
+        deprecated=_READABLE_ID_DEPRECATED,
+    )
     role: str = Field(min_length=1)  # Role enum: ADMIN, EDITOR, VIEWER, etc.
     products: List[ProductAccess] = Field(default_factory=list)
 
