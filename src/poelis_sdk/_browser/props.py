@@ -551,7 +551,7 @@ class _PropWrapper:
     def name(self) -> Optional[str]:
         """Return the best-effort display name for this property.
 
-        Falls back to name, id, or category when readableId is not present.
+        Falls back to name, id, or category when the key is not present.
         """
         p = self._raw
         n = p.get("readableId") or p.get("name") or p.get("id") or p.get("category")

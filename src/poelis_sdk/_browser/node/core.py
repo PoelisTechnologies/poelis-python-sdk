@@ -6,6 +6,7 @@ helper modules in this package.
 
 from __future__ import annotations
 
+import warnings
 from types import MethodType
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
@@ -137,9 +138,26 @@ class _Node:
     def _props_key_map(self) -> Dict[str, Dict[str, Any]]:
         return props_key_map(self)
 
-    def _get_property(self, readable_id: str) -> "_PropWrapper":
-        """Get a property by readableId from this node context."""
-        return get_property(self, readable_id)
+    def _get_property(
+        self,
+        key: Optional[str] = None,
+        *,
+        readable_id: Optional[str] = None,
+    ) -> "_PropWrapper":
+        """Get a property by key from this node context.
+
+        ``readable_id`` is deprecated and will be removed in a future version.
+        """
+        if readable_id is not None:
+            warnings.warn(
+                "readable_id is deprecated and will be removed in a future version. Use key instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        resolved = key if key is not None else readable_id
+        if resolved is None:
+            raise TypeError("get_property() missing required argument: 'key'")
+        return get_property(self, resolved)
 
     def _load_children(self) -> None:
         load_children(self)

@@ -6,6 +6,7 @@ These tests avoid reliance on IPython and focus on programmatic APIs.
 from __future__ import annotations
 
 import json
+import warnings
 from typing import TYPE_CHECKING, Any, Dict
 
 import pytest
@@ -562,6 +563,14 @@ def test_get_property_on_item_node() -> None:
     assert mass_prop.name == "demo_property_mass"
     assert mass_prop.category == "Mass"
     assert mass_prop.unit == "kg"
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        assert item.get_property(key="demo_property_mass").value == 10.5
+    with pytest.warns(DeprecationWarning, match="future version"):
+        assert item.get_property(readable_id="demo_property_mass").value == 10.5
+    with pytest.warns(DeprecationWarning, match="future version"):
+        assert item.get_property(key="demo_property_mass", readable_id="other").value == 10.5
     
     # Test error for non-existent property
     with pytest.raises(RuntimeError, match="not found"):

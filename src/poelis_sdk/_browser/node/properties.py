@@ -172,8 +172,8 @@ def props_key_map(node: "_Node") -> Dict[str, Dict[str, Any]]:
     return out
 
 
-def get_property(node: "_Node", readable_id: str) -> "_PropWrapper":
-    """Get a property by its readableId from an item context.
+def get_property(node: "_Node", key: str) -> "_PropWrapper":
+    """Get a property by its key from an item context.
 
     Implementation moved from `src/poelis_sdk/_browser/node_properties.py` (legacy)
     to fully consolidate node property logic under `src/poelis_sdk/_browser/node/`.
@@ -194,7 +194,7 @@ def get_property(node: "_Node", readable_id: str) -> "_PropWrapper":
             "Use version.<item>.get_property() instead to access properties from items in this version."
         )
 
-    return get_property_from_item_tree(node, readable_id)
+    return get_property_from_item_tree(node, key)
 
 
 def get_property_from_item_tree(
@@ -258,17 +258,17 @@ def search_property_in_item_and_children(
 ) -> "_PropWrapper":
     """Recursively search for a property in an item and optionally its descendants."""
     if not item_id:
-        raise RuntimeError(f"Property with readableId '{readable_id}' not found")
+        raise RuntimeError(f"Property with key '{readable_id}' not found")
 
     if visited is None:
         visited = set()
     if item_id in visited:
         raise RuntimeError(
-            f"Property with readableId '{readable_id}' not found in item tree"
+            f"Property with key '{readable_id}' not found in item tree"
         )
     if depth > max_depth:
         raise RuntimeError(
-            f"Property with readableId '{readable_id}' not found in item tree"
+            f"Property with key '{readable_id}' not found in item tree"
         )
     visited.add(item_id)
     try:
@@ -308,7 +308,7 @@ def _fetch_property_from_item(
     for prop in props:
         if prop.get("readableId") == readable_id:
             return _PropWrapper(prop, client=node._client)
-    raise RuntimeError(f"Property with readableId '{readable_id}' not found")
+    raise RuntimeError(f"Property with key '{readable_id}' not found")
 
 
 def _fetch_property_from_item_and_children_impl(
@@ -325,7 +325,7 @@ def _fetch_property_from_item_and_children_impl(
     max_depth: int,
 ) -> "_PropWrapper":
     if not item_id:
-        raise RuntimeError(f"Property with readableId '{readable_id}' not found")
+        raise RuntimeError(f"Property with key '{readable_id}' not found")
 
     try:
         wrapper = _fetch_property_from_item(node, str(item_id), readable_id, product_id, version_number)
@@ -349,7 +349,7 @@ def _fetch_property_from_item_and_children_impl(
         pass
 
     if not search_descendants:
-        raise RuntimeError(f"Property with readableId '{readable_id}' not found in item tree")
+        raise RuntimeError(f"Property with key '{readable_id}' not found in item tree")
 
     filter_id = parent_item_filter_id(node_id=str(item_id), draft_item_id=item_draft_id)
     if version_number is not None:
@@ -390,4 +390,4 @@ def _fetch_property_from_item_and_children_impl(
             except RuntimeError:
                 continue
 
-    raise RuntimeError(f"Property with readableId '{readable_id}' not found in item tree")
+    raise RuntimeError(f"Property with key '{readable_id}' not found in item tree")
