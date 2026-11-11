@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, Dict, Optional
 
 import httpx
@@ -575,8 +576,15 @@ def test_change_property_updates_raw_data(mock_client: PoelisClient) -> None:
 
 @pytest.mark.parametrize("arg", ["key", "readable_id"])
 def test_update_property_sends_key_as_readable_id(arg: str) -> None:
-    """`key` sets the property's readableId; `readable_id` still works for existing code."""
+    """`key` sets the property's readableId. `readable_id` still works and warns."""
     transport = _MockTransport()
     transport.set_response({"data": {"updateTextProperty": {"id": "prop-1", "readableId": "material"}}})
-    PropertiesClient(transport).update_text_property(id="prop-1", **{arg: "material"})  # type: ignore[arg-type]
+    client = PropertiesClient(transport)
+    if arg == "readable_id":
+        with pytest.warns(DeprecationWarning, match="future version"):
+            client.update_text_property(id="prop-1", readable_id="material")
+    else:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            client.update_text_property(id="prop-1", key="material")
     assert transport.requests[0]["variables"]["readableId"] == "material"

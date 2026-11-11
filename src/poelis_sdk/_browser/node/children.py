@@ -49,7 +49,7 @@ def load_children(node: "_Node") -> None:
     elif node._level == "workspace":
         page = node._client.products.list_by_workspace(workspace_id=node._id, limit=200, offset=0)
         for p in page.data:
-            display = p.readableId or p.name or str(p.id)
+            display = p.key or p.name or str(p.id)
             nm = _safe_key(display)
             child = node.__class__(
                 node._client,

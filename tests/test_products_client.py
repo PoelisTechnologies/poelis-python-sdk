@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import warnings
 
 import httpx
+import pytest
 
 from tests.conftest import client_with_transport
 
@@ -85,8 +87,19 @@ def test_list_product_versions_parses_versions() -> None:
 
 
 def test_models_expose_readable_id_as_key() -> None:
-    """`key` is the name the app shows for the readable ID."""
+    """`key` is the name the app shows for the readable ID.
+
+    Reading the old name warns. Reading `key` does not.
+    """
     from poelis_sdk.models import Product, WorkspaceWithProducts
 
-    assert Product(id="p1", name="Drone", readableId="drone").key == "drone"
-    assert WorkspaceWithProducts(id="w1", name="Main", readableId="main", role="ADMIN").key == "main"
+    product = Product(id="p1", name="Drone", readableId="drone")
+    workspace = WorkspaceWithProducts(id="w1", name="Main", readableId="main", role="ADMIN")
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        assert product.key == "drone"
+        assert workspace.key == "main"
+    with pytest.warns(DeprecationWarning, match="future version"):
+        assert product.readableId == "drone"
+    with pytest.warns(DeprecationWarning, match="future version"):
+        assert workspace.readable_id == "main"
