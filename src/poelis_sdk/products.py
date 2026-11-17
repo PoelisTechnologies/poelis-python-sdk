@@ -63,15 +63,19 @@ class ProductsClient:
         return PaginatedProducts(data=[Product(**r) for r in products], limit=limit, offset=offset)
 
     def list_product_versions(self, *, product_id: str, limit: int = 50, offset: int = 0) -> PaginatedProductVersions:
-        """List versions for a given product.
+        """List every version of a product.
+
+        The API returns all versions in one response. ``limit`` and
+        ``offset`` are not sent to the API and do not change the result; they
+        are only copied onto the returned container.
 
         Args:
             product_id: Identifier of the product whose versions should be listed.
-            limit: Maximum number of versions to return (currently ignored by backend).
-            offset: Offset for pagination (currently ignored by backend).
+            limit: Ignored. Kept so existing calls keep working.
+            offset: Ignored. Kept so existing calls keep working.
 
         Returns:
-            PaginatedProductVersions: Container with version data and pagination info.
+            PaginatedProductVersions: All versions of the product.
 
         Raises:
             RuntimeError: If the GraphQL response contains errors.

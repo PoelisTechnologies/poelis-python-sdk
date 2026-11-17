@@ -129,6 +129,7 @@ class ItemsClient:
         parent_item_id: str | None = None,
         include_deleted: bool | None = None,
         page_size: int = 100,
+        start_offset: int = 0,
     ) -> Generator[dict[str, Any], None, None]:
         """Iterate draft items via GraphQL for a given product.
 
@@ -139,12 +140,13 @@ class ItemsClient:
             parent_item_id: Return the parent item and its direct children.
             include_deleted: Include soft-deleted draft items.
             page_size: Page size for each GraphQL request.
+            start_offset: Initial offset for pagination.
 
         Yields:
             Individual draft item dictionaries.
         """
 
-        offset = 0
+        offset = start_offset
         while True:
             data = self.list_by_product(
                 product_id=product_id,

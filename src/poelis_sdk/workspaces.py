@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 from ._transport import Transport
 from .models import UserAccessibleResources
@@ -100,4 +100,23 @@ class WorkspacesClient:
         workspaces = raw if isinstance(raw, list) else [raw]
         return UserAccessibleResources(workspaces=workspaces)
 
+    def iter_all(self, *, page_size: int = 100, start_offset: int = 0) -> Generator[Dict[str, Any], None, None]:
+        """Iterate every workspace the API key can see, one page at a time.
 
+        Args:
+            page_size: Page size for each GraphQL request.
+            start_offset: Initial offset for pagination.
+
+        Yields:
+            Workspace dictionaries, in the same shape as :meth:`list`.
+        """
+
+        offset = start_offset
+        while True:
+            page = self.list(limit=page_size, offset=offset)
+            if not page:
+                break
+            yield from page
+            offset += len(page)
+            if len(page) < page_size:
+                break

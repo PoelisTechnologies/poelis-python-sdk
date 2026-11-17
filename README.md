@@ -44,6 +44,24 @@ poelis_client = PoelisClient(
 )
 ```
 
+## Lists and iterators
+
+Methods that page follow one convention, the same as the REST API:
+
+- `list_*` and `list` return **one page**. Pass `limit` and `offset` to choose it.
+- `iter_*` walk **every page** and yield one record at a time. Pass `page_size` to set the request size and `start_offset` to skip records.
+
+```python
+first_page = poelis_client.workspaces.list(limit=50, offset=0)
+
+for workspace in poelis_client.workspaces.iter_all():
+    for product in poelis_client.products.iter_all_by_workspace(workspace_id=workspace["id"]):
+        for item in poelis_client.items.iter_all_by_product(product_id=product.id):
+            print(workspace["name"], product.name, item["name"])
+```
+
+`products.list_product_versions` is the exception: the API returns every version at once, so its `limit` and `offset` have no effect.
+
 ## Upload a file
 
 `files.upload` asks for a signed URL, sends the file bytes to storage, then completes the upload. It uses the API key already set on the client. A file over 5 GiB, or an empty file, is refused before any request.
