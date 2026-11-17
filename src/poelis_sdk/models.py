@@ -37,6 +37,34 @@ class UploadedFile(BaseModel):
     content_type: str | None = None
 
 
+class File(BaseModel):
+    """A stored file linked to an item or a property.
+
+    Field names match ``PublicFile`` in the public REST API.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str = Field(min_length=1)
+    original_file_name: str = Field(alias="originalFileName")
+    user_title: Optional[str] = Field(alias="userTitle", default=None)
+    revision: Optional[str] = None
+    code: Optional[str] = None
+    content_type: Optional[str] = Field(alias="contentType", default=None)
+    description: Optional[str] = None
+    size_bytes: Optional[int] = Field(alias="sizeBytes", default=None)
+    uploaded_at: Optional[datetime] = Field(alias="uploadedAt", default=None)
+    uploaded_by: Optional[ChangedByUser] = Field(alias="uploadedBy", default=None)
+    deleted: bool = False
+    item_id: Optional[str] = Field(alias="itemId", default=None)
+    property_id: Optional[str] = Field(alias="propertyId", default=None)
+
+    @property
+    def name(self) -> str:
+        """Original file name. Same as ``original_file_name``."""
+        return self.original_file_name
+
+
 class _KeyMixin:
     """Adds `key`, the name the app now shows for `readable_id`."""
 

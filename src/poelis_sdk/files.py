@@ -2,22 +2,99 @@ from __future__ import annotations
 
 import mimetypes
 from pathlib import Path
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import httpx
 
 from ._transport import Transport
 from .exceptions import UploadError
-from .models import UploadedFile
+from .models import File, UploadedFile
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
 
 _UPLOAD_STALL_TIMEOUT_SECONDS = 60.0
 
+_LIST_FILES_QUERY = """
+query SdkListFiles(
+  $itemId: ID
+  $propertyId: ID
+  $version: VersionInput
+  $includePropertyFiles: Boolean
+) {
+  files(
+    itemId: $itemId
+    propertyId: $propertyId
+    version: $version
+    includePropertyFiles: $includePropertyFiles
+  ) {
+    files {
+      id
+      originalFileName
+      userTitle
+      revision
+      code
+      contentType
+      description
+      sizeBytes
+      uploadedAt
+      uploadedBy { id userName imageUrl }
+      deleted
+      itemId
+      propertyId
+    }
+  }
+}
+"""
+
 
 class FilesClient:
     def __init__(self, transport: Transport) -> None:
         self._t = transport
+
+    def list(
+        self,
+        *,
+        item_id: str | None = None,
+        property_id: str | None = None,
+        version: int | Literal["baseline"] | None = None,
+        include_property_files: bool = False,
+    ) -> list[File]:
+        """List the files linked to an item or to a property.
+
+        Pass exactly one of ``item_id`` or ``property_id``. The full list is
+        returned in one call; there is no paging for these two scopes.
+
+        Args:
+            item_id: Item whose files to list.
+            property_id: Property whose files to list.
+            version: ``None`` for the draft, a product version number, or
+                ``"baseline"`` for the product's baseline version. An item or
+                property id from any version works; the files returned are the
+                ones linked at the requested version.
+            include_property_files: With ``item_id``, also return the files
+                linked to the item's properties.
+
+        Returns:
+            The files, newest upload first. A version with no baseline set, or
+            an id that does not exist, returns an empty list.
+        """
+
+        if (item_id is None) == (property_id is None):
+            raise ValueError("Pass exactly one of item_id or property_id")
+        if include_property_files and item_id is None:
+            raise ValueError("include_property_files only applies with item_id")
+        variables: dict[str, object] = {
+            "itemId": item_id,
+            "propertyId": property_id,
+            "version": _version_variable(version),
+        }
+        if item_id is not None:
+            variables["includePropertyFiles"] = include_property_files
+        payload = self._t.graphql(_LIST_FILES_QUERY, variables).json()
+        if "errors" in payload:
+            raise RuntimeError(str(payload["errors"]))
+        files = ((payload.get("data") or {}).get("files") or {}).get("files") or []
+        return [File.model_validate(row) for row in files]
 
     def upload(
         self,
@@ -83,6 +160,20 @@ class FilesClient:
             retry=False,
         ).json()
         return UploadedFile.model_validate(completed)
+
+
+def _version_variable(version: int | str | None) -> int | str | None:
+    if version is None:
+        return None
+    if isinstance(version, bool):
+        raise ValueError("version must be an integer, 'baseline' or None")
+    if isinstance(version, int):
+        if version < 0:
+            raise ValueError("version must not be negative")
+        return version
+    if isinstance(version, str) and version.strip().lower() == "baseline":
+        return "baseline"
+    raise ValueError("version must be an integer, 'baseline' or None")
 
 
 def prepare_upload(path: str | Path) -> PreparedUpload:
