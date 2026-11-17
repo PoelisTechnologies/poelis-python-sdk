@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
 from ._transport import Transport
 from .models import UserAccessibleResources
 
 """Workspaces GraphQL client."""
+
+_WORKSPACE_PAGE_SIZE = 100
 
 
 class WorkspacesClient:
@@ -35,6 +37,20 @@ class WorkspacesClient:
         
         workspaces = payload.get("data", {}).get("workspaces", [])
         return workspaces
+
+    def _iter_all(self) -> Generator[Dict[str, Any], None, None]:
+        """Yield every workspace, one page at a time.
+
+        The backend filters workspaces in SQL, so a short page is the last one.
+        """
+
+        offset = 0
+        while True:
+            page = self.list(limit=_WORKSPACE_PAGE_SIZE, offset=offset)
+            yield from page
+            if len(page) < _WORKSPACE_PAGE_SIZE:
+                break
+            offset += len(page)
 
     def get(self, *, workspace_id: str) -> Optional[Dict[str, Any]]:
         """Get a single workspace by id via GraphQL."""

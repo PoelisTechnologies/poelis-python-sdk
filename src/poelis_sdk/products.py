@@ -143,7 +143,13 @@ class ProductsClient:
         return Product(**product_data)
 
     def iter_all_by_workspace(self, *, workspace_id: str, q: Optional[str] = None, page_size: int = 100, start_offset: int = 0) -> Generator[Product, None, None]:
-        """Iterate products via GraphQL with offset pagination for a workspace."""
+        """Iterate products via GraphQL with offset pagination for a workspace.
+
+        The backend pages products first and then drops the ones the caller
+        cannot open, so a page can come back shorter than ``page_size`` before
+        the end. The offset therefore moves by ``page_size``, and iteration
+        stops at the first empty page.
+        """
 
         offset = start_offset
         while True:
@@ -152,7 +158,7 @@ class ProductsClient:
                 break
             for product in page.data:
                 yield product
-            offset += len(page.data)
+            offset += page_size
 
     def iter_all(self, *, q: Optional[str] = None, page_size: int = 100) -> Generator[Product, None, None]:
         """Iterate products across all workspaces.
@@ -167,8 +173,7 @@ class ProductsClient:
         if self._workspaces_client is None:
             raise RuntimeError("Workspaces client not available. Cannot iterate across all workspaces.")
             
-        workspaces = self._workspaces_client.list(limit=1000, offset=0)
-        for workspace in workspaces:
+        for workspace in self._workspaces_client._iter_all():
             workspace_id = workspace['id']
             for product in self.iter_all_by_workspace(workspace_id=workspace_id, q=q, page_size=page_size):
                 yield product

@@ -39,6 +39,8 @@ class _MockTransport(httpx.BaseTransport):
 
             # Products by workspace
             if "products(" in query:
+                if vars.get("offset"):  # one page of products, like a real backend
+                    return httpx.Response(200, json={"data": {"products": []}})
                 assert vars.get("ws") == "w1"
                 data = {"data": {"products": [
                     {"id": "p1", "name": "Widget Pro", "workspaceId": "w1", "code": "WP", "description": ""},
@@ -317,6 +319,8 @@ class _DraftParentIdTransport(httpx.BaseTransport):
             ]}}
             return httpx.Response(200, json=data)
         if "products(" in query:
+            if variables.get("offset"):  # one page of products, like a real backend
+                return httpx.Response(200, json={"data": {"products": []}})
             data = {"data": {"products": [
                 {"id": "p1", "name": "OG003 Technical Data", "readableId": "og003_technical_data", "workspaceId": "w1", "baselineVersionNumber": 7},
             ]}}

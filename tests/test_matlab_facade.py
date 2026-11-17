@@ -44,6 +44,8 @@ class _MockTransport(httpx.BaseTransport):
 
             # Products by workspace
             if "products(" in query:
+                if vars.get("offset"):  # one page of products, like a real backend
+                    return _response({"data": {"products": []}})
                 assert vars.get("ws") == "w1"
                 data = {
                     "data": {
@@ -289,6 +291,8 @@ class _DescendantPropertyTransport(httpx.BaseTransport):
                 ]}})
 
             if "products(" in query:
+                if vars.get("offset"):  # one page of products, like a real backend
+                    return _response({"data": {"products": []}})
                 return _response({"data": {"products": [
                     {"id": "p1", "name": "Widget Pro", "workspaceId": "w1", "code": "WP", "description": ""},
                 ]}})

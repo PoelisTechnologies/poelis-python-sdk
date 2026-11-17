@@ -39,16 +39,15 @@ def _append_item_child(parent: "_Node", item_row: dict, *, version_number: Optio
 def load_children(node: "_Node") -> None:
     """Populate `_children_cache` for the given node (behavior preserved)."""
     if node._level == "root":
-        rows = node._client.workspaces.list(limit=200, offset=0)
-        for w in rows:
+        for w in node._client.workspaces._iter_all():
             display = w.get("readableId") or w.get("name") or str(w.get("id"))
             nm = _safe_key(display)
             child = node.__class__(node._client, "workspace", node, w["id"], display)
             child._cache_ttl = node._cache_ttl
             node._children_cache[nm] = child
     elif node._level == "workspace":
-        page = node._client.products.list_by_workspace(workspace_id=node._id, limit=200, offset=0)
-        for p in page.data:
+        products = node._client.products.iter_all_by_workspace(workspace_id=node._id, page_size=200)
+        for p in products:
             display = p.key or p.name or str(p.id)
             nm = _safe_key(display)
             child = node.__class__(
