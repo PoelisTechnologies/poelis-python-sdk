@@ -12,10 +12,14 @@ class PoelisError(Exception):
 class HTTPError(PoelisError):
     """HTTP error from API response."""
 
-    def __init__(self, status_code: int, message: str | None = None) -> None:
+    def __init__(
+        self, status_code: int, message: str | None = None, error_code: str | None = None
+    ) -> None:
         super().__init__(message or f"HTTP error: {status_code}")
         self.status_code = status_code
         self.message = message or ""
+        # The ``error`` field of the API response body, for example "no_blob".
+        self.error_code = error_code
 
 
 class UnauthorizedError(HTTPError):
@@ -29,8 +33,14 @@ class NotFoundError(HTTPError):
 class RateLimitError(HTTPError):
     """Raised on 429 Too Many Requests with optional retry-after seconds."""
 
-    def __init__(self, status_code: int, message: str | None = None, retry_after_seconds: Optional[float] = None) -> None:
-        super().__init__(status_code=status_code, message=message)
+    def __init__(
+        self,
+        status_code: int,
+        message: str | None = None,
+        retry_after_seconds: Optional[float] = None,
+        error_code: str | None = None,
+    ) -> None:
+        super().__init__(status_code=status_code, message=message, error_code=error_code)
         self.retry_after_seconds = retry_after_seconds
 
 
@@ -54,5 +64,13 @@ class PropertyLookupError(PoelisError, RuntimeError):
 
 class UploadError(PoelisError):
     """Raised when a local file cannot be uploaded."""
+
+
+class FileNotDownloadableError(ClientError):
+    """Raised when a file has no stored bytes to download.
+
+    Documents written inside Poelis are stored as editor content, not as a
+    file, so they cannot be downloaded through the SDK yet.
+    """
 
 

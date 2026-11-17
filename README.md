@@ -76,6 +76,25 @@ for f in files:
     print(f.id, f.name, f.size_bytes, f.uploaded_at)
 ```
 
+## Download a file
+
+`files.download` writes a file's bytes to a path and returns that path. The bytes come from a short-lived signed storage URL; the API key is not sent to storage. The file appears at `dest` only once it is complete.
+
+```python
+from pathlib import Path
+
+out = Path("downloads")
+out.mkdir(exist_ok=True)
+for f in poelis_client.files.list(item_id="item-id"):
+    poelis_client.files.download(f.id, out / f.name)
+
+# The file as it was in a product version, or in the baseline
+poelis_client.files.download("file-id", "spec_v3.pdf", product_id="product-id", version=3)
+poelis_client.files.download("file-id", "spec.pdf", product_id="product-id", version="baseline")
+```
+
+Documents written inside Poelis have no stored file yet, so they raise `FileNotDownloadableError`.
+
 ## Browser Usage
 
 The browser lets you navigate your Poelis data with simple dot notation:
