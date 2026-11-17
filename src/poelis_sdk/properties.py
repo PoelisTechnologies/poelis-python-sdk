@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import json
 import warnings
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Literal, Optional, Union
 
+from ._browser.node.properties import _property_selection
 from ._transport import Transport
 from .exceptions import NotFoundError, UnauthorizedError
 
@@ -12,6 +13,17 @@ from .exceptions import NotFoundError, UnauthorizedError
 _READABLE_ID_DEPRECATED = (
     "readable_id is deprecated and will be removed in a future version. Use key instead."
 )
+
+
+def _version_variable(version: Union[int, str, None]) -> Union[int, str, None]:
+    """Return ``version`` as the backend's ``VersionInput``: null, an int, or "baseline"."""
+    if version is None:
+        return None
+    if isinstance(version, int) and not isinstance(version, bool) and version >= 0:
+        return version
+    if isinstance(version, str) and version.strip().lower() == "baseline":
+        return "baseline"
+    raise ValueError(f"version must be None, a non-negative integer or 'baseline', got {version!r}")
 
 
 def _resolved_key(key: Optional[str], readable_id: Optional[str]) -> Optional[str]:
@@ -33,6 +45,49 @@ class PropertiesClient:
             transport: Shared HTTP/GraphQL transport used by the SDK.
         """
         self._t = transport
+
+    def list(
+        self,
+        item_id: str,
+        *,
+        version: Union[int, Literal["baseline"], None] = None,
+        include_deleted: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """List an item's properties in the draft or at a product version.
+
+        Args:
+            item_id: Item whose properties to list. A draft or a versioned item ID both work.
+            version: ``None`` for the draft, a product version number, or
+                ``"baseline"`` for the product's baseline version.
+            include_deleted: Also return soft-deleted properties. Applies to the draft
+                only; a version never contains deleted properties.
+
+        Returns:
+            One dict per property, with ``__typename`` naming its type (for example
+            ``SdkNumericProperty``). Empty when the item doesn't exist, or when
+            ``version="baseline"`` and the product has no baseline.
+
+        Raises:
+            ValueError: If ``version`` is not ``None``, a non-negative integer or ``"baseline"``.
+            RuntimeError: For GraphQL errors.
+        """
+        query = (
+            "query SdkListProperties($itemId: ID!, $version: VersionInput, $includeDeleted: Boolean!) {\n"
+            "  sdkProperties(itemId: $itemId, version: $version, includeDeleted: $includeDeleted) {\n"
+            f"{_property_selection(use_sdk=True)}"
+            "  }\n"
+            "}"
+        )
+        variables = {
+            "itemId": item_id,
+            "version": _version_variable(version),
+            "includeDeleted": include_deleted,
+        }
+        payload = self._t.graphql(query, variables).json()
+        if payload.get("errors"):
+            message = payload["errors"][0].get("message", "GraphQL error")
+            raise RuntimeError(f"GraphQL error: {message}")
+        return (payload.get("data") or {}).get("sdkProperties") or []
 
     def update_numeric_property(
         self,

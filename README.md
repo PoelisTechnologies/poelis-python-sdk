@@ -147,6 +147,21 @@ item_unit = item.some_property.unit  # Access property units directly
 
 For property type `formula`, `property.category` and `property.unit` is always `None`. The unit is part of the value itself: the value is the computed result of the expression (e.g. `"10 kg"`), so there is no separate unit field. For invalid formulas, `property.value` is `None`.
 
+## List an item's properties at a version
+
+`properties.list` returns every property of one item, as plain dicts. Pass `version` to read the properties as they were at a product version: a version number, `"baseline"`, or `None` for the draft. A draft or a versioned item id both work.
+
+```python
+props = poelis_client.properties.list("item-id")                       # draft
+props = poelis_client.properties.list("item-id", version=3)            # version 3
+props = poelis_client.properties.list("item-id", version="baseline")   # baseline
+
+for p in props:
+    print(p["__typename"], p["name"], p.get("parsedValue"))
+```
+
+`include_deleted=True` also returns soft-deleted properties of the draft. With `version="baseline"`, a product without a baseline returns an empty list.
+
 ## Property Change Detection
 
 The SDK can automatically warn you when property values change between script/notebook runs. This is useful when you're using property values for calculations and want to be notified if a colleague changes them in the webapp.

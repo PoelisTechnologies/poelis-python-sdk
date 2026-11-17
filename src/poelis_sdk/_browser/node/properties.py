@@ -46,6 +46,26 @@ def _sdk_properties_enabled(node: "_Node") -> bool:
         return False
 
 
+def _property_selection(*, use_sdk: bool) -> str:
+    """Return the per-type field selection for `sdkProperties` or `properties`."""
+    prefix = "Sdk" if use_sdk else ""
+    updated = " updatedAt updatedBy" if use_sdk else ""
+    formula_extra = (
+        " formulaExpression formulaDependencies { id name value displayUnit hierarchyContext { id name } itemId productId }"
+        if use_sdk
+        else " formulaExpression formulaDependencies { id name value displayUnit itemId productId }"
+    )
+    return (
+        f"    __typename\n"
+        f"    ... on {prefix}NumericProperty {{ id name readableId deleted category displayUnit numericValue: value parsedValue{updated} }}\n"
+        f"    ... on {prefix}FormulaProperty {{ id name readableId deleted numericValue: value parsedValue{formula_extra}{updated} }}\n"
+        f"    ... on {prefix}MatrixProperty {{ id name readableId deleted category displayUnit value parsedValue{updated} }}\n"
+        f"    ... on {prefix}TextProperty {{ id name readableId deleted value parsedValue{updated} }}\n"
+        f"    ... on {prefix}DateProperty {{ id name readableId deleted value{updated} }}\n"
+        f"    ... on {prefix}StatusProperty {{ id name readableId deleted value parsedValue{updated} }}\n"
+    )
+
+
 def _item_properties_gql(
     *,
     use_sdk: bool,
@@ -55,22 +75,7 @@ def _item_properties_gql(
 ) -> tuple[str, dict[str, Any], str]:
     """Build a properties GraphQL query shared by list and single-item fetch."""
     query_name = "sdkProperties" if use_sdk else "properties"
-    prefix = "Sdk" if use_sdk else ""
-    updated = " updatedAt updatedBy" if use_sdk else ""
-    formula_extra = (
-        " formulaExpression formulaDependencies { id name value displayUnit hierarchyContext { id name } itemId productId }"
-        if use_sdk
-        else " formulaExpression formulaDependencies { id name value displayUnit itemId productId }"
-    )
-    selection = (
-        f"    __typename\n"
-        f"    ... on {prefix}NumericProperty {{ id name readableId deleted category displayUnit numericValue: value parsedValue{updated} }}\n"
-        f"    ... on {prefix}FormulaProperty {{ id name readableId deleted numericValue: value parsedValue{formula_extra}{updated} }}\n"
-        f"    ... on {prefix}MatrixProperty {{ id name readableId deleted category displayUnit value parsedValue{updated} }}\n"
-        f"    ... on {prefix}TextProperty {{ id name readableId deleted value parsedValue{updated} }}\n"
-        f"    ... on {prefix}DateProperty {{ id name readableId deleted value{updated} }}\n"
-        f"    ... on {prefix}StatusProperty {{ id name readableId deleted value parsedValue{updated} }}\n"
-    )
+    selection = _property_selection(use_sdk=use_sdk)
 
     if version_number is not None and product_id is not None:
         query = (

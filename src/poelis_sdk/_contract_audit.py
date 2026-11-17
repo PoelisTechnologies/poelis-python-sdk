@@ -66,6 +66,7 @@ class _RecordingTransport:
             ("items(productId:", "items.list_by_product"),
             ("item(id:", "items.get"),
             ("searchProperties(", "search.properties"),
+            ("query SdkListProperties", "properties.list"),
             ("sdkProperties(", "browser.sdk_properties"),
             ("properties(itemId:", "browser.properties"),
             ("updateMatrixProperty(", "properties.update_matrix_property"),
@@ -510,6 +511,7 @@ def collect_sdk_graphql_documents() -> List[GraphQLDocument]:
         sort="updated_at",
     )
 
+    client.properties.list("i1", version="baseline", include_deleted=True)
     client.properties.update_numeric_property(id="pn1", value="123.5")
     client.properties.update_numeric_property(id="pn1", value="123.5", changed_via="PYTHON_SDK")
     client.properties.update_matrix_property(id="pm1", value="[[1, 2], [3, 4]]")
