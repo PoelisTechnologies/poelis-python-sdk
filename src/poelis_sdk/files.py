@@ -2,18 +2,26 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import mimetypes
+import os
+import tempfile
 from pathlib import Path
 from typing import Literal, NamedTuple
 
 import httpx
 
 from ._transport import Transport
-from .exceptions import UploadError
+from .exceptions import ClientError, FileNotDownloadableError, NotFoundError, UploadError
 from .models import File, UploadedFile
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
 
 _UPLOAD_STALL_TIMEOUT_SECONDS = 60.0
+
+_PRODUCT_BASELINE_QUERY = """
+query SdkProductBaselineVersion($id: ID!) {
+  product(id: $id) { id baselineVersionNumber }
+}
+"""
 
 _LIST_FILES_QUERY = """
 query SdkListFiles(
@@ -101,6 +109,110 @@ class FilesClient:
             parsed.sort(key=lambda file: file.uploaded_at or epoch, reverse=True)
         return parsed
 
+    def download(
+        self,
+        file_id: str,
+        dest: str | Path,
+        *,
+        product_id: str | None = None,
+        version: int | Literal["baseline"] | None = None,
+    ) -> Path:
+        """Download a file's bytes to ``dest``.
+
+        The API returns a short-lived signed URL and the bytes are streamed
+        from storage without the API key. They are written to a temporary file
+        next to ``dest`` and moved into place only when complete, so ``dest``
+        never holds a partial file.
+
+        Args:
+            file_id: File to download, for example ``File.id`` from ``list``.
+            dest: Path of the file to write. An existing file is replaced.
+                The parent directory must exist.
+            product_id: Product whose version to read. Required with
+                ``version``.
+            version: ``None`` for the current file, a product version number,
+                or ``"baseline"`` for the product's baseline version.
+
+        Returns:
+            The path that was written.
+
+        Raises:
+            FileNotDownloadableError: The file has no stored bytes: a
+                document written inside Poelis, or, with ``version``, a file
+                that was not in that version.
+            NotFoundError: The file, or the requested version of it, does
+                not exist or is not visible to this API key.
+        """
+
+        target = Path(dest)
+        if target.is_dir():
+            raise ValueError(f"dest is a directory, pass a file path: {target}")
+        if not target.parent.is_dir():
+            raise ValueError(f"Directory does not exist: {target.parent}")
+        version_number = self._version_number(product_id, version)
+        body: dict[str, object] = {}
+        if version_number is not None:
+            body = {"product_id": product_id, "version_number": version_number}
+        try:
+            url = self._t.post_json(f"/v1/storage/objects/{file_id}/download-url", body).json()[
+                "url"
+            ]
+        except ClientError as exc:
+            if exc.error_code == "no_blob":
+                message = (
+                    f"File {file_id} has no stored bytes to download. Documents "
+                    "written inside Poelis cannot be downloaded through the SDK yet."
+                )
+                if version_number is not None:
+                    message = (
+                        f"File {file_id} has no stored bytes at version {version_number}. "
+                        "Either it was not in that version, or it is a document written "
+                        "inside Poelis, which cannot be downloaded through the SDK yet."
+                    )
+                raise FileNotDownloadableError(
+                    exc.status_code,
+                    message=message,
+                    error_code=exc.error_code,
+                ) from exc
+            raise
+
+        previous_mode = target.stat().st_mode if target.is_file() else None
+        handle, part_name = tempfile.mkstemp(dir=target.parent, prefix=".poelis.", suffix=".part")
+        part = Path(part_name)
+        try:
+            with (
+                os.fdopen(handle, "wb") as out,
+                self._t.get_stream(url, _transfer_timeout()) as response,
+            ):
+                for chunk in response.iter_bytes():
+                    out.write(chunk)
+            os.replace(part, target)
+            if previous_mode is not None:
+                os.chmod(target, previous_mode)
+        except BaseException:
+            part.unlink(missing_ok=True)
+            raise
+        return target
+
+    def _version_number(self, product_id: str | None, version: int | str | None) -> int | None:
+        value = _version_variable(version)
+        if value is None:
+            return None
+        if not product_id:
+            raise ValueError("product_id is required when version is given")
+        if value != "baseline":
+            return int(value)
+        payload = self._t.graphql(_PRODUCT_BASELINE_QUERY, {"id": product_id}).json()
+        if "errors" in payload:
+            raise RuntimeError(str(payload["errors"]))
+        product = (payload.get("data") or {}).get("product")
+        if not product:
+            raise NotFoundError(404, message=f"Product not found: {product_id}")
+        baseline = product.get("baselineVersionNumber")
+        if baseline is None:
+            raise NotFoundError(404, message=f"Product {product_id} has no baseline version")
+        return int(baseline)
+
     def upload(
         self,
         path: str | Path,
@@ -150,7 +262,7 @@ class FilesClient:
                 upload_url,
                 handle,
                 required_headers,
-                _upload_timeout(),
+                _transfer_timeout(),
             )
 
         completed = self._t.post_json(
@@ -201,7 +313,7 @@ def prepare_upload(path: str | Path) -> PreparedUpload:
     )
 
 
-def _upload_timeout() -> httpx.Timeout:
+def _transfer_timeout() -> httpx.Timeout:
     return httpx.Timeout(
         connect=30.0,
         read=_UPLOAD_STALL_TIMEOUT_SECONDS,

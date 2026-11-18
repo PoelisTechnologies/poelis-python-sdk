@@ -57,6 +57,7 @@ class _RecordingTransport:
             ("workspace(", "workspaces.get"),
             ("workspaces(", "workspaces.list"),
             ("files(", "files.list"),
+            ("product(id:", "files.download"),
             ("setProductBaselineVersion(", "products.set_product_baseline_version"),
             ("productVersions(", "products.list_product_versions"),
             ("products(", "products.list_by_workspace"),
@@ -79,6 +80,8 @@ class _RecordingTransport:
     def _payload_for(self, query: str, variables: Dict[str, Any]) -> Dict[str, Any]:
         if "files(" in query:
             return {"data": {"files": {"files": []}}}
+        if "product(id:" in query:
+            return {"data": {"product": {"id": "p1", "baselineVersionNumber": 2}}}
         if "userAccessibleResources(" in query:
             return {
                 "data": {
@@ -479,6 +482,8 @@ def collect_sdk_graphql_documents() -> List[GraphQLDocument]:
 
     client.files.list(item_id="i1", version="baseline", include_property_files=True)
     client.files.list(property_id="pn1", version=2)
+    # download() resolves "baseline" with a GraphQL query before its REST calls.
+    client.files._version_number("p1", "baseline")
 
     client.items.list_by_product(product_id="p1", q="alpha", limit=1, offset=0)
     client.items.get("i1")
