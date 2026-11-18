@@ -63,6 +63,19 @@ uploaded = poelis_client.files.upload(
 
 A second file with the same size and content type in the workspace returns HTTP 409. Pass `allow_duplicate=True` to store it anyway.
 
+## List files
+
+`files.list` returns the files linked to one item or one property. Pass `version` to see the files as they were at a product version: a version number, `"baseline"`, or `None` for the draft.
+
+```python
+files = poelis_client.files.list(property_id="property-id")
+files = poelis_client.files.list(item_id="item-id", version="baseline")
+files = poelis_client.files.list(item_id="item-id", version=3, include_property_files=True)
+
+for f in files:
+    print(f.id, f.name, f.size_bytes, f.uploaded_at)
+```
+
 ## Browser Usage
 
 The browser lets you navigate your Poelis data with simple dot notation:

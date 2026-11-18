@@ -8,6 +8,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from .browser import Browser
 from .client import PoelisClient
+from .files import FilesClient
 from .items import ItemsClient
 from .matlab_facade import PoelisMatlab
 from .products import ProductsClient
@@ -55,6 +56,7 @@ class _RecordingTransport:
             ("userAccessibleResources(", "workspaces.get_user_accessible_resources"),
             ("workspace(", "workspaces.get"),
             ("workspaces(", "workspaces.list"),
+            ("files(", "files.list"),
             ("setProductBaselineVersion(", "products.set_product_baseline_version"),
             ("productVersions(", "products.list_product_versions"),
             ("products(", "products.list_by_workspace"),
@@ -75,6 +77,8 @@ class _RecordingTransport:
         return "unknown"
 
     def _payload_for(self, query: str, variables: Dict[str, Any]) -> Dict[str, Any]:
+        if "files(" in query:
+            return {"data": {"files": {"files": []}}}
         if "userAccessibleResources(" in query:
             return {
                 "data": {
@@ -447,6 +451,7 @@ def _configure_client(transport: _RecordingTransport, *, enable_sdk_properties: 
     )
     client._transport = transport
     client.workspaces = WorkspacesClient(transport)
+    client.files = FilesClient(transport)
     client.products = ProductsClient(transport, client.workspaces)
     client.items = ItemsClient(transport)
     client.versions = VersionsClient(transport)
@@ -471,6 +476,9 @@ def collect_sdk_graphql_documents() -> List[GraphQLDocument]:
     client.products.set_product_baseline_version(product_id="p1", version_number=2)
     list(client.products.iter_all_by_workspace(workspace_id="w1", q="widget", page_size=1))
     list(client.products.iter_all(q="widget", page_size=1))
+
+    client.files.list(item_id="i1", version="baseline", include_property_files=True)
+    client.files.list(property_id="pn1", version=2)
 
     client.items.list_by_product(product_id="p1", q="alpha", limit=1, offset=0)
     client.items.get("i1")
