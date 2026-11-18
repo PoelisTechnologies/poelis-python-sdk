@@ -27,13 +27,6 @@ class ItemOrPropertyDeletedWarning(UserWarning):
     pass
 
 
-CHANGE_DETECTION_DEFAULT_MESSAGE = (
-    "Change detection is on by default, so the SDK writes a baseline file and a change log. "
-    "The default will become False in a future version. Pass enable_change_detection=True to keep "
-    "this behaviour, or enable_change_detection=False to stop writing these files."
-)
-
-
 class PropertyChangeTracker:
     """Tracks property values and detects changes.
 
@@ -707,7 +700,13 @@ class PropertyChangeTracker:
             return
         if self._warn_on_first_write:
             self._warn_on_first_write = False
-            warnings.warn(CHANGE_DETECTION_DEFAULT_MESSAGE, FutureWarning, stacklevel=2)
+            warnings.warn(
+                "Change detection is on by default, so the SDK writes a baseline file and a change log. "
+                "The default will become False in a future version. Pass enable_change_detection=True to keep "
+                "this behaviour, or enable_change_detection=False to stop writing these files.",
+                FutureWarning,
+                stacklevel=2,
+            )
 
         try:
             # Resolve baseline file path (relative paths are relative to current working directory)
