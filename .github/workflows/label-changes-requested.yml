@@ -1,0 +1,22 @@
+name: Label changes requested
+
+on:
+  pull_request_review:
+    types:
+      - submitted
+      - edited
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  add-label:
+    if: github.event.review.state == 'changes_requested'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add changes-requested label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh pr edit "${{ github.event.pull_request.number }}" --add-label "changes-requested"
