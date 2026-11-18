@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import mimetypes
 from pathlib import Path
 from typing import Literal, NamedTuple
@@ -94,7 +95,11 @@ class FilesClient:
         if "errors" in payload:
             raise RuntimeError(str(payload["errors"]))
         files = ((payload.get("data") or {}).get("files") or {}).get("files") or []
-        return [File.model_validate(row) for row in files]
+        parsed = [File.model_validate(row) for row in files]
+        if include_property_files:
+            epoch = datetime.min.replace(tzinfo=timezone.utc)
+            parsed.sort(key=lambda file: file.uploaded_at or epoch, reverse=True)
+        return parsed
 
     def upload(
         self,

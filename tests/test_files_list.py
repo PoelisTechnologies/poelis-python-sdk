@@ -66,12 +66,14 @@ def test_list_property_files_sends_the_version_and_parses_rows(version, sent) ->
 
 
 def test_list_item_files_can_include_property_files() -> None:
-    transport = _GraphQLTransport(_files_payload(_FILE_ROW, {**_FILE_ROW, "id": "file-2", "propertyId": None}))
+    older = _FILE_ROW
+    newer = {**_FILE_ROW, "id": "file-2", "propertyId": None, "uploadedAt": "2026-11-17T12:00:00Z"}
+    transport = _GraphQLTransport(_files_payload(older, newer))
     client = client_with_transport(transport)
 
     files = client.files.list(item_id="item-1", include_property_files=True)
 
-    assert [f.id for f in files] == ["file-1", "file-2"]
+    assert [f.id for f in files] == ["file-2", "file-1"]
     assert transport.bodies[0]["variables"] == {
         "itemId": "item-1",
         "propertyId": None,
