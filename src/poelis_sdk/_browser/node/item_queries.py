@@ -69,8 +69,8 @@ def _direct_child_rows(
 
 
 def _node_parent_filter_id(node: "_Node") -> str:
-    """Id for ItemFilter.parentItemId: the row id in a version, the draft id otherwise."""
-    if getattr(node, "_version_number", None) is not None:
+    """ItemFilter.parentItemId for a browser node."""
+    if node._version_number is not None:
         return str(node._id)
     return parent_item_filter_id(
         node_id=str(node._id),

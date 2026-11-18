@@ -222,7 +222,7 @@ class ItemsClient:
         payload = self._t.graphql(_LIST_ITEMS_QUERY, variables).json()
         if "errors" in payload:
             raise RuntimeError(str(payload["errors"]))
-        rows = (payload.get("data") or {}).get("sdkItems") or []
+        rows = payload.get("data", {}).get("sdkItems", [])
         return [Item.model_validate(row) for row in rows]
 
     def iter_all(
