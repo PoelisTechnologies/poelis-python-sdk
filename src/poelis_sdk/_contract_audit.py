@@ -61,6 +61,7 @@ class _RecordingTransport:
             ("setProductBaselineVersion(", "products.set_product_baseline_version"),
             ("productVersions(", "products.list_product_versions"),
             ("products(", "products.list_by_workspace"),
+            ("SdkListItemsAtVersion", "items.list"),
             ("sdkItems(", "versions.list_items"),
             ("items(productId:", "items.list_by_product"),
             ("item(id:", "items.get"),
@@ -189,6 +190,8 @@ class _RecordingTransport:
                     "readableId": "widget_alpha",
                     "productId": "p1",
                     "parentId": None,
+                    "parentDraftItemId": None,
+                    "draftItemId": None,
                     "position": 1,
                     "deleted": False,
                 }
@@ -488,6 +491,7 @@ def collect_sdk_graphql_documents() -> List[GraphQLDocument]:
     client.items.list_by_product(product_id="p1", q="alpha", limit=1, offset=0)
     client.items.get("i1")
     list(client.items.iter_all_by_product(product_id="p1", q="alpha", page_size=1))
+    client.items.list("p1", version="baseline", q="alpha", limit=1, offset=0)
 
     client.versions.list_items(product_id="p1", version_number=2, q="alpha", limit=1, offset=0)
     list(client.versions.iter_items(product_id="p1", version_number=2, q="alpha", page_size=1))

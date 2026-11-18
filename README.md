@@ -44,6 +44,18 @@ poelis_client = PoelisClient(
 )
 ```
 
+## List items
+
+`items.list` returns one page of a product's items, in the draft or at a version: pass a version number, `"baseline"`, or `None` for the draft. `items.iter_all` walks every page.
+
+`parent_item_id` is the parent's id in that same draft or version. `parent_draft_item_id` is the parent's draft id.
+
+```python
+items = poelis_client.items.list("product-id", version="baseline", limit=50)
+for item in poelis_client.items.iter_all("product-id", version=3, root_only=True):
+    print(item.id, item.key, item.name, item.parent_item_id)
+```
+
 ## Upload a file
 
 `files.upload` asks for a signed URL, sends the file bytes to storage, then completes the upload. It uses the API key already set on the client. A file over 5 GiB, or an empty file, is refused before any request.
