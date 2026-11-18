@@ -49,7 +49,7 @@ class VersionsClient:
             version_number: Version number of the product whose items to list.
             q: Optional free-text filter applied to item name.
             root_only: When True, return only root items (no parent).
-            parent_item_id: Draft-scoped parent id; returns parent and direct children.
+            parent_item_id: Id of the parent row in that version. Returns that parent and its direct children.
             limit: Maximum number of items to return.
             offset: Offset for pagination.
 
@@ -109,7 +109,7 @@ class VersionsClient:
             version_number: Version number whose items to iterate.
             q: Optional free-text filter applied to item name.
             root_only: When True, return only root items (no parent).
-            parent_item_id: Draft-scoped parent id; returns parent and direct children.
+            parent_item_id: Id of the parent row in that version. Returns that parent and its direct children.
             page_size: Page size for each GraphQL request.
             start_offset: Initial offset for pagination.
 
@@ -135,4 +135,3 @@ class VersionsClient:
             offset += len(page)
             if len(page) < page_size:
                 break
-

@@ -13,15 +13,15 @@ _READABLE_ID_DEPRECATED = "Use `key` instead. This will be removed in a future v
 
 class ChangedByUser(BaseModel):
     """User information for reviewers and change tracking.
-    
+
     Attributes:
         id: User identifier.
         user_name: Username or display name.
         image_url: Optional URL to user's profile image.
     """
-    
+
     model_config = ConfigDict(populate_by_name=True)
-    
+
     id: str = Field(min_length=1)
     user_name: str = Field(alias="userName", min_length=1)
     image_url: Optional[str] = Field(alias="imageUrl", default=None)
@@ -68,9 +68,8 @@ class File(BaseModel):
 class Item(BaseModel):
     """An item of a product, in the draft or at a version.
 
-    Field names match ``PublicItem`` in the public REST API. ``parent_item_id``
-    is always the parent's draft id, also on versioned items; match it against
-    ``draft_item_id`` (versioned) or ``id`` (draft).
+    ``parent_item_id`` is the parent's id in that same draft or version.
+    ``parent_draft_item_id`` is the parent's draft id.
     """
 
     model_config = ConfigDict(populate_by_name=True)
@@ -78,7 +77,8 @@ class Item(BaseModel):
     id: str = Field(min_length=1)
     key: Optional[str] = Field(alias="readableId", default=None)
     product_id: str = Field(alias="productId")
-    parent_item_id: Optional[str] = Field(alias="parentDraftItemId", default=None)
+    parent_item_id: Optional[str] = Field(alias="parentId", default=None)
+    parent_draft_item_id: Optional[str] = Field(alias="parentDraftItemId", default=None)
     name: str
     description: Optional[str] = None
     part_number: Optional[str] = Field(alias="partNumber", default=None)
@@ -101,7 +101,7 @@ class _KeyMixin:
 
 class Product(BaseModel):
     """Product resource representation.
-    
+
     Attributes:
         id: Product identifier.
         name: Product name.
@@ -186,10 +186,10 @@ class PropertyValue(BaseModel):
     """Base class for property values with typed access."""
 
     model_config = ConfigDict(populate_by_name=True)
-    
+
     raw_value: str = Field(alias="value")
     parsed_value: Optional[Any] = Field(alias="parsedValue", default=None)
-    
+
     @property
     def value(self) -> Any:
         """Get the properly typed value, falling back to raw string if parsing failed."""
@@ -216,7 +216,9 @@ class NumericProperty(BaseModel):
     category: Optional[str] = None
     display_unit: Optional[str] = Field(alias="displayUnit", default=None)
     type: Optional[str] = Field(default=None)
-    parsed_value: Optional[Union[int, float, List[Any], str]] = Field(alias="parsedValue", default=None)
+    parsed_value: Optional[Union[int, float, List[Any], str]] = Field(
+        alias="parsedValue", default=None
+    )
 
     @property
     def typed_value(self) -> Union[int, float, List[Any], str, None]:
@@ -228,7 +230,7 @@ class TextProperty(BaseModel):
     """Text property representation."""
 
     model_config = ConfigDict(populate_by_name=True)
-    
+
     id: str = Field(min_length=1)
     product_id: Optional[str] = Field(alias="productId", default=None)
     product_version_number: Optional[int] = Field(alias="productVersionNumber", default=None)
@@ -237,8 +239,10 @@ class TextProperty(BaseModel):
     name: str = Field(min_length=1)
     value: str
     type: str = Field(min_length=1)
-    parsed_value: Optional[Union[int, float, List[Any], str]] = Field(alias="parsedValue", default=None)
-    
+    parsed_value: Optional[Union[int, float, List[Any], str]] = Field(
+        alias="parsedValue", default=None
+    )
+
     @property
     def typed_value(self) -> Union[int, float, List[Any], str]:
         """Get the properly typed value, falling back to raw string if parsing failed."""
@@ -249,7 +253,7 @@ class DateProperty(BaseModel):
     """Date property representation."""
 
     model_config = ConfigDict(populate_by_name=True)
-    
+
     id: str = Field(min_length=1)
     product_id: Optional[str] = Field(alias="productId", default=None)
     product_version_number: Optional[int] = Field(alias="productVersionNumber", default=None)
@@ -259,7 +263,7 @@ class DateProperty(BaseModel):
     value: str
     type: str = Field(min_length=1)
     parsed_value: Optional[str] = Field(alias="parsedValue", default=None)
-    
+
     @property
     def typed_value(self) -> str:
         """Get the properly typed value, falling back to raw string if parsing failed."""
@@ -319,16 +323,24 @@ class FormulaProperty(_KeyMixin, BaseModel):
     numeric_value: Optional[str] = Field(alias="numericValue", default=None)
     category: Optional[str] = None
     display_unit: Optional[str] = Field(alias="displayUnit", default=None)
-    parsed_value: Optional[Union[int, float, List[Any], str]] = Field(alias="parsedValue", default=None)
+    parsed_value: Optional[Union[int, float, List[Any], str]] = Field(
+        alias="parsedValue", default=None
+    )
     formula_expression: Optional[str] = Field(alias="formulaExpression", default=None)
-    formula_dependencies: Optional[List[Dict[str, Any]]] = Field(alias="formulaDependencies", default=None)
+    formula_dependencies: Optional[List[Dict[str, Any]]] = Field(
+        alias="formulaDependencies", default=None
+    )
     updated_at: Optional[str] = Field(alias="updatedAt", default=None)
     updated_by: Optional[str] = Field(alias="updatedBy", default=None)
 
     @property
     def typed_value(self) -> Union[int, float, List[Any], str, None]:
         """Get the properly typed value, falling back to raw string if parsing failed."""
-        return self.parsed_value if self.parsed_value is not None else (self.value or self.numeric_value)
+        return (
+            self.parsed_value
+            if self.parsed_value is not None
+            else (self.value or self.numeric_value)
+        )
 
 
 class MatrixProperty(_KeyMixin, BaseModel):
@@ -350,7 +362,9 @@ class MatrixProperty(_KeyMixin, BaseModel):
     value: Optional[str] = None
     category: Optional[str] = None
     display_unit: Optional[str] = Field(alias="displayUnit", default=None)
-    parsed_value: Optional[Union[int, float, List[Any], str]] = Field(alias="parsedValue", default=None)
+    parsed_value: Optional[Union[int, float, List[Any], str]] = Field(
+        alias="parsedValue", default=None
+    )
     updated_at: Optional[str] = Field(alias="updatedAt", default=None)
     updated_by: Optional[str] = Field(alias="updatedBy", default=None)
 
@@ -364,7 +378,7 @@ class PropertySearchResult(BaseModel):
     """Property search result with unified fields across all property types."""
 
     model_config = ConfigDict(populate_by_name=True)
-    
+
     id: str = Field(min_length=1)
     workspace_id: str = Field(alias="workspaceId", min_length=1)
     product_id: str = Field(alias="productId", min_length=1)
@@ -375,11 +389,13 @@ class PropertySearchResult(BaseModel):
     category: Optional[str] = None
     display_unit: Optional[str] = Field(alias="displayUnit", default=None)
     value: Any  # Raw value from GraphQL
-    parsed_value: Optional[Union[int, float, List[Any], str]] = Field(alias="parsedValue", default=None)
+    parsed_value: Optional[Union[int, float, List[Any], str]] = Field(
+        alias="parsedValue", default=None
+    )
     created_by: str = Field(alias="createdBy", min_length=1)
     created_at: str = Field(alias="createdAt", min_length=1)
     updated_at: str = Field(alias="updatedAt", min_length=1)
-    
+
     @property
     def typed_value(self) -> Union[int, float, List[Any], str]:
         """Get the properly typed value, falling back to raw string if parsing failed."""
@@ -390,7 +406,7 @@ class PropertySearchResponse(BaseModel):
     """Response for property search queries."""
 
     model_config = ConfigDict(populate_by_name=True)
-    
+
     query: str
     hits: List[PropertySearchResult]
     total: int
@@ -401,16 +417,16 @@ class PropertySearchResponse(BaseModel):
 
 class ProductAccess(_KeyMixin, BaseModel):
     """Product access information with role.
-    
+
     Attributes:
         id: Product identifier.
         name: Product name.
         readable_id: Deprecated. Use `key`. This will be removed in a future version.
         role: User's role for this product (product-level role or inherited workspace role).
     """
-    
+
     model_config = ConfigDict(populate_by_name=True)
-    
+
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     readable_id: Optional[str] = Field(
@@ -423,7 +439,7 @@ class ProductAccess(_KeyMixin, BaseModel):
 
 class WorkspaceWithProducts(_KeyMixin, BaseModel):
     """Workspace with its accessible products and role information.
-    
+
     Attributes:
         id: Workspace identifier.
         name: Workspace name.
@@ -431,9 +447,9 @@ class WorkspaceWithProducts(_KeyMixin, BaseModel):
         role: User's role for this workspace.
         products: List of products accessible in this workspace with their roles.
     """
-    
+
     model_config = ConfigDict(populate_by_name=True)
-    
+
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     readable_id: Optional[str] = Field(
@@ -447,13 +463,11 @@ class WorkspaceWithProducts(_KeyMixin, BaseModel):
 
 class UserAccessibleResources(BaseModel):
     """User's accessible resources (workspaces and products) with role information.
-    
+
     Attributes:
         workspaces: List of workspaces the user can access with their roles and products.
     """
-    
+
     model_config = ConfigDict(populate_by_name=True)
-    
+
     workspaces: List[WorkspaceWithProducts] = Field(default_factory=list)
-
-

@@ -13,12 +13,19 @@ from poelis_sdk.models import Item
 from tests.conftest import client_with_transport
 
 
-def _row(item_id: str, *, parent: str | None = None, draft: str | None = None) -> dict[str, Any]:
+def _row(
+    item_id: str,
+    *,
+    parent: str | None = None,
+    parent_draft: str | None = None,
+    draft: str | None = None,
+) -> dict[str, Any]:
     return {
         "id": item_id,
         "readableId": f"key_{item_id}",
         "productId": "p1",
-        "parentDraftItemId": parent,
+        "parentId": parent,
+        "parentDraftItemId": parent_draft,
         "name": f"Item {item_id}",
         "description": None,
         "partNumber": None,
@@ -57,8 +64,8 @@ def test_list_sends_the_version(version: int | str | None, sent: int | str | Non
     assert request["variables"]["version"] == sent
 
 
-def test_list_returns_items_with_rest_field_names() -> None:
-    transport = _ItemsTransport([_row("v2", parent="d1", draft="d2")])
+def test_list_returns_both_parent_ids() -> None:
+    transport = _ItemsTransport([_row("v2", parent="snap-1", parent_draft="d1", draft="d2")])
     client = client_with_transport(transport)
 
     [item] = client.items.list("p1", version=1)
@@ -67,7 +74,8 @@ def test_list_returns_items_with_rest_field_names() -> None:
     assert item.id == "v2"
     assert item.key == "key_v2"
     assert item.product_id == "p1"
-    assert item.parent_item_id == "d1"
+    assert item.parent_item_id == "snap-1"
+    assert item.parent_draft_item_id == "d1"
     assert item.draft_item_id == "d2"
 
 

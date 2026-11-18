@@ -48,7 +48,7 @@ poelis_client = PoelisClient(
 
 `items.list` returns one page of a product's items, in the draft or at a version: pass a version number, `"baseline"`, or `None` for the draft. `items.iter_all` walks every page.
 
-`parent_item_id` is always the parent's draft id, as in the REST API. On versioned items, match it against the parent's `draft_item_id`.
+`parent_item_id` is the parent's id in that same draft or version. `parent_draft_item_id` is the parent's draft id.
 
 ```python
 items = poelis_client.items.list("product-id", version="baseline", limit=50)

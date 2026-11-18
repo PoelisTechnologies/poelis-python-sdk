@@ -15,7 +15,7 @@ query SdkListItemsAtVersion(
   $pid: ID!, $version: VersionInput, $filter: ItemFilter, $limit: Int!, $offset: Int!
 ) {
   sdkItems(productId: $pid, version: $version, filter: $filter, limit: $limit, offset: $offset) {
-    id readableId productId parentDraftItemId name description partNumber draftItemId deleted position
+    id readableId productId parentId parentDraftItemId name description partNumber draftItemId deleted position
   }
 }
 """
@@ -95,9 +95,9 @@ class ItemsClient:
         payload = resp.json()
         if "errors" in payload:
             raise RuntimeError(str(payload["errors"]))
-        
+
         items = payload.get("data", {}).get("items", [])
-        
+
         return items
 
     def get(self, item_id: str) -> dict[str, Any]:
@@ -128,11 +128,11 @@ class ItemsClient:
         payload = resp.json()
         if "errors" in payload:
             raise RuntimeError(str(payload["errors"]))
-        
+
         item = payload.get("data", {}).get("item")
         if item is None:
             raise RuntimeError(f"Item with id '{item_id}' not found")
-        
+
         return item
 
     def iter_all_by_product(
@@ -192,15 +192,14 @@ class ItemsClient:
     ) -> list[Item]:
         """Return one page of a product's items, in the draft or at a version.
 
-        Mirrors ``GET /v1/public/items`` of the REST API.
-
         Args:
             product_id: Product whose items to list.
             version: ``None`` for the draft, a version number, or ``"baseline"``
                 for the product's baseline version (no items if none is set).
             q: Optional free-text filter applied to item names.
             root_only: When True, return only root items.
-            parent_item_id: Draft id of a parent; returns it and its direct children.
+            parent_item_id: Id of the parent row in that draft or version.
+                Returns that parent and its direct children.
             include_deleted: Include soft-deleted draft items.
             limit: Page size.
             offset: Number of items to skip.

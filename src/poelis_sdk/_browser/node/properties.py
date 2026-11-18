@@ -168,7 +168,13 @@ def props_key_map(node: "_Node") -> Dict[str, Dict[str, Any]]:
     props = node._properties()
     used_names: Dict[str, int] = {}
     for i, pr in enumerate(props):
-        display = pr.get("readableId") or pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
+        display = (
+            pr.get("readableId")
+            or pr.get("name")
+            or pr.get("id")
+            or pr.get("category")
+            or f"property_{i}"
+        )
         safe = _safe_key(str(display))
         if safe in used_names:
             used_names[safe] += 1
@@ -338,7 +344,9 @@ def _fetch_property_from_item_and_children_impl(
         raise _PropertyKeyNotFound(f"Property with key '{readable_id}' not found")
 
     try:
-        wrapper = _fetch_property_from_item(node, str(item_id), readable_id, product_id, version_number)
+        wrapper = _fetch_property_from_item(
+            node, str(item_id), readable_id, product_id, version_number
+        )
         if node._client is not None:
             try:
                 change_tracker = getattr(node._client, "_change_tracker", None)
@@ -372,7 +380,11 @@ def _fetch_property_from_item_and_children_impl(
     if not search_descendants:
         raise _PropertyKeyNotFound(f"Property with key '{readable_id}' not found in item tree")
 
-    filter_id = parent_item_filter_id(node_id=str(item_id), draft_item_id=item_draft_id)
+    filter_id = (
+        str(item_id)
+        if version_number is not None
+        else parent_item_filter_id(node_id=str(item_id), draft_item_id=item_draft_id)
+    )
     if version_number is not None:
         rows = _list_versioned_items(
             node,

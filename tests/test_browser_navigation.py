@@ -32,35 +32,86 @@ class _MockTransport(httpx.BaseTransport):
 
             # Workspaces
             if "workspaces(" in query:
-                data = {"data": {"workspaces": [
-                    {"id": "w1", "orgId": "o", "name": "uh2", "projectLimit": 10},
-                ]}}
+                data = {
+                    "data": {
+                        "workspaces": [
+                            {"id": "w1", "orgId": "o", "name": "uh2", "projectLimit": 10},
+                        ]
+                    }
+                }
                 return httpx.Response(200, json=data)
 
             # Products by workspace
             if "products(" in query:
                 assert vars.get("ws") == "w1"
-                data = {"data": {"products": [
-                    {"id": "p1", "name": "Widget Pro", "workspaceId": "w1", "code": "WP", "description": ""},
-                ]}}
+                data = {
+                    "data": {
+                        "products": [
+                            {
+                                "id": "p1",
+                                "name": "Widget Pro",
+                                "workspaceId": "w1",
+                                "code": "WP",
+                                "description": "",
+                            },
+                        ]
+                    }
+                }
                 return httpx.Response(200, json=data)
 
             # Items by product (top-level only, but include child items for draft queries)
-            if "items(productId:" in query and "parentItemId" not in query and "version:" not in query and "sdkItems(" not in query:
+            if (
+                "items(productId:" in query
+                and "parentItemId" not in query
+                and "version:" not in query
+                and "sdkItems(" not in query
+            ):
                 assert vars.get("pid") == "p1"
                 # For draft queries, include both parent and child items
-                data = {"data": {"items": [
-                    {"id": "i1", "name": "Gadget A", "code": "GA", "description": "", "productId": "p1", "parentId": None, "position": 1},
-                    {"id": "i2", "name": "Child Item", "code": "CI", "description": "", "productId": "p1", "parentId": "i1", "position": 1},
-                ]}}
+                data = {
+                    "data": {
+                        "items": [
+                            {
+                                "id": "i1",
+                                "name": "Gadget A",
+                                "code": "GA",
+                                "description": "",
+                                "productId": "p1",
+                                "parentId": None,
+                                "position": 1,
+                            },
+                            {
+                                "id": "i2",
+                                "name": "Child Item",
+                                "code": "CI",
+                                "description": "",
+                                "productId": "p1",
+                                "parentId": "i1",
+                                "position": 1,
+                            },
+                        ]
+                    }
+                }
                 return httpx.Response(200, json=data)
 
             # Children items - return one child item for filtering tests
             if "parentItemId" in query:
                 if vars.get("parent") == "i1":
-                    data = {"data": {"items": [
-                        {"id": "i2", "name": "Child Item", "code": "CI", "description": "", "productId": "p1", "parentId": "i1", "position": 1},
-                    ]}}
+                    data = {
+                        "data": {
+                            "items": [
+                                {
+                                    "id": "i2",
+                                    "name": "Child Item",
+                                    "code": "CI",
+                                    "description": "",
+                                    "productId": "p1",
+                                    "parentId": "i1",
+                                    "position": 1,
+                                },
+                            ]
+                        }
+                    }
                 else:
                     data = {"data": {"items": []}}
                 return httpx.Response(200, json=data)
@@ -75,8 +126,25 @@ class _MockTransport(httpx.BaseTransport):
                     # Return properties for parent item (no demo_property_mass here)
                     # Note: "Color" and "Weight" use capitalized readableId to match existing tests
                     props = [
-                        {"__typename": "TextProperty", "id": "p1", "name": "Color", "readableId": "Color", "value": "Red", "parsedValue": "Red", "deleted": False},
-                        {"__typename": "NumericProperty", "id": "p3", "name": "Weight", "readableId": "Weight", "integerPart": 5, "exponent": 0, "category": "Mass", "deleted": False},
+                        {
+                            "__typename": "TextProperty",
+                            "id": "p1",
+                            "name": "Color",
+                            "readableId": "Color",
+                            "value": "Red",
+                            "parsedValue": "Red",
+                            "deleted": False,
+                        },
+                        {
+                            "__typename": "NumericProperty",
+                            "id": "p3",
+                            "name": "Weight",
+                            "readableId": "Weight",
+                            "integerPart": 5,
+                            "exponent": 0,
+                            "category": "Mass",
+                            "deleted": False,
+                        },
                     ]
                     if is_sdk and is_versioned:
                         props.append(
@@ -90,54 +158,182 @@ class _MockTransport(httpx.BaseTransport):
                                 "deleted": True,
                             }
                         )
-                    data = {"data": {"properties": props, "sdkProperties": props} if is_sdk else {"properties": props}}
+                    data = {
+                        "data": {"properties": props, "sdkProperties": props}
+                        if is_sdk
+                        else {"properties": props}
+                    }
                     return httpx.Response(200, json=data)
                 elif item_id == "i2":
                     # Return properties for child item (demo_property_mass is here)
                     props = [
-                        {"__typename": "NumericProperty", "id": "p2", "name": "Mass", "readableId": "demo_property_mass", "category": "Mass", "displayUnit": "kg", "value": "10.5", "parsedValue": 10.5, "deleted": False},
+                        {
+                            "__typename": "NumericProperty",
+                            "id": "p2",
+                            "name": "Mass",
+                            "readableId": "demo_property_mass",
+                            "category": "Mass",
+                            "displayUnit": "kg",
+                            "value": "10.5",
+                            "parsedValue": 10.5,
+                            "deleted": False,
+                        },
                     ]
-                    data = {"data": {"properties": props, "sdkProperties": props} if is_sdk else {"properties": props}}
+                    data = {
+                        "data": {"properties": props, "sdkProperties": props}
+                        if is_sdk
+                        else {"properties": props}
+                    }
                     return httpx.Response(200, json=data)
                 elif item_id == "i3":
                     # Deleted child item should never win recursive version-tree lookup
                     props = [
-                        {"__typename": "NumericProperty", "id": "p_deleted", "name": "Mass", "readableId": "demo_property_mass", "category": "Mass", "displayUnit": "kg", "value": "99.0", "parsedValue": 99.0, "deleted": False},
+                        {
+                            "__typename": "NumericProperty",
+                            "id": "p_deleted",
+                            "name": "Mass",
+                            "readableId": "demo_property_mass",
+                            "category": "Mass",
+                            "displayUnit": "kg",
+                            "value": "99.0",
+                            "parsedValue": 99.0,
+                            "deleted": False,
+                        },
                     ]
-                    data = {"data": {"properties": props, "sdkProperties": props} if is_sdk else {"properties": props}}
+                    data = {
+                        "data": {"properties": props, "sdkProperties": props}
+                        if is_sdk
+                        else {"properties": props}
+                    }
                     return httpx.Response(200, json=data)
                 else:
                     # Return empty for other items
-                    data = {"data": {"properties": [], "sdkProperties": []} if is_sdk else {"properties": []}}
+                    data = {
+                        "data": {"properties": [], "sdkProperties": []}
+                        if is_sdk
+                        else {"properties": []}
+                    }
                     return httpx.Response(200, json=data)
 
             # Product versions
             if "productVersions(" in query:
                 assert vars.get("pid") == "p1"
-                data = {"data": {"productVersions": [
-                    {"productId": "p1", "versionNumber": 1, "title": "version 1", "description": "First version", "createdAt": "2024-01-01T00:00:00Z"},
-                    {"productId": "p1", "versionNumber": 2, "title": "version 2", "description": "Second version", "createdAt": "2024-01-02T00:00:00Z"},
-                    {"productId": "p1", "versionNumber": 3, "title": "version 3", "description": "Third version", "createdAt": "2024-01-03T00:00:00Z"},
-                ]}}
+                data = {
+                    "data": {
+                        "productVersions": [
+                            {
+                                "productId": "p1",
+                                "versionNumber": 1,
+                                "title": "version 1",
+                                "description": "First version",
+                                "createdAt": "2024-01-01T00:00:00Z",
+                            },
+                            {
+                                "productId": "p1",
+                                "versionNumber": 2,
+                                "title": "version 2",
+                                "description": "Second version",
+                                "createdAt": "2024-01-02T00:00:00Z",
+                            },
+                            {
+                                "productId": "p1",
+                                "versionNumber": 3,
+                                "title": "version 3",
+                                "description": "Third version",
+                                "createdAt": "2024-01-03T00:00:00Z",
+                            },
+                        ]
+                    }
+                }
                 return httpx.Response(200, json=data)
 
             # Versioned items (new sdkItems query, keep items compatibility in tests)
-            if ("sdkItems(productId:" in query and "version:" in query) or ("items(productId:" in query and "version:" in query):
+            if ("sdkItems(productId:" in query and "version:" in query) or (
+                "items(productId:" in query and "version:" in query
+            ):
                 assert vars.get("pid") == "p1"
                 # Include both parent and child items for all versioned queries
-                data = {"data": {"sdkItems": [
-                    {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "position": 1, "deleted": False},
-                    {"id": "i_deleted", "name": "Deleted Item", "readableId": "deleted_item", "productId": "p1", "parentId": None, "position": 99, "deleted": True},
-                    {"id": "i3", "name": "Deleted Child", "readableId": "deleted_child", "productId": "p1", "parentId": "i1", "position": 0, "deleted": True},
-                    {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "position": 1, "deleted": False},
-                ], "items": [
-                    {"id": "i1", "name": "Gadget A", "readableId": "gadget_a", "productId": "p1", "parentId": None, "position": 1, "deleted": False},
-                    {"id": "i_deleted", "name": "Deleted Item", "readableId": "deleted_item", "productId": "p1", "parentId": None, "position": 99, "deleted": True},
-                    {"id": "i3", "name": "Deleted Child", "readableId": "deleted_child", "productId": "p1", "parentId": "i1", "position": 0, "deleted": True},
-                    {"id": "i2", "name": "Child Item", "readableId": "child_item", "productId": "p1", "parentId": "i1", "position": 1, "deleted": False},
-                ]}}
+                data = {
+                    "data": {
+                        "sdkItems": [
+                            {
+                                "id": "i1",
+                                "name": "Gadget A",
+                                "readableId": "gadget_a",
+                                "productId": "p1",
+                                "parentId": None,
+                                "position": 1,
+                                "deleted": False,
+                            },
+                            {
+                                "id": "i_deleted",
+                                "name": "Deleted Item",
+                                "readableId": "deleted_item",
+                                "productId": "p1",
+                                "parentId": None,
+                                "position": 99,
+                                "deleted": True,
+                            },
+                            {
+                                "id": "i3",
+                                "name": "Deleted Child",
+                                "readableId": "deleted_child",
+                                "productId": "p1",
+                                "parentId": "i1",
+                                "position": 0,
+                                "deleted": True,
+                            },
+                            {
+                                "id": "i2",
+                                "name": "Child Item",
+                                "readableId": "child_item",
+                                "productId": "p1",
+                                "parentId": "i1",
+                                "position": 1,
+                                "deleted": False,
+                            },
+                        ],
+                        "items": [
+                            {
+                                "id": "i1",
+                                "name": "Gadget A",
+                                "readableId": "gadget_a",
+                                "productId": "p1",
+                                "parentId": None,
+                                "position": 1,
+                                "deleted": False,
+                            },
+                            {
+                                "id": "i_deleted",
+                                "name": "Deleted Item",
+                                "readableId": "deleted_item",
+                                "productId": "p1",
+                                "parentId": None,
+                                "position": 99,
+                                "deleted": True,
+                            },
+                            {
+                                "id": "i3",
+                                "name": "Deleted Child",
+                                "readableId": "deleted_child",
+                                "productId": "p1",
+                                "parentId": "i1",
+                                "position": 0,
+                                "deleted": True,
+                            },
+                            {
+                                "id": "i2",
+                                "name": "Child Item",
+                                "readableId": "child_item",
+                                "productId": "p1",
+                                "parentId": "i1",
+                                "position": 1,
+                                "deleted": False,
+                            },
+                        ],
+                    }
+                }
                 return httpx.Response(200, json=data)
-
 
             return httpx.Response(200, json={"data": {}})
 
@@ -153,7 +349,6 @@ def _client_with_graphql_mock(t: httpx.BaseTransport, **client_kwargs: Any) -> P
         self._client = httpx.Client(base_url=base_url, transport=t, timeout=timeout_seconds)
         self._api_key = api_key
         self._timeout = timeout_seconds
-
 
     orig = _T.__init__
     _T.__init__ = _init  # type: ignore[assignment]
@@ -199,46 +394,46 @@ def test_browser_traversal_and_properties() -> None:
 
 def test_names_filtering() -> None:
     """Test explicit filtering methods (item_names, product_names, property_names)."""
-    
+
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
-    
+
     b = c.browser
     ws = b["uh2"]
     prod = ws["Widget Pro"]
     item = prod["gadget_a"]
-    
+
     # Test workspace level filtering
     all_workspace_names = ws.list_products().names
     assert "Widget Pro" in all_workspace_names
-    
+
     products_only = ws.list_products().names
     assert products_only == all_workspace_names  # At workspace level, children are products
     assert "Widget Pro" in products_only
-    
+
     # Test product level filtering
     all_product_names = prod.list_items().names
     assert "gadget_a" in all_product_names
-    
+
     items_only = prod.list_items().names
     assert items_only == all_product_names  # At product level, children are items
     assert "gadget_a" in items_only
-    
+
     # Test item level filtering - properties list only
     item_all_names = item.list_properties().names
     assert "Color" in item_all_names and "Weight" in item_all_names
-    
+
     # Test item level filtering - items only
     # Note: In the current mock, there are no child items, so this should be empty
     item_child_items = item.list_items().names
     assert isinstance(item_child_items, list)
-    
+
     # Test item level filtering - properties only
     item_props_only = item.list_properties().names
     assert "Color" in item_props_only
     assert "Weight" in item_props_only
     assert len(item_props_only) == 2  # Color, Weight (demo_property_mass is in child item)
-    
+
     # Test invalid filters at different levels: should not exist on these nodes
     with pytest.raises(AttributeError):
         _ = ws.list_items()  # No items at workspace level
@@ -252,22 +447,22 @@ def test_names_filtering() -> None:
 
 def test_names_filtering_with_child_items() -> None:
     """Test explicit filtering methods when item has child items."""
-    
+
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
-    
+
     b = c.browser
     ws = b["uh2"]
     prod = ws["Widget Pro"]
     item = prod["gadget_a"]
-    
+
     # Refresh to load child items
     item._refresh()
-    
+
     # Now item.list_properties() should return properties
     all_prop_names = item.list_properties().names
     assert "Color" in all_prop_names and "Weight" in all_prop_names
-    
+
     # Filter for items only - should return child items
     child_items = item.list_items().names
     # In our mock, there's one child item
@@ -312,36 +507,90 @@ class _DraftParentIdTransport(httpx.BaseTransport):
         filt = variables.get("filter") or {}
 
         if "workspaces(" in query:
-            data = {"data": {"workspaces": [
-                {"id": "w1", "orgId": "o", "name": "OG3", "readableId": "og3"},
-            ]}}
+            data = {
+                "data": {
+                    "workspaces": [
+                        {"id": "w1", "orgId": "o", "name": "OG3", "readableId": "og3"},
+                    ]
+                }
+            }
             return httpx.Response(200, json=data)
         if "products(" in query:
-            data = {"data": {"products": [
-                {"id": "p1", "name": "OG003 Technical Data", "readableId": "og003_technical_data", "workspaceId": "w1", "baselineVersionNumber": 7},
-            ]}}
+            data = {
+                "data": {
+                    "products": [
+                        {
+                            "id": "p1",
+                            "name": "OG003 Technical Data",
+                            "readableId": "og003_technical_data",
+                            "workspaceId": "w1",
+                            "baselineVersionNumber": 7,
+                        },
+                    ]
+                }
+            }
             return httpx.Response(200, json=data)
         if "sdkItems(" in query or ("items(productId:" in query and "version:" in query):
             parent = filt.get("parentItemId")
             if filt.get("rootOnly") or parent is None:
-                rows = [{"id": "snap-system", "name": "System", "readableId": "system", "productId": "p1", "parentId": None, "draftItemId": "draft-system", "deleted": False}]
-            elif parent == "draft-system":
-                rows = [{"id": "snap-payload", "name": "Payload", "readableId": "payload", "productId": "p1", "parentId": "draft-system", "draftItemId": "draft-payload", "deleted": False}]
-            elif parent == "draft-payload":
-                rows = [{"id": "snap-wac", "name": "WAC", "readableId": "wac", "productId": "p1", "parentId": "draft-payload", "draftItemId": "draft-wac", "deleted": False}]
+                rows = [
+                    {
+                        "id": "snap-system",
+                        "name": "System",
+                        "readableId": "system",
+                        "productId": "p1",
+                        "parentId": None,
+                        "draftItemId": "draft-system",
+                        "deleted": False,
+                    }
+                ]
+            elif parent == "snap-system":
+                rows = [
+                    {
+                        "id": "snap-payload",
+                        "name": "Payload",
+                        "readableId": "payload",
+                        "productId": "p1",
+                        "parentId": "snap-system",
+                        "draftItemId": "draft-payload",
+                        "deleted": False,
+                    }
+                ]
+            elif parent == "snap-payload":
+                rows = [
+                    {
+                        "id": "snap-wac",
+                        "name": "WAC",
+                        "readableId": "wac",
+                        "productId": "p1",
+                        "parentId": "snap-payload",
+                        "draftItemId": "draft-wac",
+                        "deleted": False,
+                    }
+                ]
             else:
                 rows = []
             return httpx.Response(200, json={"data": {"sdkItems": rows, "items": rows}})
         if "properties(itemId:" in query or "sdkProperties(itemId:" in query:
             props = []
             if variables.get("iid") == "snap-wac":
-                props = [{"__typename": "NumericProperty", "id": "prop-mass", "name": "Mass", "readableId": "mass", "value": "12.5", "parsedValue": 12.5, "deleted": False}]
+                props = [
+                    {
+                        "__typename": "NumericProperty",
+                        "id": "prop-mass",
+                        "name": "Mass",
+                        "readableId": "mass",
+                        "value": "12.5",
+                        "parsedValue": 12.5,
+                        "deleted": False,
+                    }
+                ]
             return httpx.Response(200, json={"data": {"properties": props, "sdkProperties": props}})
         return httpx.Response(200, json={"data": {}})
 
 
-def test_versioned_path_lists_properties_when_parent_id_is_draft() -> None:
-    """Baseline navigation still lists properties when parentId is the draft id."""
+def test_versioned_path_lists_properties() -> None:
+    """Versioned navigation lists properties when parentId is the parent row id."""
 
     t = _DraftParentIdTransport()
     c = _client_with_graphql_mock(t)
@@ -386,64 +635,64 @@ def test_deleted_version_properties_hidden_from_browser_navigation() -> None:
 
 def test_baseline_version_access() -> None:
     """Test accessing the latest version via baseline property."""
-    
+
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
-    
+
     b = c.browser
     ws = b["uh2"]
     prod = ws["Widget Pro"]
-    
+
     # Access baseline (should return latest version, which is v3)
     baseline = prod.baseline
     assert baseline is not None
     assert baseline._name == "v3"
     assert baseline._id == "3"
     assert baseline._level == "version"
-    
+
     # Baseline should be accessible and work like a version node
     assert hasattr(baseline, "list_items")
 
 
 def test_version_method_by_title() -> None:
     """Test accessing versions by title using get_version() method."""
-    
+
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
-    
+
     b = c.browser
     ws = b["uh2"]
     prod = ws["Widget Pro"]
-    
+
     # Access version by exact title
     v1 = prod.get_version("version 1")
     assert v1 is not None
     assert v1._name == "v1"
     assert v1._id == "1"
     assert v1._level == "version"
-    
+
     # Access version by different title
     v2 = prod.get_version("version 2")
     assert v2 is not None
     assert v2._name == "v2"
     assert v2._id == "2"
-    
+
     # Access latest version by title
     v3 = prod.get_version("version 3")
     assert v3 is not None
     assert v3._name == "v3"
     assert v3._id == "3"
-    
+
     # Test case-insensitive matching
     v1_case = prod.get_version("VERSION 1")
     assert v1_case is not None
     assert v1_case._id == "1"
-    
+
     # Test with whitespace
     v2_space = prod.get_version("  version 2  ")
     assert v2_space is not None
     assert v2_space._id == "2"
-    
+
     # Test error for non-existent version
     with pytest.raises(ValueError, match="No version found"):
         _ = prod.get_version("nonexistent version")
@@ -451,24 +700,24 @@ def test_version_method_by_title() -> None:
 
 def test_version_method_by_version_number() -> None:
     """Test accessing versions by version number using get_version() method."""
-    
+
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
-    
+
     b = c.browser
     ws = b["uh2"]
     prod = ws["Widget Pro"]
-    
+
     # Access version by number with "v" prefix
     v1 = prod.get_version("v1")
     assert v1 is not None
     assert v1._id == "1"
-    
+
     # Access version by number without prefix
     v2 = prod.get_version("2")
     assert v2 is not None
     assert v2._id == "2"
-    
+
     # Access latest version
     v3 = prod.get_version("v3")
     assert v3 is not None
@@ -477,21 +726,21 @@ def test_version_method_by_version_number() -> None:
 
 def test_get_property_on_version_raises_error() -> None:
     """Test that get_property is not available on version nodes and raises AttributeError."""
-    
+
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
-    
+
     b = c.browser
     ws = b["uh2"]
     prod = ws["Widget Pro"]
-    
+
     # Access version v1
     v1 = prod.v1
-    
+
     # get_property should not be available on version nodes
     with pytest.raises(AttributeError, match="get_property.*not available on version nodes"):
         _ = v1.get_property("demo_property_mass")
-    
+
     # Users should access items in the version first, then get properties from items
     # Load children for v1 and get item from cache
     v1._load_children()
@@ -504,14 +753,14 @@ def test_get_property_on_version_raises_error() -> None:
                 break
     assert item is not None, "Item not found in version"
     mass_prop = item.get_property("demo_property_mass")
-    
+
     # Verify it returns a property wrapper with correct value
     assert mass_prop is not None
     assert mass_prop.value == 10.5
     assert mass_prop.name == "demo_property_mass"
     assert mass_prop.category == "Mass"
     assert mass_prop.unit == "kg"
-    
+
     # Test that get_property is NOT available on product nodes
     with pytest.raises(AttributeError, match="get_property.*not available on product nodes"):
         _ = prod.get_property("demo_property_mass")
@@ -519,18 +768,18 @@ def test_get_property_on_version_raises_error() -> None:
 
 def test_get_property_on_product_node_raises_error() -> None:
     """Test that get_property is not available on product nodes and raises AttributeError."""
-    
+
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
-    
+
     b = c.browser
     ws = b["uh2"]
     prod = ws["Widget Pro"]
-    
+
     # get_property should not be available on product nodes
     with pytest.raises(AttributeError, match="get_property.*not available on product nodes"):
         _ = prod.get_property("demo_property_mass")
-    
+
     # Users should access items in baseline first, then get properties from items
     # For product nodes, accessing items automatically routes through baseline
     item = prod["gadget_a"]
@@ -544,19 +793,19 @@ def test_get_property_on_product_node_raises_error() -> None:
 
 def test_get_property_on_item_node() -> None:
     """Test getting a property by readableId from an item node (searches recursively)."""
-    
+
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
-    
+
     b = c.browser
     ws = b["uh2"]
     prod = ws["Widget Pro"]
     item = prod["gadget_a"]
-    
+
     # Get property from item node (should search in item and sub-items)
     # In our mock, demo_property_mass is in child item i2
     mass_prop = item.get_property("demo_property_mass")
-    
+
     # Verify it returns a property wrapper with correct value
     assert mass_prop is not None
     assert mass_prop.value == 10.5
@@ -571,7 +820,7 @@ def test_get_property_on_item_node() -> None:
         assert item.get_property(readable_id="demo_property_mass").value == 10.5
     with pytest.warns(DeprecationWarning, match="future version"):
         assert item.get_property(key="demo_property_mass", readable_id="other").value == 10.5
-    
+
     # Test error for non-existent property
     with pytest.raises(RuntimeError, match="not found in item tree") as missing:
         _ = item.get_property("nonexistent_property")
@@ -645,15 +894,15 @@ def test_draft_get_property_raises_unauthorized_from_the_searched_item() -> None
 
 def test_get_property_on_item_node_with_version() -> None:
     """Test getting a property by readableId from an item node in a versioned context."""
-    
+
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
-    
+
     b = c.browser
     ws = b["uh2"]
     prod = ws["Widget Pro"]
     v1 = prod.v1
-    
+
     # Load items for v1
     v1._load_children()
     item = v1._children_cache.get("gadget_a") or v1._children_cache.get("Gadget_A")
@@ -663,10 +912,10 @@ def test_get_property_on_item_node_with_version() -> None:
             if child._name == "gadget_a":
                 item = child
                 break
-    
+
     # Get property from versioned item node (should search recursively in sub-items)
     mass_prop = item.get_property("demo_property_mass")
-    
+
     # Verify it returns a property wrapper
     assert mass_prop is not None
     assert mass_prop.value == 10.5
@@ -674,21 +923,21 @@ def test_get_property_on_item_node_with_version() -> None:
 
 def test_get_property_on_draft_version_raises_error() -> None:
     """Test that get_property is not available on draft version nodes."""
-    
+
     t = _MockTransport()
     c = _client_with_graphql_mock(t)
-    
+
     b = c.browser
     ws = b["uh2"]
     prod = ws["Widget Pro"]
-    
+
     # Access draft version
     draft = prod.draft
-    
+
     # get_property should not be available on version nodes (including draft)
     with pytest.raises(AttributeError, match="get_property.*not available on version nodes"):
         _ = draft.get_property("demo_property_mass")
-    
+
     # Users should access items in draft first, then get properties from items
     # Load children for draft and get item from cache
     draft._load_children()
@@ -701,7 +950,7 @@ def test_get_property_on_draft_version_raises_error() -> None:
                 break
     assert item is not None, "Item not found in draft"
     mass_prop = item.get_property("demo_property_mass")
-    
+
     # Verify it returns a property wrapper
     assert mass_prop is not None
     assert mass_prop.value == 10.5
@@ -709,7 +958,7 @@ def test_get_property_on_draft_version_raises_error() -> None:
 
 def test_baseline_and_version_in_dir() -> None:
     """Test that baseline and version appear in __dir__ for product nodes."""
-    
+
     t = _MockTransport()
     _client_with_graphql_mock(t)
 
@@ -770,11 +1019,11 @@ def test_change_tracking_with_get_property_records_id_and_path(tmp_path: Any) ->
     # There should be at least one accessed_properties entry that references this ID.
     assert accessed_props
     assert any(info.get("property_id") == property_id for info in accessed_props.values())
-    
+
     b = c.browser
     ws = b["uh2"]
     prod = ws["Widget Pro"]
-    
+
     # Check that baseline and version are in dir()
     dir_items = dir(prod)
     assert "baseline" in dir_items
