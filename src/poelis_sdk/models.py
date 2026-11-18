@@ -65,6 +65,28 @@ class File(BaseModel):
         return self.original_file_name
 
 
+class Item(BaseModel):
+    """An item of a product, in the draft or at a version.
+
+    Field names match ``PublicItem`` in the public REST API. ``parent_item_id``
+    is always the parent's draft id, also on versioned items; match it against
+    ``draft_item_id`` (versioned) or ``id`` (draft).
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: str = Field(min_length=1)
+    key: Optional[str] = Field(alias="readableId", default=None)
+    product_id: str = Field(alias="productId")
+    parent_item_id: Optional[str] = Field(alias="parentDraftItemId", default=None)
+    name: str
+    description: Optional[str] = None
+    part_number: Optional[str] = Field(alias="partNumber", default=None)
+    draft_item_id: Optional[str] = Field(alias="draftItemId", default=None)
+    deleted: bool = False
+    position: Optional[float] = None
+
+
 class _KeyMixin:
     """Adds `key`, the name the app now shows for `readable_id`."""
 

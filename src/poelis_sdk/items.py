@@ -4,16 +4,29 @@ from typing import Any, Generator
 
 from ._item_filter import build_item_filter
 from ._transport import Transport
+from .files import _version_variable
+from .models import Item
 
 """Items resource client."""
 
 
-class ItemsClient:
-    """Client for draft item resources.
+_LIST_ITEMS_QUERY = """
+query SdkListItemsAtVersion(
+  $pid: ID!, $version: VersionInput, $filter: ItemFilter, $limit: Int!, $offset: Int!
+) {
+  sdkItems(productId: $pid, version: $version, filter: $filter, limit: $limit, offset: $offset) {
+    id readableId productId parentDraftItemId name description partNumber draftItemId deleted position
+  }
+}
+"""
 
-    This client is intended for accessing the current draft view of items.
-    Versioned (snapshot) items for a given product version should be accessed
-    via the `VersionsClient`.
+
+class ItemsClient:
+    """Client for item resources.
+
+    ``list`` and ``iter_all`` read items in the draft or at a version. The
+    older ``list_by_product`` / ``iter_all_by_product`` read the draft only, and
+    ``VersionsClient.list_items`` reads a numbered version.
     """
 
     def __init__(self, transport: Transport) -> None:
@@ -37,6 +50,8 @@ class ItemsClient:
         offset: int = 0,
     ) -> list[dict[str, Any]]:
         """List draft items for a product via GraphQL with optional filters.
+
+        For the draft or any version as ``Item`` models, use ``items.list``.
 
         This method is intended to return the current draft state of items for
         the given product (items without a bound product version). To retrieve
@@ -163,4 +178,80 @@ class ItemsClient:
             if len(data) < page_size:
                 break
 
+    def list(
+        self,
+        product_id: str,
+        *,
+        version: int | str | None = None,
+        q: str | None = None,
+        root_only: bool | None = None,
+        parent_item_id: str | None = None,
+        include_deleted: bool = False,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[Item]:
+        """Return one page of a product's items, in the draft or at a version.
 
+        Mirrors ``GET /v1/public/items`` of the REST API.
+
+        Args:
+            product_id: Product whose items to list.
+            version: ``None`` for the draft, a version number, or ``"baseline"``
+                for the product's baseline version (no items if none is set).
+            q: Optional free-text filter applied to item names.
+            root_only: When True, return only root items.
+            parent_item_id: Draft id of a parent; returns it and its direct children.
+            include_deleted: Include soft-deleted draft items.
+            limit: Page size.
+            offset: Number of items to skip.
+
+        Raises:
+            ValueError: If ``version`` is not an integer, ``"baseline"`` or None.
+        """
+        variables: dict[str, Any] = {
+            "pid": product_id,
+            "version": _version_variable(version),
+            "filter": build_item_filter(
+                q=q,
+                root_only=root_only,
+                parent_item_id=parent_item_id,
+                include_deleted=include_deleted or None,
+            ),
+            "limit": int(limit),
+            "offset": int(offset),
+        }
+        payload = self._t.graphql(_LIST_ITEMS_QUERY, variables).json()
+        if "errors" in payload:
+            raise RuntimeError(str(payload["errors"]))
+        rows = (payload.get("data") or {}).get("sdkItems") or []
+        return [Item.model_validate(row) for row in rows]
+
+    def iter_all(
+        self,
+        product_id: str,
+        *,
+        version: int | str | None = None,
+        q: str | None = None,
+        root_only: bool | None = None,
+        parent_item_id: str | None = None,
+        include_deleted: bool = False,
+        page_size: int = 100,
+        start_offset: int = 0,
+    ) -> Generator[Item, None, None]:
+        """Iterate over every item that ``list`` would return, page by page."""
+        offset = start_offset
+        while True:
+            page = self.list(
+                product_id,
+                version=version,
+                q=q,
+                root_only=root_only,
+                parent_item_id=parent_item_id,
+                include_deleted=include_deleted,
+                limit=page_size,
+                offset=offset,
+            )
+            yield from page
+            if len(page) < page_size:
+                break
+            offset += len(page)

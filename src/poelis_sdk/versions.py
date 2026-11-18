@@ -38,6 +38,8 @@ class VersionsClient:
     ) -> list[dict[str, Any]]:
         """List versioned items for a specific product version via GraphQL.
 
+        For the draft or any version as ``Item`` models, use ``items.list``.
+
         This method returns the snapshot of items as they were frozen in the
         specified product version. Draft items should be accessed through the
         non-versioned `ItemsClient`.
