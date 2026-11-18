@@ -44,7 +44,6 @@ class Transport:
         self._client = httpx.Client(base_url=base_url, timeout=timeout_seconds)
         self._api_key = api_key
 
-
     def _headers(self, extra: Optional[Mapping[str, str]] = None) -> Dict[str, str]:
         headers: Dict[str, str] = {
             "Accept": "application/json",
@@ -148,9 +147,7 @@ def _raise_mapped(response: httpx.Response) -> httpx.Response:
         raise NotFoundError(404, message=message, error_code=code)
     if response.status_code == 429:
         retry_after = _retry_after_seconds(response)
-        raise RateLimitError(
-            429, message=message, retry_after_seconds=retry_after, error_code=code
-        )
+        raise RateLimitError(429, message=message, retry_after_seconds=retry_after, error_code=code)
     if 400 <= response.status_code < 500:
         raise ClientError(response.status_code, message=message, error_code=code)
     if 500 <= response.status_code < 600:
@@ -163,7 +160,12 @@ def _error_code(response: httpx.Response) -> Optional[str]:
         data = response.json()
     except Exception:
         return None
-    code = data.get("error") if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        return None
+    detail = data.get("detail")
+    if isinstance(detail, dict):
+        data = detail
+    code = data.get("error")
     return code if isinstance(code, str) else None
 
 

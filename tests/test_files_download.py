@@ -16,7 +16,9 @@ _SIGNED_URL = "https://storage.example/bucket/object?X-Goog-Signature=abc"
 class _RoutingTransport(httpx.BaseTransport):
     """Answers each request with the first route whose predicate matches."""
 
-    def __init__(self, routes: list[tuple[Callable[[httpx.Request], bool], httpx.Response]]) -> None:
+    def __init__(
+        self, routes: list[tuple[Callable[[httpx.Request], bool], httpx.Response]]
+    ) -> None:
         self._routes = routes
         self.requests: list[httpx.Request] = []
 
@@ -81,7 +83,10 @@ def test_download_at_a_version_number_sends_product_and_version(tmp_path: Path) 
 
     client.files.download("file-1", tmp_path / "spec.pdf", product_id="prod-1", version=3)
 
-    assert json.loads(transport.requests[0].content) == {"product_id": "prod-1", "version_number": 3}
+    assert json.loads(transport.requests[0].content) == {
+        "product_id": "prod-1",
+        "version_number": 3,
+    }
 
 
 def test_download_at_baseline_resolves_the_version_number_first(tmp_path: Path) -> None:
@@ -121,8 +126,10 @@ def test_document_without_bytes_raises_a_clear_error(tmp_path: Path) -> None:
                 httpx.Response(
                     400,
                     json={
-                        "error": "no_blob",
-                        "message": "No storage object for this document (e.g. authored SFDT-only).",
+                        "detail": {
+                            "error": "no_blob",
+                            "message": "No storage object for this document (e.g. authored SFDT-only).",
+                        }
                     },
                 ),
             )
@@ -197,7 +204,14 @@ def test_versioned_download_without_bytes_says_the_file_may_not_be_in_that_versi
     tmp_path: Path,
 ) -> None:
     transport = _RoutingTransport(
-        [(_is_download_url, httpx.Response(400, json={"error": "no_blob", "message": "No storage object"}))]
+        [
+            (
+                _is_download_url,
+                httpx.Response(
+                    400, json={"detail": {"error": "no_blob", "message": "No storage object"}}
+                ),
+            )
+        ]
     )
     client = client_with_transport(transport)
 
