@@ -27,6 +27,13 @@ class ItemOrPropertyDeletedWarning(UserWarning):
     pass
 
 
+CHANGE_DETECTION_DEFAULT_MESSAGE = (
+    "Change detection is on by default, so the SDK writes a baseline file and a change log. "
+    "The default becomes False in version 2.0. Pass enable_change_detection=True to keep "
+    "this behaviour, or enable_change_detection=False to stop writing these files."
+)
+
+
 class PropertyChangeTracker:
     """Tracks property values and detects changes.
 
@@ -40,6 +47,7 @@ class PropertyChangeTracker:
         enabled: bool = False,
         baseline_file: Optional[str] = None,
         log_file: Optional[str] = None,
+        warn_on_first_write: bool = False,
     ) -> None:
         """Initialize the change tracker.
 
@@ -49,8 +57,11 @@ class PropertyChangeTracker:
                 If None, baselines are only stored in memory. Defaults to None.
             log_file: Optional path to log file for recording changes.
                 If None, changes are only logged via warnings. Defaults to None.
+            warn_on_first_write: Emit one ``FutureWarning`` before the first baseline
+                write, for clients that rely on the default of ``enable_change_detection``.
         """
         self._enabled = enabled
+        self._warn_on_first_write = warn_on_first_write
         # Key: property_id, Value: {value, name, first_accessed_at, updated_at, updated_by}
         self._baselines: Dict[str, Dict[str, Any]] = {}
         self._accessed_items: Dict[str, Dict[str, Any]] = {}
@@ -65,6 +76,10 @@ class PropertyChangeTracker:
         # Load baselines from file if it exists
         if self._baseline_file and os.path.exists(self._baseline_file):
             self._load_baselines()
+
+    def acknowledge_default(self) -> None:
+        """Drop the pending default warning once the caller chose a setting."""
+        self._warn_on_first_write = False
 
     def is_enabled(self) -> bool:
         """Check if change detection is enabled.
@@ -690,7 +705,10 @@ class PropertyChangeTracker:
         """
         if not self._baseline_file:
             return
-        
+        if self._warn_on_first_write:
+            self._warn_on_first_write = False
+            warnings.warn(CHANGE_DETECTION_DEFAULT_MESSAGE, FutureWarning, stacklevel=2)
+
         try:
             # Resolve baseline file path (relative paths are relative to current working directory)
             baseline_path = Path(self._baseline_file)

@@ -441,3 +441,54 @@ def test_client_with_persistent_storage(tmp_path: Any) -> None:
     import os
     assert os.path.exists(log_file)
 
+
+
+def test_default_change_detection_warns_once_on_first_write(tmp_path, monkeypatch) -> None:
+    """Relying on the default warns once, when the baseline file is first written."""
+    monkeypatch.chdir(tmp_path)
+    client = PoelisClient(api_key="test_key")
+    assert client.enable_change_detection is True
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        client._change_tracker.record_baseline("prop1", 100, "Price")
+        client._change_tracker.record_baseline("prop2", 200, "Mass")
+
+    assert [w.category for w in caught] == [FutureWarning]
+    assert "version 2.0" in str(caught[0].message)
+    assert (tmp_path / ".poelis" / "baseline.json").exists()
+
+
+def test_explicit_change_detection_choice_does_not_warn(tmp_path, monkeypatch) -> None:
+    """Passing the option, or setting it later, silences the default warning."""
+    monkeypatch.chdir(tmp_path)
+    explicit = PoelisClient(api_key="test_key", enable_change_detection=True)
+    set_later = PoelisClient(api_key="test_key")
+    set_later.enable_change_detection = True
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        explicit._change_tracker.record_baseline("prop1", 100, "Price")
+        set_later._change_tracker.record_baseline("prop1", 100, "Price")
+
+
+def test_from_env_forwards_constructor_options(monkeypatch) -> None:
+    """from_env accepts the same options as the constructor."""
+    monkeypatch.setenv("POELIS_API_KEY", "test_key")
+    client = PoelisClient.from_env(enable_change_detection=False, timeout_seconds=5.0)
+
+    assert client.enable_change_detection is False
+    assert client._config.timeout_seconds == 5.0
+
+
+def test_matlab_facade_keeps_change_detection_without_warning(tmp_path, monkeypatch) -> None:
+    """MATLAB users cannot pass the option, so the facade sets it explicitly."""
+    from poelis_sdk.matlab_facade import PoelisMatlab
+
+    monkeypatch.chdir(tmp_path)
+    matlab = PoelisMatlab(api_key="test_key")
+
+    assert matlab.client.enable_change_detection is True
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        matlab.client._change_tracker.record_baseline("prop1", 100, "Price")

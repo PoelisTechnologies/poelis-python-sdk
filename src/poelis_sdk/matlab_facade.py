@@ -207,6 +207,7 @@ class PoelisMatlab:
             api_key=api_key,
             base_url=base_url,
             timeout_seconds=timeout_seconds,
+            enable_change_detection=True,
         )
     
     def get_value(self, path: str) -> Any:
