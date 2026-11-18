@@ -60,7 +60,7 @@ def test_list_rejects_an_invalid_version_before_any_request(version: Any) -> Non
     transport = _Transport({"data": {"sdkProperties": []}})
     client = client_with_transport(transport)
 
-    with pytest.raises(ValueError, match="version must be"):
+    with pytest.raises(ValueError, match="version must"):
         client.properties.list("item-1", version=version)
     assert transport.requests == []
 

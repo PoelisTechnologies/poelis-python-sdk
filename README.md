@@ -160,7 +160,7 @@ for p in props:
     print(p["__typename"], p["name"], p.get("parsedValue"))
 ```
 
-`include_deleted=True` also returns soft-deleted properties of the draft. With `version="baseline"`, a product without a baseline returns an empty list.
+`include_deleted=True` also returns soft-deleted draft properties. It does not change a versioned read. A version can still include a property that was deleted when that version was published. With `version="baseline"`, a product without a baseline returns an empty list.
 
 ## Property Change Detection
 

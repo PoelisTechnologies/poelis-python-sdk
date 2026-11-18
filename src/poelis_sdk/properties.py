@@ -7,23 +7,13 @@ from typing import Any, Dict, List, Literal, Optional, Union
 from ._browser.node.properties import _property_selection
 from ._transport import Transport
 from .exceptions import NotFoundError, UnauthorizedError
+from .files import _version_variable
 
 """Properties resource client for updating property values."""
 
 _READABLE_ID_DEPRECATED = (
     "readable_id is deprecated and will be removed in a future version. Use key instead."
 )
-
-
-def _version_variable(version: Union[int, str, None]) -> Union[int, str, None]:
-    """Return ``version`` as the backend's ``VersionInput``: null, an int, or "baseline"."""
-    if version is None:
-        return None
-    if isinstance(version, int) and not isinstance(version, bool) and version >= 0:
-        return version
-    if isinstance(version, str) and version.strip().lower() == "baseline":
-        return "baseline"
-    raise ValueError(f"version must be None, a non-negative integer or 'baseline', got {version!r}")
 
 
 def _resolved_key(key: Optional[str], readable_id: Optional[str]) -> Optional[str]:
@@ -59,8 +49,9 @@ class PropertiesClient:
             item_id: Item whose properties to list. A draft or a versioned item ID both work.
             version: ``None`` for the draft, a product version number, or
                 ``"baseline"`` for the product's baseline version.
-            include_deleted: Also return soft-deleted properties. Applies to the draft
-                only; a version never contains deleted properties.
+            include_deleted: Also return soft-deleted properties. Only the draft
+                honors this flag. A version still returns a property that was
+                deleted when that version was published.
 
         Returns:
             One dict per property, with ``__typename`` naming its type (for example
