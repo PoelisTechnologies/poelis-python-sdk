@@ -5,8 +5,11 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
+import httpx
+
 from poelis_sdk._item_filter import item_draft_id as row_draft_id
 from poelis_sdk._item_filter import parent_item_filter_id
+from poelis_sdk.exceptions import HTTPError, PropertyLookupError
 
 from ..props import _PropWrapper
 from ..utils import _is_visible_version_property, _safe_key
@@ -18,6 +21,10 @@ from .item_queries import (
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..nodes import _Node
+
+
+class _PropertyKeyNotFound(RuntimeError):
+    """The key is not on the searched item. The tree search catches only this and moves on."""
 
 
 def _filter_visible_version_properties(
@@ -232,15 +239,18 @@ def get_property_from_item_tree(
         raise RuntimeError("Cannot determine product ID for item node")
 
     draft = getattr(node, "_draft_item_id", None)
-    return search_property_in_item_and_children(
-        node,
-        node._id,
-        readable_id,
-        pid,
-        version_number,
-        search_descendants=search_descendants,
-        item_draft_id=str(draft) if draft is not None else None,
-    )
+    try:
+        return search_property_in_item_and_children(
+            node,
+            node._id,
+            readable_id,
+            pid,
+            version_number,
+            search_descendants=search_descendants,
+            item_draft_id=str(draft) if draft is not None else None,
+        )
+    except _PropertyKeyNotFound as exc:
+        raise RuntimeError(str(exc)) from None
 
 
 def search_property_in_item_and_children(
@@ -258,16 +268,16 @@ def search_property_in_item_and_children(
 ) -> "_PropWrapper":
     """Recursively search for a property in an item and optionally its descendants."""
     if not item_id:
-        raise RuntimeError(f"Property with key '{readable_id}' not found")
+        raise _PropertyKeyNotFound(f"Property with key '{readable_id}' not found")
 
     if visited is None:
         visited = set()
     if item_id in visited:
-        raise RuntimeError(
+        raise _PropertyKeyNotFound(
             f"Property with key '{readable_id}' not found in item tree"
         )
     if depth > max_depth:
-        raise RuntimeError(
+        raise _PropertyKeyNotFound(
             f"Property with key '{readable_id}' not found in item tree"
         )
     visited.add(item_id)
@@ -308,7 +318,7 @@ def _fetch_property_from_item(
     for prop in props:
         if prop.get("readableId") == readable_id:
             return _PropWrapper(prop, client=node._client)
-    raise RuntimeError(f"Property with key '{readable_id}' not found")
+    raise _PropertyKeyNotFound(f"Property with key '{readable_id}' not found")
 
 
 def _fetch_property_from_item_and_children_impl(
@@ -325,7 +335,7 @@ def _fetch_property_from_item_and_children_impl(
     max_depth: int,
 ) -> "_PropWrapper":
     if not item_id:
-        raise RuntimeError(f"Property with key '{readable_id}' not found")
+        raise _PropertyKeyNotFound(f"Property with key '{readable_id}' not found")
 
     try:
         wrapper = _fetch_property_from_item(node, str(item_id), readable_id, product_id, version_number)
@@ -345,11 +355,22 @@ def _fetch_property_from_item_and_children_impl(
             except Exception:
                 pass
         return wrapper
-    except Exception:
+    except _PropertyKeyNotFound:
         pass
+    except (HTTPError, httpx.HTTPError):
+        # HTTP and network errors keep their own type (UnauthorizedError,
+        # ServerError, ...): the descendant search already raised these types
+        # from its next request, so callers may catch them by type.
+        raise
+    except Exception as exc:
+        # GraphQL errors used to surface as a "not found" RuntimeError, so the
+        # wrapper keeps RuntimeError as a base and chains the real cause.
+        raise PropertyLookupError(
+            f"Could not read the properties of item '{item_id}' while looking up '{readable_id}': {exc}"
+        ) from exc
 
     if not search_descendants:
-        raise RuntimeError(f"Property with key '{readable_id}' not found in item tree")
+        raise _PropertyKeyNotFound(f"Property with key '{readable_id}' not found in item tree")
 
     filter_id = parent_item_filter_id(node_id=str(item_id), draft_item_id=item_draft_id)
     if version_number is not None:
@@ -387,7 +408,7 @@ def _fetch_property_from_item_and_children_impl(
                     depth=depth + 1,
                     max_depth=max_depth,
                 )
-            except RuntimeError:
+            except _PropertyKeyNotFound:
                 continue
 
-    raise RuntimeError(f"Property with key '{readable_id}' not found in item tree")
+    raise _PropertyKeyNotFound(f"Property with key '{readable_id}' not found in item tree")
