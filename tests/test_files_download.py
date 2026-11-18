@@ -217,3 +217,26 @@ def test_versioned_download_without_bytes_says_the_file_may_not_be_in_that_versi
 
     with pytest.raises(FileNotDownloadableError, match="not in that version"):
         client.files.download("file-1", tmp_path / "x", product_id="prod-1", version=2)
+
+
+def test_download_to_a_long_name(tmp_path: Path) -> None:
+    transport = _signed_url_then_bytes()
+    client = client_with_transport(transport)
+    dest = tmp_path / f"{'a' * 240}.pdf"
+
+    written = client.files.download("file-1", dest)
+
+    assert written.read_bytes() == b"pdf-bytes"
+
+
+def test_download_keeps_existing_file_permissions(tmp_path: Path) -> None:
+    transport = _signed_url_then_bytes(b"new")
+    client = client_with_transport(transport)
+    dest = tmp_path / "spec.pdf"
+    dest.write_bytes(b"old")
+    dest.chmod(0o640)
+
+    client.files.download("file-1", dest)
+
+    assert dest.read_bytes() == b"new"
+    assert dest.stat().st_mode & 0o777 == 0o640

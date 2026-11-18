@@ -154,9 +154,9 @@ class FilesClient:
         if version_number is not None:
             body = {"product_id": product_id, "version_number": version_number}
         try:
-            url = self._t.post_json(
-                f"/v1/storage/objects/{file_id}/download-url", body
-            ).json()["url"]
+            url = self._t.post_json(f"/v1/storage/objects/{file_id}/download-url", body).json()[
+                "url"
+            ]
         except ClientError as exc:
             if exc.error_code == "no_blob":
                 message = (
@@ -176,25 +176,25 @@ class FilesClient:
                 ) from exc
             raise
 
-        handle, part_name = tempfile.mkstemp(
-            dir=target.parent, prefix=f".{target.name}.", suffix=".part"
-        )
+        previous_mode = target.stat().st_mode if target.is_file() else None
+        handle, part_name = tempfile.mkstemp(dir=target.parent, prefix=".poelis.", suffix=".part")
         part = Path(part_name)
         try:
-            with os.fdopen(handle, "wb") as out, self._t.get_stream(
-                url, _transfer_timeout()
-            ) as response:
+            with (
+                os.fdopen(handle, "wb") as out,
+                self._t.get_stream(url, _transfer_timeout()) as response,
+            ):
                 for chunk in response.iter_bytes():
                     out.write(chunk)
             os.replace(part, target)
+            if previous_mode is not None:
+                os.chmod(target, previous_mode)
         except BaseException:
             part.unlink(missing_ok=True)
             raise
         return target
 
-    def _version_number(
-        self, product_id: str | None, version: int | str | None
-    ) -> int | None:
+    def _version_number(self, product_id: str | None, version: int | str | None) -> int | None:
         value = _version_variable(version)
         if value is None:
             return None
