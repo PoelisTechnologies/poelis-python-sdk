@@ -4,7 +4,9 @@ on:
   pull_request_review:
     types:
       - submitted
-      - edited
+  pull_request:
+    types:
+      - closed
 
 permissions:
   issues: write
@@ -12,7 +14,7 @@ permissions:
 
 jobs:
   add-label:
-    if: github.event.review.state == 'changes_requested'
+    if: github.event_name == 'pull_request_review' && github.event.review.state == 'changes_requested'
     runs-on: ubuntu-latest
     steps:
       - name: Add changes-requested label
@@ -20,3 +22,41 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: gh pr edit "${{ github.event.pull_request.number }}" --add-label "changes-requested"
+
+  remove-label:
+    if: >-
+      (github.event_name == 'pull_request_review' && github.event.review.state == 'approved')
+      || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove changes-requested label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          has_label="$(gh pr view "$PR_NUMBER" --json labels --jq 'any(.labels[]; .name == "changes-requested")')"
+          if [ "$has_label" != "true" ]; then
+            exit 0
+          fi
+
+          if [ "$EVENT_NAME" = "pull_request_review" ]; then
+            still_requested="$(
+              gh api --paginate --slurp "repos/${GH_REPO}/pulls/${PR_NUMBER}/reviews" | jq '
+                add
+                | [
+                    group_by(.user.login)[]
+                    | map(select(.state == "APPROVED" or .state == "CHANGES_REQUESTED" or .state == "DISMISSED"))
+                    | max_by(.submitted_at)
+                    | select(.state == "CHANGES_REQUESTED")
+                  ]
+                | length
+              '
+            )"
+            if [ "$still_requested" != "0" ]; then
+              exit 0
+            fi
+          fi
+
+          gh pr edit "$PR_NUMBER" --remove-label "changes-requested"
