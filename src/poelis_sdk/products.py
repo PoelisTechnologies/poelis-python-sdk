@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Generator, Optional
 
+from ._graphql import raise_for_graphql_errors
 from ._transport import Transport
 from .models import PaginatedProducts, PaginatedProductVersions, Product, ProductVersion
 
@@ -55,8 +56,7 @@ class ProductsClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_graphql_errors(payload)
 
         products = payload.get("data", {}).get("products", [])
 
@@ -74,7 +74,7 @@ class ProductsClient:
             PaginatedProductVersions: Container with version data and pagination info.
 
         Raises:
-            RuntimeError: If the GraphQL response contains errors.
+            GraphQLError: If the GraphQL response contains errors (a RuntimeError subclass).
         """
 
         query = (
@@ -92,8 +92,7 @@ class ProductsClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_graphql_errors(payload)
 
         versions = payload.get("data", {}).get("productVersions", [])
 
@@ -113,7 +112,7 @@ class ProductsClient:
             Product: The updated product with the new baseline version number.
 
         Raises:
-            RuntimeError: If the GraphQL response contains errors.
+            GraphQLError: If the GraphQL response contains errors (a RuntimeError subclass).
         """
 
         query = (
@@ -133,8 +132,7 @@ class ProductsClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_graphql_errors(payload)
 
         product_data = payload.get("data", {}).get("setProductBaselineVersion")
         if product_data is None:

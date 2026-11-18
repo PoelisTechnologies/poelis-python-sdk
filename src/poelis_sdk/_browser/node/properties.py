@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from poelis_sdk._item_filter import item_draft_id as row_draft_id
 from poelis_sdk._item_filter import parent_item_filter_id
 
+from ...exceptions import GraphQLError
 from ..props import _PropWrapper
 from ..utils import _is_visible_version_property, _safe_key
 from .item_queries import (
@@ -115,7 +116,7 @@ def _query_item_properties(
                 version_number=version_number,
                 use_sdk=False,
             )
-        raise RuntimeError(data["errors"])
+        raise GraphQLError(data["errors"])
 
     props = data.get("data", {}).get(query_name, []) or []
     if not props:

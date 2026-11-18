@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from ._graphql import raise_for_graphql_errors
 from ._transport import Transport
 from .models import UserAccessibleResources
 
@@ -30,8 +31,7 @@ class WorkspacesClient:
         resp = self._t.graphql(query=query, variables={"limit": int(limit), "offset": int(offset)})
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_graphql_errors(payload)
         
         workspaces = payload.get("data", {}).get("workspaces", [])
         return workspaces
@@ -47,8 +47,7 @@ class WorkspacesClient:
         resp = self._t.graphql(query=query, variables={"id": workspace_id})
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_graphql_errors(payload)
         
         workspace = payload.get("data", {}).get("workspace")
         return workspace
@@ -68,7 +67,7 @@ class WorkspacesClient:
                 can access, including role information.
                 
         Raises:
-            RuntimeError: If the GraphQL response contains errors.
+            GraphQLError: If the GraphQL response contains errors (a RuntimeError subclass).
             UnauthorizedError: If the current user is not in the same organization.
         """
         
@@ -91,8 +90,7 @@ class WorkspacesClient:
         resp = self._t.graphql(query=query, variables={"userId": user_id})
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_graphql_errors(payload)
         
         raw = payload.get("data", {}).get("userAccessibleResources")
         if raw is None:

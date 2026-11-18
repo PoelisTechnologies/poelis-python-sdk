@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Generator
 
+from ._graphql import raise_for_graphql_errors
 from ._item_filter import build_item_filter
 from ._transport import Transport
 
@@ -55,7 +56,7 @@ class VersionsClient:
             List of item dictionaries belonging to the given product version.
 
         Raises:
-            RuntimeError: If the GraphQL response contains errors.
+            GraphQLError: If the GraphQL response contains errors (a RuntimeError subclass).
         """
 
         query = (
@@ -82,8 +83,7 @@ class VersionsClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_graphql_errors(payload)
 
         items = payload.get("data", {}).get("sdkItems", [])
 
