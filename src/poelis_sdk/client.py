@@ -73,7 +73,7 @@ class PoelisClient:
                 `.poelis/baseline.json` for baseline_file and `poelis_changes.log` for
                 log_file if not explicitly provided. Defaults to True; when it is not
                 passed, the first file write emits a ``FutureWarning`` because the
-                default becomes False in version 2.0.
+                default will become False in a future version.
             baseline_file: Optional path to JSON file for persistent baseline storage.
                 If provided, property baselines will be saved and loaded between script runs.
                 If enable_change_detection is True and this is None, defaults to

@@ -455,7 +455,6 @@ def test_default_change_detection_warns_once_on_first_write(tmp_path, monkeypatc
         client._change_tracker.record_baseline("prop2", 200, "Mass")
 
     assert [w.category for w in caught] == [FutureWarning]
-    assert "version 2.0" in str(caught[0].message)
     assert (tmp_path / ".poelis" / "baseline.json").exists()
 
 

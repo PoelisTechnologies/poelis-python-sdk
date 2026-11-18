@@ -112,7 +112,7 @@ Change detection is on by default. It writes two files in the working directory:
 - `.poelis/baseline.json`: the values seen on the first access, written as soon as a property is read
 - `poelis_changes.log`: the changes found, appended when a value differs from its baseline
 
-If you rely on the default, the SDK emits one `FutureWarning` when it first writes the baseline file, because the default becomes `False` in version 2.0. Choose a setting explicitly to keep the current behaviour or to stop writing files:
+If you rely on the default, the SDK emits one `FutureWarning` when it first writes the baseline file, because the default will become `False` in a future version. Choose a setting explicitly to keep the current behaviour or to stop writing files:
 
 ```python
 client = PoelisClient(api_key="...", enable_change_detection=False)

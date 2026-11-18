@@ -29,7 +29,7 @@ class ItemOrPropertyDeletedWarning(UserWarning):
 
 CHANGE_DETECTION_DEFAULT_MESSAGE = (
     "Change detection is on by default, so the SDK writes a baseline file and a change log. "
-    "The default becomes False in version 2.0. Pass enable_change_detection=True to keep "
+    "The default will become False in a future version. Pass enable_change_detection=True to keep "
     "this behaviour, or enable_change_detection=False to stop writing these files."
 )
 
