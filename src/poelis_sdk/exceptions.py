@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 """SDK exception hierarchy for Poelis."""
 
@@ -46,19 +46,3 @@ class UploadError(PoelisError):
     """Raised when a local file cannot be uploaded."""
 
 
-class GraphQLError(PoelisError, RuntimeError):
-    """Raised when the API answers a GraphQL request with errors.
-
-    Subclasses ``RuntimeError``, which these errors used to be, so existing
-    ``except RuntimeError`` handlers keep working.
-
-    Attributes:
-        errors: The ``errors`` list from the GraphQL response.
-        code: ``extensions.code`` of the first error, when the API sets one.
-    """
-
-    def __init__(self, errors: Any, message: Optional[str] = None) -> None:
-        super().__init__(message if message is not None else str(errors))
-        self.errors = errors
-        first = errors[0] if isinstance(errors, list) and errors else {}
-        self.code: Optional[str] = (first.get("extensions") or {}).get("code") if isinstance(first, dict) else None

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from ._graphql import raise_for_graphql_errors
 from ._transport import Transport
 
 """Search resource client using GraphQL endpoints only."""
@@ -26,7 +25,8 @@ class SearchClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        raise_for_graphql_errors(payload)
+        if "errors" in payload:
+            raise RuntimeError(str(payload["errors"]))
         hits = payload.get("data", {}).get("products", [])
         return {"query": q, "hits": hits, "total": None, "limit": limit, "offset": offset}
 
@@ -47,7 +47,8 @@ class SearchClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        raise_for_graphql_errors(payload)
+        if "errors" in payload:
+            raise RuntimeError(str(payload["errors"]))
         hits = payload.get("data", {}).get("items", [])
         return {"query": q, "hits": hits, "total": None, "limit": limit, "offset": offset}
 
@@ -76,7 +77,8 @@ class SearchClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        raise_for_graphql_errors(payload)
+        if "errors" in payload:
+            raise RuntimeError(str(payload["errors"]))
         data = payload.get("data", {}).get("searchProperties", {})
         # Normalize to match previous REST shape
         return {

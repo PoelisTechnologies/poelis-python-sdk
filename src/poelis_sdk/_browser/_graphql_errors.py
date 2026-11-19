@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..exceptions import GraphQLError, NotFoundError, UnauthorizedError
+from ..exceptions import NotFoundError, UnauthorizedError
 
 
 def handle_graphql_read_errors(errors: list[dict[str, Any]]) -> None:
@@ -24,7 +24,7 @@ def handle_graphql_read_errors(errors: list[dict[str, Any]]) -> None:
     Raises:
         NotFoundError: For `"not_found"` errors.
         UnauthorizedError: For `"forbidden"` errors (access denied).
-        GraphQLError: For other errors (a RuntimeError subclass).
+        RuntimeError: For other errors.
     """
 
     if not errors:
@@ -45,7 +45,7 @@ def handle_graphql_read_errors(errors: list[dict[str, Any]]) -> None:
         )
         raise UnauthorizedError(403, message=enhanced_message)
 
-    raise GraphQLError(errors, message=f"GraphQL error: {error_message}")
+    raise RuntimeError(f"GraphQL error: {error_message}")
 
 
 # Backwards-compatible alias for the existing internal helper name used in

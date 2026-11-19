@@ -5,7 +5,7 @@ import warnings
 from typing import Any, Dict, Optional
 
 from ._transport import Transport
-from .exceptions import GraphQLError, NotFoundError, UnauthorizedError
+from .exceptions import NotFoundError, UnauthorizedError
 
 """Properties resource client for updating property values."""
 
@@ -71,7 +71,7 @@ class PropertiesClient:
         Raises:
             NotFoundError: If property doesn't exist.
             UnauthorizedError: If permission denied.
-            GraphQLError: For other GraphQL errors (a RuntimeError subclass).
+            RuntimeError: For other GraphQL errors.
         """
         # Build mutation - include changedVia only if provided
         if changed_via is not None:
@@ -214,7 +214,7 @@ class PropertiesClient:
         Raises:
             NotFoundError: If property doesn't exist.
             UnauthorizedError: If permission denied.
-            GraphQLError: For other GraphQL errors (a RuntimeError subclass).
+            RuntimeError: For other GraphQL errors.
         """
         # Build mutation - include changedVia only if provided
         if changed_via is not None:
@@ -479,7 +479,7 @@ class PropertiesClient:
             NotFoundError: If property doesn't exist.
             UnauthorizedError: If permission denied.
             ValueError: If date format is invalid.
-            GraphQLError: For other GraphQL errors (a RuntimeError subclass).
+            RuntimeError: For other GraphQL errors.
         """
         # Build mutation - include changedVia only if provided
         if changed_via is not None:
@@ -605,7 +605,7 @@ class PropertiesClient:
             NotFoundError: If property doesn't exist.
             UnauthorizedError: If permission denied.
             ValueError: If status value is invalid.
-            GraphQLError: For other GraphQL errors (a RuntimeError subclass).
+            RuntimeError: For other GraphQL errors.
         """
         # Build mutation - include changedVia only if provided
         if changed_via is not None:
@@ -709,7 +709,7 @@ class PropertiesClient:
             NotFoundError: For 'not_found' errors.
             UnauthorizedError: For 'forbidden' errors.
             ValueError: For 'invalid_date_format' or 'invalid_status_value' errors.
-            GraphQLError: For other errors (a RuntimeError subclass).
+            RuntimeError: For other errors.
         """
         if not errors:
             return
@@ -733,7 +733,7 @@ class PropertiesClient:
         elif error_code == "invalid_status_value":
             raise ValueError(f"Status must be one of: DRAFT, UNDER_REVIEW, DONE. {error_message}")
         else:
-            raise GraphQLError(errors, message=f"GraphQL error: {error_message}")
+            raise RuntimeError(f"GraphQL error: {error_message}")
 
     @staticmethod
     def _convert_numeric_value(value: Any) -> str:

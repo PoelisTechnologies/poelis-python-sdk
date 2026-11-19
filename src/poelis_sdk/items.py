@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Generator
 
-from ._graphql import raise_for_graphql_errors
 from ._item_filter import build_item_filter
 from ._transport import Transport
 
@@ -57,7 +56,7 @@ class ItemsClient:
             configured organization.
 
         Raises:
-            GraphQLError: If the GraphQL response contains errors (a RuntimeError subclass).
+            RuntimeError: If the GraphQL response contains errors.
         """
 
         query = (
@@ -79,7 +78,8 @@ class ItemsClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        raise_for_graphql_errors(payload)
+        if "errors" in payload:
+            raise RuntimeError(str(payload["errors"]))
         
         items = payload.get("data", {}).get("items", [])
         
@@ -99,7 +99,7 @@ class ItemsClient:
             Dictionary representing the draft item.
 
         Raises:
-            GraphQLError: If the GraphQL response contains errors (a RuntimeError subclass) or the item
+            RuntimeError: If the GraphQL response contains errors or the item
                 cannot be found.
         """
 
@@ -111,7 +111,8 @@ class ItemsClient:
         resp = self._t.graphql(query=query, variables={"id": item_id})
         resp.raise_for_status()
         payload = resp.json()
-        raise_for_graphql_errors(payload)
+        if "errors" in payload:
+            raise RuntimeError(str(payload["errors"]))
         
         item = payload.get("data", {}).get("item")
         if item is None:
