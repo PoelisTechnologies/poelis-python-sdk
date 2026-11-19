@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from ..exceptions import NotFoundError, UnauthorizedError
+from ..exceptions import PoelisError
 from .utils import _safe_key
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -304,7 +304,7 @@ class _PropWrapper:
     ) -> None:
         """Update the property value via the backend.
 
-        Updates the property value by calling the appropriate GraphQL mutation.
+        Updates the property value through the API.
         Only draft properties can be updated. Requires EDITOR role for the workspace or product.
 
         Args:
@@ -322,7 +322,8 @@ class _PropWrapper:
             ValueError: If property is versioned, or if value format is invalid.
             NotFoundError: If property doesn't exist.
             UnauthorizedError: If permission denied (requires EDITOR role; VIEWER role is read-only).
-            RuntimeError: For other GraphQL errors.
+            InvalidInputError: If the API rejects the value.
+            ClientError: For other rejected requests.
 
         Note:
             Write permissions are enforced by the backend. Users with VIEWER role will receive
@@ -425,7 +426,7 @@ class _PropWrapper:
                     # Silently ignore tracking errors
                     pass
 
-        except (NotFoundError, UnauthorizedError, ValueError, RuntimeError):
+        except (PoelisError, ValueError, RuntimeError):
             # Re-raise these exceptions as-is
             raise
         except Exception as e:

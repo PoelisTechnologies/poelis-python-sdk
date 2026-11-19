@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Generator, Optional
 
 from ._transport import Transport
 from .models import PaginatedProducts, PaginatedProductVersions, Product, ProductVersion
+from ._api_errors import raise_for_errors
 
 if TYPE_CHECKING:
     from .workspaces import WorkspacesClient
@@ -21,7 +22,7 @@ class ProductsClient:
         self._workspaces_client = workspaces_client
 
     def list_by_workspace(self, *, workspace_id: str, q: Optional[str] = None, limit: int = 100, offset: int = 0) -> PaginatedProducts:
-        """List products using GraphQL for a given workspace.
+        """List products for a given workspace.
         
         Products are automatically filtered by the user's access permissions.
         Products with NO_ACCESS are excluded from results. Access is determined by:
@@ -55,8 +56,7 @@ class ProductsClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
 
         products = payload.get("data", {}).get("products", [])
 
@@ -74,7 +74,8 @@ class ProductsClient:
             PaginatedProductVersions: Container with version data and pagination info.
 
         Raises:
-            RuntimeError: If the GraphQL response contains errors.
+            PoelisError: If the API rejects the request (for example NotFoundError or
+                UnauthorizedError).
         """
 
         query = (
@@ -92,8 +93,7 @@ class ProductsClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
 
         versions = payload.get("data", {}).get("productVersions", [])
 
@@ -102,7 +102,7 @@ class ProductsClient:
     def set_product_baseline_version(self, *, product_id: str, version_number: int) -> Product:
         """Set the baseline version for a product.
 
-        This wraps the ``setProductBaselineVersion`` GraphQL mutation and returns
+        Sets the baseline version and returns
         the updated :class:`Product` including its ``baseline_version_number``.
 
         Args:
@@ -113,7 +113,8 @@ class ProductsClient:
             Product: The updated product with the new baseline version number.
 
         Raises:
-            RuntimeError: If the GraphQL response contains errors.
+            PoelisError: If the API rejects the request (for example NotFoundError or
+                UnauthorizedError).
         """
 
         query = (
@@ -133,17 +134,16 @@ class ProductsClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
 
         product_data = payload.get("data", {}).get("setProductBaselineVersion")
         if product_data is None:
-            raise RuntimeError("Malformed GraphQL response: missing 'setProductBaselineVersion' field")
+            raise RuntimeError("Unexpected response from the Poelis API: missing 'setProductBaselineVersion'")
 
         return Product(**product_data)
 
     def iter_all_by_workspace(self, *, workspace_id: str, q: Optional[str] = None, page_size: int = 100, start_offset: int = 0) -> Generator[Product, None, None]:
-        """Iterate products via GraphQL with offset pagination for a workspace."""
+        """Iterate products with offset pagination for a workspace."""
 
         offset = start_offset
         while True:

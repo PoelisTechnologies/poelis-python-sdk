@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from .client import PoelisClient
-from .exceptions import NotFoundError, PropertyLookupError, UnauthorizedError
+from .exceptions import HTTPError, PropertyLookupError
 from ._browser.node.properties import get_property_from_item_tree
 
 
@@ -86,7 +86,7 @@ def _resolve_property_on_item(node: Any, property_name: str) -> Any:
         return get_property_from_item_tree(
             node, property_name, search_descendants=False
         )
-    except PropertyLookupError:
+    except (HTTPError, PropertyLookupError):
         raise
     except RuntimeError as e:
         raise RuntimeError(
@@ -262,8 +262,8 @@ class PoelisMatlab:
                     value = prop.value
                     # Ensure the value is MATLAB-compatible
                     return _ensure_matlab_compatible(value)
-                except (NotFoundError, UnauthorizedError, PropertyLookupError):
-                    # Re-raise permission/access and lookup errors as-is
+                except (HTTPError, PropertyLookupError):
+                    # Re-raise API and lookup errors as-is
                     raise
                 except (RuntimeError, AttributeError) as e:
                     # Re-raise with more context
@@ -368,8 +368,8 @@ class PoelisMatlab:
                         "name": _ensure_matlab_compatible(prop.name) if hasattr(prop, "name") else None,
                     }
                     return info
-                except (NotFoundError, UnauthorizedError, PropertyLookupError):
-                    # Re-raise permission/access and lookup errors as-is
+                except (HTTPError, PropertyLookupError):
+                    # Re-raise API and lookup errors as-is
                     raise
                 except (RuntimeError, AttributeError) as e:
                     raise RuntimeError(
@@ -659,8 +659,8 @@ class PoelisMatlab:
                     prop = _resolve_property_for_write(obj, name, path)
                     # Call change_property on the property wrapper with changed_via='MATLAB_SDK'
                     prop.change_property(value, title=title, description=description, changed_via="MATLAB_SDK")
-                except (NotFoundError, UnauthorizedError, PropertyLookupError):
-                    # Re-raise permission/access and lookup errors as-is
+                except (HTTPError, PropertyLookupError):
+                    # Re-raise API and lookup errors as-is
                     raise
                 except RuntimeError as e:
                     # Re-raise with more context

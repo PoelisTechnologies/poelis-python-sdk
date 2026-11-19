@@ -148,10 +148,10 @@ class ProductVersion(BaseModel):
         version_number: Monotonic version number for the product.
         title: Human-friendly title for this version.
         description: Optional free-text description of the version.
-        created_by: Optional identifier of the user who created the version (not currently queried from GraphQL).
+        created_by: Optional identifier of the user who created the version (not returned by the API yet).
         created_at: Timestamp when the version was created.
-        updated_at: Optional timestamp of the last update to the version (not in GraphQL schema yet).
-        org_id: Optional identifier of the owning organization (not in GraphQL schema yet).
+        updated_at: Optional timestamp of the last update to the version (not returned by the API yet).
+        org_id: Optional identifier of the owning organization (not returned by the API yet).
     """
 
     model_config = ConfigDict(populate_by_name=True)
@@ -276,7 +276,7 @@ StatusPropertyWireValue = Literal["Draft", "Under Review", "Done"]
 class StatusProperty(BaseModel):
     """Status workflow property.
 
-    GraphQL responses use display values: Draft, Under Review, Done.
+    The API returns display values: Draft, Under Review, Done.
     Mutations accept enum names: DRAFT, UNDER_REVIEW, DONE
     (see PropertiesClient.update_status_property / _validate_status_value).
     """

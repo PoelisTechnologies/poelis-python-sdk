@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import httpx
 
+from poelis_sdk._api_errors import raise_for_errors
 from poelis_sdk._item_filter import item_draft_id as row_draft_id
 from poelis_sdk._item_filter import parent_item_filter_id
 from poelis_sdk.exceptions import HTTPError, PropertyLookupError
@@ -122,7 +123,7 @@ def _query_item_properties(
                 version_number=version_number,
                 use_sdk=False,
             )
-        raise RuntimeError(data["errors"])
+        raise_for_errors(data)
 
     props = data.get("data", {}).get(query_name, []) or []
     if not props:
@@ -366,12 +367,11 @@ def _fetch_property_from_item_and_children_impl(
     except _PropertyKeyNotFound:
         pass
     except (HTTPError, httpx.HTTPError):
-        # HTTP and network errors keep their own type (UnauthorizedError,
-        # ServerError, ...): the descendant search already raised these types
-        # from its next request, so callers may catch them by type.
+        # API and network errors keep their own type (NotFoundError,
+        # UnauthorizedError, ServerError, ...) so callers may catch them by type.
         raise
     except Exception as exc:
-        # GraphQL errors used to surface as a "not found" RuntimeError, so the
+        # Other failures used to surface as a "not found" RuntimeError, so the
         # wrapper keeps RuntimeError as a base and chains the real cause.
         raise PropertyLookupError(
             f"Could not read the properties of item '{item_id}' while looking up '{readable_id}': {exc}"

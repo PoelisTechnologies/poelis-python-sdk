@@ -290,6 +290,6 @@ def test_get_user_accessible_resources_malformed_response(monkeypatch: "MonkeyPa
     monkeypatch.setattr(client.workspaces._t, "graphql", mock_graphql)
     
     # Should raise RuntimeError
-    with pytest.raises(RuntimeError, match="Malformed GraphQL response"):
+    with pytest.raises(RuntimeError, match="Unexpected response from the Poelis API"):
         client.workspaces.get_user_accessible_resources(user_id="user-123")
 
