@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from .client import PoelisClient
-from .exceptions import NotFoundError, UnauthorizedError
+from .exceptions import NotFoundError, PropertyLookupError, UnauthorizedError
 from ._browser.node.properties import get_property_from_item_tree
 
 
@@ -86,6 +86,8 @@ def _resolve_property_on_item(node: Any, property_name: str) -> Any:
         return get_property_from_item_tree(
             node, property_name, search_descendants=False
         )
+    except PropertyLookupError:
+        raise
     except RuntimeError as e:
         raise RuntimeError(
             f"Property '{property_name}' not found on item '{item_name}'."
@@ -207,6 +209,7 @@ class PoelisMatlab:
             api_key=api_key,
             base_url=base_url,
             timeout_seconds=timeout_seconds,
+            enable_change_detection=True,
         )
     
     def get_value(self, path: str) -> Any:
@@ -259,8 +262,8 @@ class PoelisMatlab:
                     value = prop.value
                     # Ensure the value is MATLAB-compatible
                     return _ensure_matlab_compatible(value)
-                except (NotFoundError, UnauthorizedError):
-                    # Re-raise permission/access errors as-is
+                except (NotFoundError, UnauthorizedError, PropertyLookupError):
+                    # Re-raise permission/access and lookup errors as-is
                     raise
                 except (RuntimeError, AttributeError) as e:
                     # Re-raise with more context
@@ -365,8 +368,8 @@ class PoelisMatlab:
                         "name": _ensure_matlab_compatible(prop.name) if hasattr(prop, "name") else None,
                     }
                     return info
-                except (NotFoundError, UnauthorizedError):
-                    # Re-raise permission/access errors as-is
+                except (NotFoundError, UnauthorizedError, PropertyLookupError):
+                    # Re-raise permission/access and lookup errors as-is
                     raise
                 except (RuntimeError, AttributeError) as e:
                     raise RuntimeError(
@@ -656,8 +659,8 @@ class PoelisMatlab:
                     prop = _resolve_property_for_write(obj, name, path)
                     # Call change_property on the property wrapper with changed_via='MATLAB_SDK'
                     prop.change_property(value, title=title, description=description, changed_via="MATLAB_SDK")
-                except (NotFoundError, UnauthorizedError):
-                    # Re-raise permission/access errors as-is
+                except (NotFoundError, UnauthorizedError, PropertyLookupError):
+                    # Re-raise permission/access and lookup errors as-is
                     raise
                 except RuntimeError as e:
                     # Re-raise with more context

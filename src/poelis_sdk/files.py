@@ -1,23 +1,217 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import mimetypes
+import os
+import tempfile
 from pathlib import Path
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import httpx
 
 from ._transport import Transport
-from .exceptions import UploadError
-from .models import UploadedFile
+from .exceptions import ClientError, FileNotDownloadableError, NotFoundError, UploadError
+from .models import File, UploadedFile
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
 
 _UPLOAD_STALL_TIMEOUT_SECONDS = 60.0
 
+_PRODUCT_BASELINE_QUERY = """
+query SdkProductBaselineVersion($id: ID!) {
+  product(id: $id) { id baselineVersionNumber }
+}
+"""
+
+_LIST_FILES_QUERY = """
+query SdkListFiles(
+  $itemId: ID
+  $propertyId: ID
+  $version: VersionInput
+  $includePropertyFiles: Boolean
+) {
+  files(
+    itemId: $itemId
+    propertyId: $propertyId
+    version: $version
+    includePropertyFiles: $includePropertyFiles
+  ) {
+    files {
+      id
+      originalFileName
+      userTitle
+      revision
+      code
+      contentType
+      description
+      sizeBytes
+      uploadedAt
+      uploadedBy { id userName imageUrl }
+      deleted
+      itemId
+      propertyId
+    }
+  }
+}
+"""
+
 
 class FilesClient:
     def __init__(self, transport: Transport) -> None:
         self._t = transport
+
+    def list(
+        self,
+        *,
+        item_id: str | None = None,
+        property_id: str | None = None,
+        version: int | Literal["baseline"] | None = None,
+        include_property_files: bool = False,
+    ) -> list[File]:
+        """List the files linked to an item or to a property.
+
+        Pass exactly one of ``item_id`` or ``property_id``. The full list is
+        returned in one call; there is no paging for these two scopes.
+
+        Args:
+            item_id: Item whose files to list.
+            property_id: Property whose files to list.
+            version: ``None`` for the draft, a product version number, or
+                ``"baseline"`` for the product's baseline version. An item or
+                property id from any version works; the files returned are the
+                ones linked at the requested version.
+            include_property_files: With ``item_id``, also return the files
+                linked to the item's properties.
+
+        Returns:
+            The files, newest upload first. A version with no baseline set, or
+            an id that does not exist, returns an empty list.
+        """
+
+        if (item_id is None) == (property_id is None):
+            raise ValueError("Pass exactly one of item_id or property_id")
+        if include_property_files and item_id is None:
+            raise ValueError("include_property_files only applies with item_id")
+        variables: dict[str, object] = {
+            "itemId": item_id,
+            "propertyId": property_id,
+            "version": _version_variable(version),
+        }
+        if item_id is not None:
+            variables["includePropertyFiles"] = include_property_files
+        payload = self._t.graphql(_LIST_FILES_QUERY, variables).json()
+        if "errors" in payload:
+            raise RuntimeError(str(payload["errors"]))
+        files = ((payload.get("data") or {}).get("files") or {}).get("files") or []
+        parsed = [File.model_validate(row) for row in files]
+        if include_property_files:
+            epoch = datetime.min.replace(tzinfo=timezone.utc)
+            parsed.sort(key=lambda file: file.uploaded_at or epoch, reverse=True)
+        return parsed
+
+    def download(
+        self,
+        file_id: str,
+        dest: str | Path,
+        *,
+        product_id: str | None = None,
+        version: int | Literal["baseline"] | None = None,
+    ) -> Path:
+        """Download a file's bytes to ``dest``.
+
+        The API returns a short-lived signed URL and the bytes are streamed
+        from storage without the API key. They are written to a temporary file
+        next to ``dest`` and moved into place only when complete, so ``dest``
+        never holds a partial file.
+
+        Args:
+            file_id: File to download, for example ``File.id`` from ``list``.
+            dest: Path of the file to write. An existing file is replaced.
+                The parent directory must exist.
+            product_id: Product whose version to read. Required with
+                ``version``.
+            version: ``None`` for the current file, a product version number,
+                or ``"baseline"`` for the product's baseline version.
+
+        Returns:
+            The path that was written.
+
+        Raises:
+            FileNotDownloadableError: The file has no stored bytes: a
+                document written inside Poelis, or, with ``version``, a file
+                that was not in that version.
+            NotFoundError: The file, or the requested version of it, does
+                not exist or is not visible to this API key.
+        """
+
+        target = Path(dest)
+        if target.is_dir():
+            raise ValueError(f"dest is a directory, pass a file path: {target}")
+        if not target.parent.is_dir():
+            raise ValueError(f"Directory does not exist: {target.parent}")
+        version_number = self._version_number(product_id, version)
+        body: dict[str, object] = {}
+        if version_number is not None:
+            body = {"product_id": product_id, "version_number": version_number}
+        try:
+            url = self._t.post_json(f"/v1/storage/objects/{file_id}/download-url", body).json()[
+                "url"
+            ]
+        except ClientError as exc:
+            if exc.error_code == "no_blob":
+                message = (
+                    f"File {file_id} has no stored bytes to download. Documents "
+                    "written inside Poelis cannot be downloaded through the SDK yet."
+                )
+                if version_number is not None:
+                    message = (
+                        f"File {file_id} has no stored bytes at version {version_number}. "
+                        "Either it was not in that version, or it is a document written "
+                        "inside Poelis, which cannot be downloaded through the SDK yet."
+                    )
+                raise FileNotDownloadableError(
+                    exc.status_code,
+                    message=message,
+                    error_code=exc.error_code,
+                ) from exc
+            raise
+
+        previous_mode = target.stat().st_mode if target.is_file() else None
+        handle, part_name = tempfile.mkstemp(dir=target.parent, prefix=".poelis.", suffix=".part")
+        part = Path(part_name)
+        try:
+            with (
+                os.fdopen(handle, "wb") as out,
+                self._t.get_stream(url, _transfer_timeout()) as response,
+            ):
+                for chunk in response.iter_bytes():
+                    out.write(chunk)
+            os.replace(part, target)
+            if previous_mode is not None:
+                os.chmod(target, previous_mode)
+        except BaseException:
+            part.unlink(missing_ok=True)
+            raise
+        return target
+
+    def _version_number(self, product_id: str | None, version: int | str | None) -> int | None:
+        value = _version_variable(version)
+        if value is None:
+            return None
+        if not product_id:
+            raise ValueError("product_id is required when version is given")
+        if value != "baseline":
+            return int(value)
+        payload = self._t.graphql(_PRODUCT_BASELINE_QUERY, {"id": product_id}).json()
+        if "errors" in payload:
+            raise RuntimeError(str(payload["errors"]))
+        product = (payload.get("data") or {}).get("product")
+        if not product:
+            raise NotFoundError(404, message=f"Product not found: {product_id}")
+        baseline = product.get("baselineVersionNumber")
+        if baseline is None:
+            raise NotFoundError(404, message=f"Product {product_id} has no baseline version")
+        return int(baseline)
 
     def upload(
         self,
@@ -68,7 +262,7 @@ class FilesClient:
                 upload_url,
                 handle,
                 required_headers,
-                _upload_timeout(),
+                _transfer_timeout(),
             )
 
         completed = self._t.post_json(
@@ -83,6 +277,20 @@ class FilesClient:
             retry=False,
         ).json()
         return UploadedFile.model_validate(completed)
+
+
+def _version_variable(version: int | str | None) -> int | str | None:
+    if version is None:
+        return None
+    if isinstance(version, bool):
+        raise ValueError("version must be an integer, 'baseline' or None")
+    if isinstance(version, int):
+        if version < 0:
+            raise ValueError("version must not be negative")
+        return version
+    if isinstance(version, str) and version.strip().lower() == "baseline":
+        return "baseline"
+    raise ValueError("version must be an integer, 'baseline' or None")
 
 
 def prepare_upload(path: str | Path) -> PreparedUpload:
@@ -105,7 +313,7 @@ def prepare_upload(path: str | Path) -> PreparedUpload:
     )
 
 
-def _upload_timeout() -> httpx.Timeout:
+def _transfer_timeout() -> httpx.Timeout:
     return httpx.Timeout(
         connect=30.0,
         read=_UPLOAD_STALL_TIMEOUT_SECONDS,

@@ -44,6 +44,18 @@ poelis_client = PoelisClient(
 )
 ```
 
+## List items
+
+`items.list` returns one page of a product's items, in the draft or at a version: pass a version number, `"baseline"`, or `None` for the draft. `items.iter_all` walks every page.
+
+`parent_item_id` is the parent's id in that same draft or version. `parent_draft_item_id` is the parent's draft id.
+
+```python
+items = poelis_client.items.list("product-id", version="baseline", limit=50)
+for item in poelis_client.items.iter_all("product-id", version=3, root_only=True):
+    print(item.id, item.key, item.name, item.parent_item_id)
+```
+
 ## Upload a file
 
 `files.upload` asks for a signed URL, sends the file bytes to storage, then completes the upload. It uses the API key already set on the client. A file over 5 GiB, or an empty file, is refused before any request.
@@ -62,6 +74,38 @@ uploaded = poelis_client.files.upload(
 ```
 
 A second file with the same size and content type in the workspace returns HTTP 409. Pass `allow_duplicate=True` to store it anyway.
+
+## List files
+
+`files.list` returns the files linked to one item or one property. Pass `version` to see the files as they were at a product version: a version number, `"baseline"`, or `None` for the draft.
+
+```python
+files = poelis_client.files.list(property_id="property-id")
+files = poelis_client.files.list(item_id="item-id", version="baseline")
+files = poelis_client.files.list(item_id="item-id", version=3, include_property_files=True)
+
+for f in files:
+    print(f.id, f.name, f.size_bytes, f.uploaded_at)
+```
+
+## Download a file
+
+`files.download` writes a file's bytes to a path and returns that path. The bytes come from a short-lived signed storage URL; the API key is not sent to storage. The file appears at `dest` only once it is complete.
+
+```python
+from pathlib import Path
+
+out = Path("downloads")
+out.mkdir(exist_ok=True)
+for f in poelis_client.files.list(item_id="item-id"):
+    poelis_client.files.download(f.id, out / f.name)
+
+# The file as it was in a product version, or in the baseline
+poelis_client.files.download("file-id", "spec_v3.pdf", product_id="product-id", version=3)
+poelis_client.files.download("file-id", "spec.pdf", product_id="product-id", version="baseline")
+```
+
+Documents written inside Poelis have no stored file yet, so they raise `FileNotDownloadableError`.
 
 ## Browser Usage
 
@@ -106,6 +150,21 @@ For property type `formula`, `property.category` and `property.unit` is always `
 ## Property Change Detection
 
 The SDK can automatically warn you when property values change between script/notebook runs. This is useful when you're using property values for calculations and want to be notified if a colleague changes them in the webapp.
+
+Change detection is on by default. It writes two files in the working directory:
+
+- `.poelis/baseline.json`: the values seen on the first access, written as soon as a property is read
+- `poelis_changes.log`: the changes found, appended when a value differs from its baseline
+
+If you rely on the default, the SDK emits one `FutureWarning` when it first writes the baseline file, because the default will become `False` in a future version. Choose a setting explicitly to keep the current behaviour or to stop writing files:
+
+```python
+client = PoelisClient(api_key="...", enable_change_detection=False)
+# or, with the environment variables:
+client = PoelisClient.from_env(enable_change_detection=False)
+```
+
+Use `baseline_file` and `log_file` to write the files somewhere else.
 
 
 ## License

@@ -26,6 +26,9 @@ future async parity.
 """
 
 
+_UNSET: Any = object()
+
+
 class ClientConfig(BaseModel):
     """Configuration for `PoelisClient`.
     
@@ -54,7 +57,7 @@ class PoelisClient:
         base_url: str = "https://api.poelis.com",
         timeout_seconds: float = 30.0,
         org_id: Optional[str] = None,
-        enable_change_detection: bool = True,
+        enable_change_detection: bool = _UNSET,
         baseline_file: Optional[str] = None,
         log_file: Optional[str] = None,
     ) -> None:
@@ -68,7 +71,9 @@ class PoelisClient:
             enable_change_detection: If True, enables automatic warnings when property
                 values change between accesses. When True, defaults to using
                 `.poelis/baseline.json` for baseline_file and `poelis_changes.log` for
-                log_file if not explicitly provided. Defaults to False.
+                log_file if not explicitly provided. Defaults to True; when it is not
+                passed, the first file write emits a ``FutureWarning`` because the
+                default will become False in a future version.
             baseline_file: Optional path to JSON file for persistent baseline storage.
                 If provided, property baselines will be saved and loaded between script runs.
                 If enable_change_detection is True and this is None, defaults to
@@ -97,6 +102,10 @@ class PoelisClient:
             timeout_seconds=self._config.timeout_seconds,
         )
 
+        warn_on_first_write = enable_change_detection is _UNSET
+        if warn_on_first_write:
+            enable_change_detection = True
+
         # Auto-configure baseline_file and log_file if change detection is enabled
         if enable_change_detection:
             if baseline_file is None:
@@ -109,6 +118,7 @@ class PoelisClient:
             enabled=enable_change_detection,
             baseline_file=baseline_file,
             log_file=log_file,
+            warn_on_first_write=warn_on_first_write,
         )
 
         # Resource clients
@@ -122,12 +132,16 @@ class PoelisClient:
         self.browser = Browser(self)
 
     @classmethod
-    def from_env(cls) -> "PoelisClient":
+    def from_env(cls, **options: Any) -> "PoelisClient":
         """Construct a client using environment variables.
 
         Expected variables:
         - POELIS_BASE_URL (optional, defaults to managed GCP endpoint)
         - POELIS_API_KEY
+
+        Args:
+            **options: Other constructor arguments, such as ``timeout_seconds``,
+                ``enable_change_detection``, ``baseline_file`` or ``log_file``.
         """
 
         base_url = os.environ.get("POELIS_BASE_URL", "https://api.poelis.com")
@@ -136,7 +150,7 @@ class PoelisClient:
         if not api_key:
             raise ValueError("POELIS_API_KEY must be set")
 
-        return cls(api_key=api_key, base_url=base_url)
+        return cls(api_key=api_key, base_url=base_url, **options)
 
     @property
     def base_url(self) -> str:
@@ -172,6 +186,7 @@ class PoelisClient:
         Args:
             value: True to enable, False to disable.
         """
+        self._change_tracker.acknowledge_default()
         if value:
             self._change_tracker.enable()
         else:

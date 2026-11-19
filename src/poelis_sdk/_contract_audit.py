@@ -8,6 +8,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from .browser import Browser
 from .client import PoelisClient
+from .files import FilesClient
 from .items import ItemsClient
 from .matlab_facade import PoelisMatlab
 from .products import ProductsClient
@@ -55,9 +56,12 @@ class _RecordingTransport:
             ("userAccessibleResources(", "workspaces.get_user_accessible_resources"),
             ("workspace(", "workspaces.get"),
             ("workspaces(", "workspaces.list"),
+            ("files(", "files.list"),
+            ("product(id:", "files.download"),
             ("setProductBaselineVersion(", "products.set_product_baseline_version"),
             ("productVersions(", "products.list_product_versions"),
             ("products(", "products.list_by_workspace"),
+            ("SdkListItemsAtVersion", "items.list"),
             ("sdkItems(", "versions.list_items"),
             ("items(productId:", "items.list_by_product"),
             ("item(id:", "items.get"),
@@ -75,6 +79,10 @@ class _RecordingTransport:
         return "unknown"
 
     def _payload_for(self, query: str, variables: Dict[str, Any]) -> Dict[str, Any]:
+        if "files(" in query:
+            return {"data": {"files": {"files": []}}}
+        if "product(id:" in query:
+            return {"data": {"product": {"id": "p1", "baselineVersionNumber": 2}}}
         if "userAccessibleResources(" in query:
             return {
                 "data": {
@@ -182,6 +190,8 @@ class _RecordingTransport:
                     "readableId": "widget_alpha",
                     "productId": "p1",
                     "parentId": None,
+                    "parentDraftItemId": None,
+                    "draftItemId": None,
                     "position": 1,
                     "deleted": False,
                 }
@@ -447,6 +457,7 @@ def _configure_client(transport: _RecordingTransport, *, enable_sdk_properties: 
     )
     client._transport = transport
     client.workspaces = WorkspacesClient(transport)
+    client.files = FilesClient(transport)
     client.products = ProductsClient(transport, client.workspaces)
     client.items = ItemsClient(transport)
     client.versions = VersionsClient(transport)
@@ -472,9 +483,15 @@ def collect_sdk_graphql_documents() -> List[GraphQLDocument]:
     list(client.products.iter_all_by_workspace(workspace_id="w1", q="widget", page_size=1))
     list(client.products.iter_all(q="widget", page_size=1))
 
+    client.files.list(item_id="i1", version="baseline", include_property_files=True)
+    client.files.list(property_id="pn1", version=2)
+    # download() resolves "baseline" with a GraphQL query before its REST calls.
+    client.files._version_number("p1", "baseline")
+
     client.items.list_by_product(product_id="p1", q="alpha", limit=1, offset=0)
     client.items.get("i1")
     list(client.items.iter_all_by_product(product_id="p1", q="alpha", page_size=1))
+    client.items.list("p1", version="baseline", q="alpha", limit=1, offset=0)
 
     client.versions.list_items(product_id="p1", version_number=2, q="alpha", limit=1, offset=0)
     list(client.versions.iter_items(product_id="p1", version_number=2, q="alpha", page_size=1))

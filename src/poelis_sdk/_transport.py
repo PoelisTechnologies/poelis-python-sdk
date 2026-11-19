@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import random
 import time
-from typing import Any, Dict, Mapping, Optional
+from contextlib import contextmanager
+from typing import Any, Dict, Iterator, Mapping, Optional
 
 import httpx
 
@@ -43,7 +44,6 @@ class Transport:
         self._client = httpx.Client(base_url=base_url, timeout=timeout_seconds)
         self._api_key = api_key
 
-
     def _headers(self, extra: Optional[Mapping[str, str]] = None) -> Dict[str, str]:
         headers: Dict[str, str] = {
             "Accept": "application/json",
@@ -79,6 +79,15 @@ class Transport:
             "PUT", url, content=body, headers=safe_headers, timeout=timeout
         )
         return _raise_mapped(response)
+
+    @contextmanager
+    def get_stream(self, url: str, timeout: httpx.Timeout) -> Iterator[httpx.Response]:
+        """GET an absolute URL as a stream. Does not send the API key or retry."""
+
+        with self._client.stream("GET", url, timeout=timeout) as response:
+            if not 200 <= response.status_code < 300:
+                response.read()
+            yield _raise_mapped(response)
 
     def graphql(self, query: str, variables: Optional[Mapping[str, Any]] = None) -> httpx.Response:
         """Post a GraphQL operation to /v1/graphql.
@@ -130,18 +139,34 @@ class Transport:
 def _raise_mapped(response: httpx.Response) -> httpx.Response:
     if 200 <= response.status_code < 300:
         return response
+    message = _safe_message(response)
+    code = _error_code(response)
     if response.status_code == 401:
-        raise UnauthorizedError(401, message=_safe_message(response))
+        raise UnauthorizedError(401, message=message, error_code=code)
     if response.status_code == 404:
-        raise NotFoundError(404, message=_safe_message(response))
+        raise NotFoundError(404, message=message, error_code=code)
     if response.status_code == 429:
         retry_after = _retry_after_seconds(response)
-        raise RateLimitError(429, message=_safe_message(response), retry_after_seconds=retry_after)
+        raise RateLimitError(429, message=message, retry_after_seconds=retry_after, error_code=code)
     if 400 <= response.status_code < 500:
-        raise ClientError(response.status_code, message=_safe_message(response))
+        raise ClientError(response.status_code, message=message, error_code=code)
     if 500 <= response.status_code < 600:
-        raise ServerError(response.status_code, message=_safe_message(response))
-    raise HTTPError(response.status_code, message=_safe_message(response))
+        raise ServerError(response.status_code, message=message, error_code=code)
+    raise HTTPError(response.status_code, message=message, error_code=code)
+
+
+def _error_code(response: httpx.Response) -> Optional[str]:
+    try:
+        data = response.json()
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    detail = data.get("detail")
+    if isinstance(detail, dict):
+        data = detail
+    code = data.get("error")
+    return code if isinstance(code, str) else None
 
 
 def _retry_after_seconds(response: httpx.Response) -> Optional[float]:
