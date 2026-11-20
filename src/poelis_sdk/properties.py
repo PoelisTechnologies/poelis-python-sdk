@@ -5,7 +5,7 @@ import warnings
 from typing import Any, Dict, Optional
 
 from ._transport import Transport
-from .exceptions import NotFoundError, UnauthorizedError
+from ._api_errors import raise_for_errors
 
 """Properties resource client for updating property values."""
 
@@ -24,13 +24,13 @@ def _resolved_key(key: Optional[str], readable_id: Optional[str]) -> Optional[st
 
 
 class PropertiesClient:
-    """Client for updating property values via GraphQL mutations."""
+    """Client for updating property values."""
 
     def __init__(self, transport: Transport) -> None:
         """Initialize with shared transport.
 
         Args:
-            transport: Shared HTTP/GraphQL transport used by the SDK.
+            transport: Shared transport used by the SDK.
         """
         self._t = transport
 
@@ -50,7 +50,7 @@ class PropertiesClient:
         description: Optional[str] = None,
         changed_via: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Update a numeric property via GraphQL mutation.
+        """Update a numeric property.
 
         Args:
             id: Property ID (required).
@@ -71,7 +71,8 @@ class PropertiesClient:
         Raises:
             NotFoundError: If property doesn't exist.
             UnauthorizedError: If permission denied.
-            RuntimeError: For other GraphQL errors.
+            InvalidInputError: If the API rejects the value.
+            ClientError: For other rejected requests.
         """
         # Build mutation - include changedVia only if provided
         if changed_via is not None:
@@ -167,17 +168,11 @@ class PropertiesClient:
 
         # CRITICAL: Check for errors FIRST - backend must enforce permissions
         # If a VIEWER user can write, the backend is not properly enforcing permissions
-        if "errors" in payload:
-            self._handle_graphql_errors(payload["errors"])
+        raise_for_errors(payload, write=True)
 
         property_data = payload.get("data", {}).get("updateNumericProperty")
         if property_data is None:
-            # If we get here without errors but no data, something is wrong
-            # This could indicate the backend allowed the mutation but returned no data
-            # Check if there are any errors we might have missed
-            if "errors" in payload:
-                self._handle_graphql_errors(payload["errors"])
-            raise RuntimeError("Malformed GraphQL response: missing 'updateNumericProperty' field")
+            raise RuntimeError("Unexpected response from the Poelis API: missing 'updateNumericProperty'")
 
         return property_data
 
@@ -195,7 +190,7 @@ class PropertiesClient:
         description: Optional[str] = None,
         changed_via: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Update a text property via GraphQL mutation.
+        """Update a text property.
 
         Args:
             id: Property ID (required).
@@ -214,7 +209,8 @@ class PropertiesClient:
         Raises:
             NotFoundError: If property doesn't exist.
             UnauthorizedError: If permission denied.
-            RuntimeError: For other GraphQL errors.
+            InvalidInputError: If the API rejects the value.
+            ClientError: For other rejected requests.
         """
         # Build mutation - include changedVia only if provided
         if changed_via is not None:
@@ -296,15 +292,11 @@ class PropertiesClient:
 
         # CRITICAL: Check for errors FIRST - backend must enforce permissions
         # If a VIEWER user can write, the backend is not properly enforcing permissions
-        if "errors" in payload:
-            self._handle_graphql_errors(payload["errors"])
+        raise_for_errors(payload, write=True)
 
         property_data = payload.get("data", {}).get("updateTextProperty")
         if property_data is None:
-            # If we get here without errors but no data, something is wrong
-            if "errors" in payload:
-                self._handle_graphql_errors(payload["errors"])
-            raise RuntimeError("Malformed GraphQL response: missing 'updateTextProperty' field")
+            raise RuntimeError("Unexpected response from the Poelis API: missing 'updateTextProperty'")
 
         return property_data
 
@@ -324,7 +316,7 @@ class PropertiesClient:
         description: Optional[str] = None,
         changed_via: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Update a matrix property via GraphQL mutation.
+        """Update a matrix property.
 
         Args:
             id: Property ID (required).
@@ -434,14 +426,11 @@ class PropertiesClient:
         resp.raise_for_status()
         payload = resp.json()
 
-        if "errors" in payload:
-            self._handle_graphql_errors(payload["errors"])
+        raise_for_errors(payload, write=True)
 
         property_data = payload.get("data", {}).get("updateMatrixProperty")
         if property_data is None:
-            if "errors" in payload:
-                self._handle_graphql_errors(payload["errors"])
-            raise RuntimeError("Malformed GraphQL response: missing 'updateMatrixProperty' field")
+            raise RuntimeError("Unexpected response from the Poelis API: missing 'updateMatrixProperty'")
 
         return property_data
 
@@ -459,7 +448,7 @@ class PropertiesClient:
         description: Optional[str] = None,
         changed_via: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Update a date property via GraphQL mutation.
+        """Update a date property.
 
         Args:
             id: Property ID (required).
@@ -479,7 +468,8 @@ class PropertiesClient:
             NotFoundError: If property doesn't exist.
             UnauthorizedError: If permission denied.
             ValueError: If date format is invalid.
-            RuntimeError: For other GraphQL errors.
+            InvalidInputError: If the API rejects the value.
+            ClientError: For other rejected requests.
         """
         # Build mutation - include changedVia only if provided
         if changed_via is not None:
@@ -559,15 +549,11 @@ class PropertiesClient:
 
         # CRITICAL: Check for errors FIRST - backend must enforce permissions
         # If a VIEWER user can write, the backend is not properly enforcing permissions
-        if "errors" in payload:
-            self._handle_graphql_errors(payload["errors"])
+        raise_for_errors(payload, write=True)
 
         property_data = payload.get("data", {}).get("updateDateProperty")
         if property_data is None:
-            # If we get here without errors but no data, something is wrong
-            if "errors" in payload:
-                self._handle_graphql_errors(payload["errors"])
-            raise RuntimeError("Malformed GraphQL response: missing 'updateDateProperty' field")
+            raise RuntimeError("Unexpected response from the Poelis API: missing 'updateDateProperty'")
 
         return property_data
 
@@ -585,7 +571,7 @@ class PropertiesClient:
         description: Optional[str] = None,
         changed_via: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Update a status property via GraphQL mutation.
+        """Update a status property.
 
         Args:
             id: Property ID (required).
@@ -605,7 +591,8 @@ class PropertiesClient:
             NotFoundError: If property doesn't exist.
             UnauthorizedError: If permission denied.
             ValueError: If status value is invalid.
-            RuntimeError: For other GraphQL errors.
+            InvalidInputError: If the API rejects the value.
+            ClientError: For other rejected requests.
         """
         # Build mutation - include changedVia only if provided
         if changed_via is not None:
@@ -687,53 +674,14 @@ class PropertiesClient:
 
         # CRITICAL: Check for errors FIRST - backend must enforce permissions
         # If a VIEWER user can write, the backend is not properly enforcing permissions
-        if "errors" in payload:
-            self._handle_graphql_errors(payload["errors"])
+        raise_for_errors(payload, write=True)
 
         property_data = payload.get("data", {}).get("updateStatusProperty")
         if property_data is None:
-            # If we get here without errors but no data, something is wrong
-            if "errors" in payload:
-                self._handle_graphql_errors(payload["errors"])
-            raise RuntimeError("Malformed GraphQL response: missing 'updateStatusProperty' field")
+            raise RuntimeError("Unexpected response from the Poelis API: missing 'updateStatusProperty'")
 
         return property_data
 
-    def _handle_graphql_errors(self, errors: list[Dict[str, Any]]) -> None:
-        """Handle GraphQL errors and map them to appropriate exceptions.
-
-        Args:
-            errors: List of GraphQL error dictionaries.
-
-        Raises:
-            NotFoundError: For 'not_found' errors.
-            UnauthorizedError: For 'forbidden' errors.
-            ValueError: For 'invalid_date_format' or 'invalid_status_value' errors.
-            RuntimeError: For other errors.
-        """
-        if not errors:
-            return
-
-        error = errors[0]  # Use first error
-        error_code = error.get("extensions", {}).get("code")
-        error_message = error.get("message", "GraphQL error")
-
-        if error_code == "not_found":
-            raise NotFoundError(404, message=error_message)
-        elif error_code == "forbidden":
-            # Enhanced error message for permission issues
-            enhanced_message = (
-                f"{error_message}. "
-                "Write operations require ADMIN or EDITOR role for the workspace or product. "
-                "Users with VIEWER role can only read data."
-            )
-            raise UnauthorizedError(403, message=enhanced_message)
-        elif error_code == "invalid_date_format":
-            raise ValueError(f"Date must be in ISO 8601 format: YYYY-MM-DD. {error_message}")
-        elif error_code == "invalid_status_value":
-            raise ValueError(f"Status must be one of: DRAFT, UNDER_REVIEW, DONE. {error_message}")
-        else:
-            raise RuntimeError(f"GraphQL error: {error_message}")
 
     @staticmethod
     def _convert_numeric_value(value: Any) -> str:

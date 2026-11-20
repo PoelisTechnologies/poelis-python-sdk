@@ -8,6 +8,7 @@ from typing import Any
 import httpx
 import pytest
 
+from poelis_sdk.exceptions import ClientError
 from poelis_sdk.models import Item
 
 from tests.conftest import client_with_transport
@@ -115,5 +116,5 @@ def test_list_raises_on_graphql_errors() -> None:
 
     client = client_with_transport(_Errors())
 
-    with pytest.raises(RuntimeError, match="boom"):
+    with pytest.raises(ClientError, match="boom"):
         client.items.list("p1")

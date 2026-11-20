@@ -6,6 +6,8 @@ from ._item_filter import build_item_filter
 from ._transport import Transport
 from .files import _version_variable
 from .models import Item
+from ._api_errors import raise_for_errors
+from .exceptions import NotFoundError
 
 """Items resource client."""
 
@@ -33,7 +35,7 @@ class ItemsClient:
         """Initialize the client with shared transport.
 
         Args:
-            transport: Shared HTTP/GraphQL transport used by the SDK.
+            transport: Shared transport used by the SDK.
         """
 
         self._t = transport
@@ -49,7 +51,7 @@ class ItemsClient:
         limit: int = 100,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
-        """List draft items for a product via GraphQL with optional filters.
+        """List draft items for a product with optional filters.
 
         For the draft or any version as ``Item`` models, use ``items.list``.
 
@@ -71,7 +73,8 @@ class ItemsClient:
             configured organization.
 
         Raises:
-            RuntimeError: If the GraphQL response contains errors.
+            PoelisError: If the API rejects the request (for example NotFoundError or
+                UnauthorizedError).
         """
 
         query = (
@@ -93,15 +96,14 @@ class ItemsClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
 
         items = payload.get("data", {}).get("items", [])
 
         return items
 
     def get(self, item_id: str) -> dict[str, Any]:
-        """Get a single draft item by identifier via GraphQL.
+        """Get a single draft item by identifier.
 
         Returns the item only if it belongs to the client's configured
         organization. The returned representation reflects the current draft
@@ -114,8 +116,9 @@ class ItemsClient:
             Dictionary representing the draft item.
 
         Raises:
-            RuntimeError: If the GraphQL response contains errors or the item
-                cannot be found.
+            PoelisError: If the API rejects the request (for example NotFoundError or
+                UnauthorizedError).
+            NotFoundError: If the item does not exist.
         """
 
         query = (
@@ -126,12 +129,11 @@ class ItemsClient:
         resp = self._t.graphql(query=query, variables={"id": item_id})
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
 
         item = payload.get("data", {}).get("item")
         if item is None:
-            raise RuntimeError(f"Item with id '{item_id}' not found")
+            raise NotFoundError(404, message=f"Item '{item_id}' not found.", error_code="not_found")
 
         return item
 
@@ -145,7 +147,7 @@ class ItemsClient:
         include_deleted: bool | None = None,
         page_size: int = 100,
     ) -> Generator[dict[str, Any], None, None]:
-        """Iterate draft items via GraphQL for a given product.
+        """Iterate draft items for a given product.
 
         Args:
             product_id: Identifier of the parent product.
@@ -153,7 +155,7 @@ class ItemsClient:
             root_only: When True, return only root items (no parent).
             parent_item_id: Return the parent item and its direct children.
             include_deleted: Include soft-deleted draft items.
-            page_size: Page size for each GraphQL request.
+            page_size: Page size for each request.
 
         Yields:
             Individual draft item dictionaries.
@@ -220,8 +222,7 @@ class ItemsClient:
             "offset": int(offset),
         }
         payload = self._t.graphql(_LIST_ITEMS_QUERY, variables).json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
         rows = payload.get("data", {}).get("sdkItems", [])
         return [Item.model_validate(row) for row in rows]
 

@@ -3,18 +3,19 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from ._transport import Transport
+from ._api_errors import raise_for_errors
 
-"""Search resource client using GraphQL endpoints only."""
+"""Search resource client."""
 
 
 class SearchClient:
-    """Search for products, items, and properties via GraphQL (/v1/graphql)."""
+    """Search for products, items, and properties."""
 
     def __init__(self, transport: Transport) -> None:
         self._t = transport
 
     def products(self, *, q: str, workspace_id: str, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
-        """Search/list products via GraphQL products(workspaceId, filter: { q })."""
+        """Search or list the products of a workspace."""
 
         query = (
             "query SdkSearchProducts($ws: ID!, $filter: ProductFilter, $limit: Int!, $offset: Int!) {\n"
@@ -25,13 +26,12 @@ class SearchClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
         hits = payload.get("data", {}).get("products", [])
         return {"query": q, "hits": hits, "total": None, "limit": limit, "offset": offset}
 
     def items(self, *, q: Optional[str], product_id: str, parent_item_id: Optional[str] = None, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
-        """Search/list items via GraphQL items(product_id, q, parent_item_id)."""
+        """Search or list the items of a product."""
 
         query = (
             "query SdkSearchItems($pid: ID!, $filter: ItemFilter, $limit: Int!, $offset: Int!) {\n"
@@ -47,13 +47,12 @@ class SearchClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
         hits = payload.get("data", {}).get("items", [])
         return {"query": q, "hits": hits, "total": None, "limit": limit, "offset": offset}
 
     def properties(self, *, q: str, workspace_id: Optional[str] = None, product_id: Optional[str] = None, item_id: Optional[str] = None, property_type: Optional[str] = None, category: Optional[str] = None, limit: int = 20, offset: int = 0, sort: Optional[str] = None) -> Dict[str, Any]:
-        """Search properties via GraphQL search_properties."""
+        """Search properties."""
 
         query = (
             "query SdkSearchProperties($q: String!, $ws: ID, $pid: ID, $iid: ID, $ptype: String, $cat: String, $limit: Int!, $offset: Int!, $sort: String) {\n"
@@ -77,8 +76,7 @@ class SearchClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
         data = payload.get("data", {}).get("searchProperties", {})
         # Normalize to match previous REST shape
         return {

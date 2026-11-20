@@ -10,6 +10,7 @@ import pytest
 
 from poelis_sdk.browser import _PropWrapper
 from poelis_sdk.client import PoelisClient
+from poelis_sdk.exceptions import InvalidInputError
 from poelis_sdk.exceptions import NotFoundError, UnauthorizedError
 from poelis_sdk.properties import PropertiesClient
 
@@ -446,7 +447,7 @@ def test_change_property_invalid_date_error(mock_client: PoelisClient) -> None:
 
 
 def test_change_property_invalid_status_error(mock_client: PoelisClient) -> None:
-    """Test that invalid status value from backend raises ValueError."""
+    """Test that invalid status value from backend raises InvalidInputError."""
     raw_prop: Dict[str, Any] = {
         "id": "prop-4",
         "__typename": "StatusProperty",
@@ -468,7 +469,7 @@ def test_change_property_invalid_status_error(mock_client: PoelisClient) -> None
 
     wrapper = _PropWrapper(raw_prop, client=mock_client)
 
-    with pytest.raises(ValueError, match="Status must be one of"):
+    with pytest.raises(InvalidInputError, match="Status must be one of"):
         wrapper.change_property("DONE")  # Valid client-side but backend rejects
 
 

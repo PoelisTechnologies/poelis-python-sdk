@@ -10,6 +10,7 @@ import httpx
 from .exceptions import (
     ClientError,
     HTTPError,
+    NetworkError,
     NotFoundError,
     RateLimitError,
     ServerError,
@@ -75,19 +76,25 @@ class Transport:
         safe_headers = {
             key: value for key, value in headers.items() if key.lower() != "authorization"
         }
-        response = self._client.request(
-            "PUT", url, content=body, headers=safe_headers, timeout=timeout
-        )
+        try:
+            response = self._client.request(
+                "PUT", url, content=body, headers=safe_headers, timeout=timeout
+            )
+        except httpx.RequestError as exc:
+            raise _network_error(exc) from exc
         return _raise_mapped(response)
 
     @contextmanager
     def get_stream(self, url: str, timeout: httpx.Timeout) -> Iterator[httpx.Response]:
         """GET an absolute URL as a stream. Does not send the API key or retry."""
 
-        with self._client.stream("GET", url, timeout=timeout) as response:
-            if not 200 <= response.status_code < 300:
-                response.read()
-            yield _raise_mapped(response)
+        try:
+            with self._client.stream("GET", url, timeout=timeout) as response:
+                if not 200 <= response.status_code < 300:
+                    response.read()
+                yield _raise_mapped(response)
+        except httpx.RequestError as exc:
+            raise _network_error(exc) from exc
 
     def graphql(self, query: str, variables: Optional[Mapping[str, Any]] = None) -> httpx.Response:
         """Post a GraphQL operation to /v1/graphql.
@@ -128,12 +135,16 @@ class Transport:
                     time.sleep(_backoff_sleep(attempt))
                     continue
                 return _raise_mapped(response)
-            except httpx.HTTPError as exc:
+            except httpx.RequestError as exc:
                 last_exc = exc
                 if method not in {"GET", "HEAD"} or attempt == max_attempts:
-                    raise
+                    raise _network_error(exc) from exc
         assert last_exc is not None
-        raise last_exc
+        raise _network_error(last_exc) from last_exc
+
+
+def _network_error(exc: Exception) -> NetworkError:
+    return NetworkError(f"Could not reach the Poelis API: {exc}")
 
 
 def _raise_mapped(response: httpx.Response) -> httpx.Response:

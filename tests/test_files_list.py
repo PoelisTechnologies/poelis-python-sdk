@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
+from poelis_sdk.exceptions import UnauthorizedError
 from tests.conftest import client_with_transport
 
 
@@ -87,10 +88,11 @@ def test_list_returns_empty_when_the_api_has_no_files() -> None:
     assert client.files.list(item_id="item-1", version="baseline") == []
 
 
-def test_list_raises_on_graphql_errors() -> None:
+def test_list_raises_access_denied_on_a_forbidden_error() -> None:
     client = client_with_transport(_GraphQLTransport({"errors": [{"message": "forbidden"}]}))
-    with pytest.raises(RuntimeError, match="forbidden"):
+    with pytest.raises(UnauthorizedError, match="Access denied") as caught:
         client.files.list(property_id="prop-1")
+    assert caught.value.error_code == "forbidden"
 
 
 @pytest.mark.parametrize(

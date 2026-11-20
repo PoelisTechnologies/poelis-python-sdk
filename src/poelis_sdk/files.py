@@ -12,6 +12,7 @@ import httpx
 from ._transport import Transport
 from .exceptions import ClientError, FileNotDownloadableError, NotFoundError, UploadError
 from .models import File, UploadedFile
+from ._api_errors import raise_for_errors
 
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024
 
@@ -100,8 +101,7 @@ class FilesClient:
         if item_id is not None:
             variables["includePropertyFiles"] = include_property_files
         payload = self._t.graphql(_LIST_FILES_QUERY, variables).json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
         files = ((payload.get("data") or {}).get("files") or {}).get("files") or []
         parsed = [File.model_validate(row) for row in files]
         if include_property_files:
@@ -203,8 +203,7 @@ class FilesClient:
         if value != "baseline":
             return int(value)
         payload = self._t.graphql(_PRODUCT_BASELINE_QUERY, {"id": product_id}).json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
         product = (payload.get("data") or {}).get("product")
         if not product:
             raise NotFoundError(404, message=f"Product not found: {product_id}")

@@ -856,23 +856,21 @@ _SCHEMA_ERROR = httpx.Response(
     "failing_items",
     [pytest.param({"i1"}, id="searched-item"), pytest.param({"i2"}, id="child-item")],
 )
-def test_draft_get_property_surfaces_graphql_error_instead_of_not_found(
+def test_draft_get_property_surfaces_the_api_error_instead_of_not_found(
     failing_items: set[str],
 ) -> None:
     """A failing properties query used to be reported as "not found in item tree"."""
 
-    from poelis_sdk.exceptions import PropertyLookupError
+    from poelis_sdk.exceptions import ClientError
 
     t = _FailingPropertiesTransport(_SCHEMA_ERROR, failing_items)
     item = _client_with_graphql_mock(t).browser["uh2"]["Widget Pro"].draft["Gadget A"]
 
-    with pytest.raises(PropertyLookupError, match="hasFormulaDependencyChanges") as caught:
+    with pytest.raises(ClientError, match="not compatible with the Poelis API") as caught:
         item.get_property("demo_property_mass")
 
-    assert isinstance(caught.value, RuntimeError)
+    assert "hasFormulaDependencyChanges" in str(caught.value)
     assert "not found" not in str(caught.value)
-    assert isinstance(caught.value.__cause__, RuntimeError)
-    assert "hasFormulaDependencyChanges" in str(caught.value.__cause__)
 
 
 def test_draft_get_property_raises_unauthorized_from_the_searched_item() -> None:

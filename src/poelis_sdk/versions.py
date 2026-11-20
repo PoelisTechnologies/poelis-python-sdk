@@ -4,6 +4,7 @@ from typing import Any, Generator
 
 from ._item_filter import build_item_filter
 from ._transport import Transport
+from ._api_errors import raise_for_errors
 
 """Versions resource client.
 
@@ -20,7 +21,7 @@ class VersionsClient:
         """Initialize the client with shared transport.
 
         Args:
-            transport: Shared HTTP/GraphQL transport used by the SDK.
+            transport: Shared transport used by the SDK.
         """
 
         self._t = transport
@@ -36,7 +37,7 @@ class VersionsClient:
         limit: int = 100,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
-        """List versioned items for a specific product version via GraphQL.
+        """List versioned items for a specific product version.
 
         For the draft or any version as ``Item`` models, use ``items.list``.
 
@@ -57,7 +58,8 @@ class VersionsClient:
             List of item dictionaries belonging to the given product version.
 
         Raises:
-            RuntimeError: If the GraphQL response contains errors.
+            PoelisError: If the API rejects the request (for example NotFoundError or
+                UnauthorizedError).
         """
 
         query = (
@@ -84,8 +86,7 @@ class VersionsClient:
         resp = self._t.graphql(query=query, variables=variables)
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
 
         items = payload.get("data", {}).get("sdkItems", [])
 
@@ -110,7 +111,7 @@ class VersionsClient:
             q: Optional free-text filter applied to item name.
             root_only: When True, return only root items (no parent).
             parent_item_id: Id of the parent row in that version. Returns that parent and its direct children.
-            page_size: Page size for each GraphQL request.
+            page_size: Page size for each request.
             start_offset: Initial offset for pagination.
 
         Yields:

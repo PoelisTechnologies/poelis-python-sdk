@@ -1,4 +1,4 @@
-"""GraphQL-backed dot-path browser for Poelis SDK.
+"""Dot-path browser for Poelis SDK.
 
 This module is the **public** import location for the Browser DSL:
 
@@ -29,7 +29,6 @@ from ._browser.props import _PropsNode as _PropsNode
 from ._browser.props import _PropWrapper as _PropWrapper
 
 # Internal helpers kept for compatibility with previous module-level symbols.
-from ._browser._graphql_errors import _handle_graphql_read_errors as _handle_graphql_read_errors
 from ._browser.utils import _safe_key as _safe_key
 
 __all__ = [
@@ -39,6 +38,5 @@ __all__ = [
     "_NodeList",
     "_PropsNode",
     "_PropWrapper",
-    "_handle_graphql_read_errors",
     "_safe_key",
 ]

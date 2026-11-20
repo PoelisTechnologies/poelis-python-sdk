@@ -4,12 +4,13 @@ from typing import Any, Dict, List, Optional
 
 from ._transport import Transport
 from .models import UserAccessibleResources
+from ._api_errors import raise_for_errors
 
-"""Workspaces GraphQL client."""
+"""Workspaces client."""
 
 
 class WorkspacesClient:
-    """Client for querying workspaces via GraphQL."""
+    """Client for querying workspaces."""
 
     def __init__(self, transport: Transport) -> None:
         self._t = transport
@@ -30,14 +31,13 @@ class WorkspacesClient:
         resp = self._t.graphql(query=query, variables={"limit": int(limit), "offset": int(offset)})
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
         
         workspaces = payload.get("data", {}).get("workspaces", [])
         return workspaces
 
     def get(self, *, workspace_id: str) -> Optional[Dict[str, Any]]:
-        """Get a single workspace by id via GraphQL."""
+        """Get a single workspace by id."""
 
         query = (
             "query SdkWorkspace($id: ID!) {\n"
@@ -47,8 +47,7 @@ class WorkspacesClient:
         resp = self._t.graphql(query=query, variables={"id": workspace_id})
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
         
         workspace = payload.get("data", {}).get("workspace")
         return workspace
@@ -68,7 +67,8 @@ class WorkspacesClient:
                 can access, including role information.
                 
         Raises:
-            RuntimeError: If the GraphQL response contains errors.
+            PoelisError: If the API rejects the request (for example NotFoundError or
+                UnauthorizedError).
             UnauthorizedError: If the current user is not in the same organization.
         """
         
@@ -91,12 +91,11 @@ class WorkspacesClient:
         resp = self._t.graphql(query=query, variables={"userId": user_id})
         resp.raise_for_status()
         payload = resp.json()
-        if "errors" in payload:
-            raise RuntimeError(str(payload["errors"]))
+        raise_for_errors(payload)
         
         raw = payload.get("data", {}).get("userAccessibleResources")
         if raw is None:
-            raise RuntimeError("Malformed GraphQL response: missing 'userAccessibleResources' field")
+            raise RuntimeError("Unexpected response from the Poelis API: missing 'userAccessibleResources'")
         workspaces = raw if isinstance(raw, list) else [raw]
         return UserAccessibleResources(workspaces=workspaces)
 

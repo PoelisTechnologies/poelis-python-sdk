@@ -10,7 +10,7 @@ class PoelisError(Exception):
 
 
 class HTTPError(PoelisError):
-    """HTTP error from API response."""
+    """Error returned by the Poelis API."""
 
     def __init__(
         self, status_code: int, message: str | None = None, error_code: str | None = None
@@ -18,7 +18,7 @@ class HTTPError(PoelisError):
         super().__init__(message or f"HTTP error: {status_code}")
         self.status_code = status_code
         self.message = message or ""
-        # The ``error`` field of the API response body, for example "no_blob".
+        # Machine-readable code from the API, for example "not_found" or "no_blob".
         self.error_code = error_code
 
 
@@ -48,17 +48,23 @@ class ClientError(HTTPError):
     """Raised on other 4xx errors."""
 
 
+class InvalidInputError(ClientError):
+    """Raised when the API rejects a value sent by the caller."""
+
+
 class ServerError(HTTPError):
     """Raised on 5xx errors."""
 
 
-class PropertyLookupError(PoelisError, RuntimeError):
+class NetworkError(PoelisError):
+    """Raised when the Poelis API cannot be reached."""
+
+
+class PropertyLookupError(PoelisError):
     """Raised when reading an item's properties fails during a property lookup.
 
-    Covers errors such as a GraphQL error; HTTP and network errors keep their
-    own type. The original error is chained as ``__cause__``. It subclasses
-    ``RuntimeError`` because the lookup raised ``RuntimeError`` before, so
-    ``except RuntimeError`` keeps working.
+    API and network errors keep their own type. The original error is chained
+    as ``__cause__``.
     """
 
 
