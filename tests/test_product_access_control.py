@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from _pytest.monkeypatch import MonkeyPatch
 
 from poelis_sdk import PoelisClient
+from poelis_sdk.exceptions import ClientError
 from poelis_sdk.models import (
     ChangedByUser,
     Product,
@@ -258,7 +259,7 @@ def test_get_user_accessible_resources_error_handling(monkeypatch: "MonkeyPatch"
     monkeypatch.setattr(client.workspaces._t, "graphql", mock_graphql)
     
     # Should raise RuntimeError
-    with pytest.raises(RuntimeError, match="User not found"):
+    with pytest.raises(ClientError, match="User not found"):
         client.workspaces.get_user_accessible_resources(user_id="user-123")
 
 

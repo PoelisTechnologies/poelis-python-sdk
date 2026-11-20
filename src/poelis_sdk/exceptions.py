@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import Optional
 
-import httpx
-
 """SDK exception hierarchy for Poelis."""
 
 
@@ -11,12 +9,8 @@ class PoelisError(Exception):
     """Base SDK exception."""
 
 
-class HTTPError(PoelisError, RuntimeError):
-    """Error returned by the Poelis API.
-
-    Subclasses ``RuntimeError``, which most API errors were before, so
-    ``except RuntimeError`` keeps working until 2.0.
-    """
+class HTTPError(PoelisError):
+    """Error returned by the Poelis API."""
 
     def __init__(
         self, status_code: int, message: str | None = None, error_code: str | None = None
@@ -54,31 +48,23 @@ class ClientError(HTTPError):
     """Raised on other 4xx errors."""
 
 
-class InvalidInputError(ClientError, ValueError):
-    """Raised when the API rejects a value sent by the caller.
-
-    Subclasses ``ValueError``, which invalid dates and statuses raised before.
-    """
+class InvalidInputError(ClientError):
+    """Raised when the API rejects a value sent by the caller."""
 
 
 class ServerError(HTTPError):
     """Raised on 5xx errors."""
 
 
-class NetworkError(PoelisError, httpx.TransportError):
-    """Raised when the Poelis API cannot be reached.
-
-    Subclasses ``httpx.TransportError``, which these errors were before, so
-    existing ``except httpx.HTTPError`` handlers keep working.
-    """
+class NetworkError(PoelisError):
+    """Raised when the Poelis API cannot be reached."""
 
 
-class PropertyLookupError(PoelisError, RuntimeError):
+class PropertyLookupError(PoelisError):
     """Raised when reading an item's properties fails during a property lookup.
 
     API and network errors keep their own type. The original error is chained
-    as ``__cause__``. It subclasses ``RuntimeError`` because the lookup raised
-    ``RuntimeError`` before, so ``except RuntimeError`` keeps working.
+    as ``__cause__``.
     """
 
 

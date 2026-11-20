@@ -869,7 +869,6 @@ def test_draft_get_property_surfaces_the_api_error_instead_of_not_found(
     with pytest.raises(ClientError, match="not compatible with the Poelis API") as caught:
         item.get_property("demo_property_mass")
 
-    assert isinstance(caught.value, RuntimeError)
     assert "hasFormulaDependencyChanges" in str(caught.value)
     assert "not found" not in str(caught.value)
 

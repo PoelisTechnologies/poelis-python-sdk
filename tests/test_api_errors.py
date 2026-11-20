@@ -93,14 +93,8 @@ def test_errors_map_to_sdk_exceptions(
     assert type(caught.value) is expected
     assert caught.value.error_code == code
     assert str(caught.value).startswith(message)
-    assert isinstance(caught.value, RuntimeError)
     assert "graphql" not in str(caught.value).lower()
     assert "locations" not in str(caught.value)
-
-
-def test_invalid_input_is_still_a_value_error() -> None:
-    with pytest.raises(ValueError):
-        raise_for_errors({"errors": [_error("invalid_status_value")]})
 
 
 def test_access_hint_depends_on_whether_the_request_writes() -> None:
@@ -167,5 +161,4 @@ def test_an_unreachable_api_raises_network_error() -> None:
         client.workspaces.list()
 
     assert isinstance(caught.value, PoelisError)
-    assert isinstance(caught.value, httpx.TransportError)
     assert isinstance(caught.value.__cause__, httpx.ConnectError)
