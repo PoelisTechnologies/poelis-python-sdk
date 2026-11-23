@@ -1106,6 +1106,7 @@ def test_an_item_key_shared_by_two_siblings_raises_instead_of_picking_one(read: 
 
     assert str(raised.value) == "Key 'bolt' matches 2 items in version 3: 'Bolt M4' (id ca), 'Bolt M6' (id cb)."
     assert item.nut.name == "nut"
+    assert item.bolt_1._id == "cd"
     assert len(item.list_items()) == 4
 
 

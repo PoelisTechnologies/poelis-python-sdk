@@ -23,21 +23,25 @@ def _safe_key(name: str) -> str:
 def _assign_keys(rows: Sequence[Mapping[str, Any]]) -> Tuple[List[str], Dict[str, List[Mapping[str, Any]]]]:
     """Give each row a unique attribute key and report the keys several rows share.
 
-    A repeated key gets a numeric suffix so every row stays in listings. The second
-    result maps a key to the rows whose readable id is that same key: reading such a
-    key raises instead of returning one of them.
+    A repeated key gets a numeric suffix so every row stays in listings. A suffix never
+    takes a key that is another row's own, so a key always reads the row it belongs to.
+    The second result maps a key to the rows whose readable id is that same key: reading
+    such a key raises instead of returning one of them.
     """
 
+    bases = [
+        _safe_key(str(row.get("readableId") or row.get("name") or row.get("id") or row.get("category") or f"property_{index}"))
+        for index, row in enumerate(rows)
+    ]
+    own_keys = set(bases)
     keys: List[str] = []
     taken: set[str] = set()
     by_readable_id: Dict[str, List[Mapping[str, Any]]] = {}
-    for index, row in enumerate(rows):
-        display = row.get("readableId") or row.get("name") or row.get("id") or row.get("category") or f"property_{index}"
-        base = _safe_key(str(display))
+    for base, row in zip(bases, rows):
         if row.get("readableId"):
             by_readable_id.setdefault(base, []).append(row)
         safe, suffix = base, 0
-        while safe in taken:
+        while safe in taken or (suffix > 0 and safe in own_keys):
             suffix += 1
             safe = f"{base}_{suffix}"
         taken.add(safe)
