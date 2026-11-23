@@ -14,26 +14,27 @@ from .item_queries import (
     _node_parent_filter_id,
 )
 from .version_cache import _resolve_baseline_version_number
-from ..utils import _safe_key
+from ..utils import _assign_keys, _safe_key
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..nodes import _Node
 
 
-def _append_item_child(parent: "_Node", item_row: dict, *, version_number: Optional[int]) -> None:
-    display = item_row.get("readableId") or item_row.get("name") or str(item_row["id"])
-    nm = _safe_key(display)
-    child = parent.__class__(
-        parent._client,
-        "item",
-        parent,
-        item_row["id"],
-        display,
-        version_number=version_number,
-        draft_item_id=item_draft_id(item_row),
-    )
-    child._cache_ttl = parent._cache_ttl
-    parent._children_cache[nm] = child
+def _append_item_children(parent: "_Node", item_rows: list, *, version_number: Optional[int]) -> None:
+    keys, parent._ambiguous_children = _assign_keys(item_rows)
+    for nm, item_row in zip(keys, item_rows):
+        display = item_row.get("readableId") or item_row.get("name") or str(item_row["id"])
+        child = parent.__class__(
+            parent._client,
+            "item",
+            parent,
+            item_row["id"],
+            display,
+            version_number=version_number,
+            draft_item_id=item_draft_id(item_row),
+        )
+        child._cache_ttl = parent._cache_ttl
+        parent._children_cache[nm] = child
 
 
 def load_children(node: "_Node") -> None:
@@ -73,8 +74,7 @@ def load_children(node: "_Node") -> None:
                     version_number=version_number,
                     root_only=True,
                 )
-                for it in rows:
-                    _append_item_child(node, it, version_number=version_number)
+                _append_item_children(node, rows, version_number=version_number)
                 node._children_loaded_at = time.time()
                 return
         except (AttributeError, KeyError, TypeError, ValueError):
@@ -84,8 +84,7 @@ def load_children(node: "_Node") -> None:
 
         if not node._children_cache:
             rows = _list_draft_items(node, product_id=node._id, root_only=True)
-            for it in rows:
-                _append_item_child(node, it, version_number=None)
+            _append_item_children(node, rows, version_number=None)
     elif node._level == "version":
         anc = node
         pid: Optional[str] = None
@@ -111,8 +110,7 @@ def load_children(node: "_Node") -> None:
                 root_only=True,
             )
 
-        for it in rows:
-            _append_item_child(node, it, version_number=version_number)
+        _append_item_children(node, rows, version_number=version_number)
     elif node._level == "item":
         anc = node
         pid: Optional[str] = None
@@ -146,7 +144,6 @@ def load_children(node: "_Node") -> None:
             parent_draft_id=getattr(node, "_draft_item_id", None),
         )
 
-        for it2 in rows:
-            _append_item_child(node, it2, version_number=version_number)
+        _append_item_children(node, rows, version_number=version_number)
 
     node._children_loaded_at = time.time()

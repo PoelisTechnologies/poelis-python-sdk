@@ -17,7 +17,7 @@ from .properties import get_property, properties, props_key_map
 from .version_cache import _get_product_versions, _resolve_baseline_version_number
 from .versions import get_version, get_version_names, list_product_versions
 from ..props import _NodeList, _PropsNode
-from ..utils import _safe_key
+from ..utils import _ambiguous_key_error, _safe_key
 
 if TYPE_CHECKING:  # pragma: no cover
     from ..props import _PropWrapper
@@ -44,6 +44,8 @@ class _Node:
         self._baseline_version_number: Optional[int] = baseline_version_number
         self._draft_item_id: Optional[str] = draft_item_id
         self._children_cache: Dict[str, "_Node"] = {}
+        self._ambiguous_children: Dict[str, List[Dict[str, Any]]] = {}
+        self._ambiguous_props: Dict[str, List[Dict[str, Any]]] = {}
         self._props_cache: Optional[List[Dict[str, Any]]] = None
         self._children_loaded_at: Optional[float] = None
         self._props_loaded_at: Optional[float] = None
@@ -194,9 +196,16 @@ class _Node:
             suggestions.append("list_workspaces")
         return sorted(set(suggestions))
 
+    def _raise_if_ambiguous_child(self, key: str) -> None:
+        rows = self._ambiguous_children.get(key) or self._ambiguous_children.get(_safe_key(key))
+        if rows:
+            loaded = next(iter(self._children_cache.values()))
+            raise _ambiguous_key_error("items", key, rows, loaded._version_number)
+
     def __getitem__(self, key: str) -> "_Node":
         if self._is_children_cache_stale():
             self._load_children()
+        self._raise_if_ambiguous_child(key)
         if key in self._children_cache:
             return self._children_cache[key]
         for child in self._children_cache.values():
@@ -272,6 +281,7 @@ class _Node:
 
         if self._is_children_cache_stale():
             self._load_children()
+        self._raise_if_ambiguous_child(attr)
         if attr in self._children_cache:
             child = self._children_cache[attr]
             if self._client is not None:
@@ -328,6 +338,8 @@ class _Node:
 
         if self._level == "item":
             pk = self._props_key_map()
+            if attr in self._ambiguous_props:
+                raise _ambiguous_key_error("properties", attr, self._ambiguous_props[attr], self._version_number)
             if attr in pk:
                 prop_wrapper = pk[attr]
                 if self._client is not None:

@@ -6,7 +6,7 @@ import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from ..exceptions import PoelisError
-from .utils import _safe_key
+from .utils import _ambiguous_key_error, _assign_keys, _safe_key
 
 if TYPE_CHECKING:  # pragma: no cover
     from .nodes import _Node
@@ -22,6 +22,7 @@ class _PropsNode:
     def __init__(self, item_node: "_Node") -> None:
         self._item = item_node
         self._children_cache: Dict[str, _PropWrapper] = {}
+        self._ambiguous: Dict[str, List[Dict[str, Any]]] = {}
         self._names: List[str] = []
         self._loaded_at: Optional[float] = None
         self._cache_ttl: float = item_node._cache_ttl  # Inherit cache TTL from parent node
@@ -36,24 +37,18 @@ class _PropsNode:
                 return
 
         props = self._item._properties()
-        used_names: Dict[str, int] = {}
+        keys, self._ambiguous = _assign_keys(props)
         names_list = []
-        for i, pr in enumerate(props):
-            # Try to get name from various possible fields
-            display = pr.get("readableId") or pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}"
-            safe = _safe_key(str(display))
-
-            # Handle duplicate names by adding a suffix
-            if safe in used_names:
-                used_names[safe] += 1
-                safe = f"{safe}_{used_names[safe]}"
-            else:
-                used_names[safe] = 0
-
+        for i, (safe, pr) in enumerate(zip(keys, props)):
             self._children_cache[safe] = _PropWrapper(pr, client=self._item._client)
-            names_list.append(display)
+            names_list.append(pr.get("readableId") or pr.get("name") or pr.get("id") or pr.get("category") or f"property_{i}")
         self._names = names_list
         self._loaded_at = time.time()
+
+    def _raise_if_ambiguous(self, key: str) -> None:
+        rows = self._ambiguous.get(key) or self._ambiguous.get(_safe_key(key))
+        if rows:
+            raise _ambiguous_key_error("properties", key, rows, getattr(self._item, "_version_number", None))
 
     def __dir__(self) -> List[str]:  # pragma: no cover - notebook UX
         self._ensure_loaded()
@@ -63,6 +58,7 @@ class _PropsNode:
 
     def __getattr__(self, attr: str) -> Any:
         self._ensure_loaded()
+        self._raise_if_ambiguous(attr)
         if attr in self._children_cache:
             prop_wrapper = self._children_cache[attr]
             # Track accessed properties for deletion detection
@@ -98,6 +94,7 @@ class _PropsNode:
 
     def __getitem__(self, key: str) -> Any:
         self._ensure_loaded()
+        self._raise_if_ambiguous(key)
         if key in self._children_cache:
             return self._children_cache[key]
         # match by display name
