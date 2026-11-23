@@ -16,6 +16,7 @@ from .lists import list_items, list_products, list_properties, list_workspaces
 from .properties import get_property, properties, props_key_map
 from .version_cache import _get_product_versions, _resolve_baseline_version_number
 from .versions import get_version, get_version_names, list_product_versions
+from ...exceptions import AmbiguousKeyError
 from ..props import _NodeList, _PropsNode
 from ..utils import _ambiguous_key_error, _safe_key
 
@@ -274,8 +275,11 @@ class _Node:
                         latest_node._cache_ttl = self._cache_ttl
                         if latest_node._is_children_cache_stale():
                             latest_node._load_children()
+                        latest_node._raise_if_ambiguous_child(attr)
                         if attr in latest_node._children_cache:
                             return latest_node._children_cache[attr]
+                except AmbiguousKeyError:
+                    raise
                 except Exception:
                     pass
 

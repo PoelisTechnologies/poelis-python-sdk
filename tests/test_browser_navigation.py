@@ -1031,7 +1031,9 @@ def test_change_tracking_with_get_property_records_id_and_path(tmp_path: Any) ->
 
 
 class _SharedKeyTransport(_MockTransport):
-    """Item i1 holds two properties keyed ``test2`` and two child items keyed ``bolt``."""
+    """Item i1 holds two properties keyed ``test2``, two child items keyed ``bolt`` and one keyed ``bolt_1``."""
+
+    extra_root_items: tuple = ()
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:  # type: ignore[override]
         if request.method == "POST" and request.url.path == "/v1/graphql":
@@ -1053,6 +1055,8 @@ class _SharedKeyTransport(_MockTransport):
                         ("ca", "Bolt M4", "bolt", "i1"),
                         ("cb", "Bolt M6", "bolt", "i1"),
                         ("cc", "Nut", "nut", "i1"),
+                        ("cd", "Bolt spare", "bolt_1", "i1"),
+                        *self.extra_root_items,
                     )
                 ]
                 return httpx.Response(200, json={"data": {"sdkItems": rows}})
@@ -1102,4 +1106,19 @@ def test_an_item_key_shared_by_two_siblings_raises_instead_of_picking_one(read: 
 
     assert str(raised.value) == "Key 'bolt' matches 2 items in version 3: 'Bolt M4' (id ca), 'Bolt M6' (id cb)."
     assert item.nut.name == "nut"
-    assert len(item.list_items()) == 3
+    assert len(item.list_items()) == 4
+
+
+def test_a_root_item_key_shared_on_the_baseline_raises_when_read_from_the_product() -> None:
+    from poelis_sdk.exceptions import AmbiguousKeyError
+
+    transport = _SharedKeyTransport()
+    transport.extra_root_items = (("i2", "Gadget A (old)", "gadget_a", None),)
+    product = _client_with_graphql_mock(transport, enable_change_detection=False).browser["uh2"]["Widget Pro"]
+
+    with pytest.raises(AmbiguousKeyError) as raised:
+        _ = product.gadget_a
+
+    assert str(raised.value) == (
+        "Key 'gadget_a' matches 2 items in version 3: 'Gadget A' (id i1), 'Gadget A (old)' (id i2)."
+    )

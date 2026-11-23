@@ -28,19 +28,19 @@ def _assign_keys(rows: Sequence[Mapping[str, Any]]) -> Tuple[List[str], Dict[str
     key raises instead of returning one of them.
     """
 
-    used: Dict[str, int] = {}
     keys: List[str] = []
+    taken: set[str] = set()
     by_readable_id: Dict[str, List[Mapping[str, Any]]] = {}
     for index, row in enumerate(rows):
         display = row.get("readableId") or row.get("name") or row.get("id") or row.get("category") or f"property_{index}"
-        safe = _safe_key(str(display))
+        base = _safe_key(str(display))
         if row.get("readableId"):
-            by_readable_id.setdefault(safe, []).append(row)
-        if safe in used:
-            used[safe] += 1
-            safe = f"{safe}_{used[safe]}"
-        else:
-            used[safe] = 0
+            by_readable_id.setdefault(base, []).append(row)
+        safe, suffix = base, 0
+        while safe in taken:
+            suffix += 1
+            safe = f"{base}_{suffix}"
+        taken.add(safe)
         keys.append(safe)
     return keys, {key: group for key, group in by_readable_id.items() if len(group) > 1}
 
