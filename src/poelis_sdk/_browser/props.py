@@ -48,7 +48,7 @@ class _PropsNode:
     def _raise_if_ambiguous(self, key: str) -> None:
         rows = self._ambiguous.get(key) or self._ambiguous.get(_safe_key(key))
         if rows:
-            raise _ambiguous_key_error("properties", key, rows, getattr(self._item, "_version_number", None))
+            raise _ambiguous_key_error("properties", key, rows, self._item._version_number)
 
     def __dir__(self) -> List[str]:  # pragma: no cover - notebook UX
         self._ensure_loaded()
