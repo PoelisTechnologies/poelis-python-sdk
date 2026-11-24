@@ -68,6 +68,14 @@ class PropertyLookupError(PoelisError):
     """
 
 
+class AmbiguousKeyError(PoelisError):
+    """Raised when a key matches more than one item or property under the same parent.
+
+    A key is unique in the draft, but renaming a key applies to every published
+    version, so an older version can hold two rows with the same key.
+    """
+
+
 class UploadError(PoelisError):
     """Raised when a local file cannot be uploaded."""
 

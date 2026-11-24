@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from poelis_sdk._api_errors import raise_for_errors
 from poelis_sdk._item_filter import item_draft_id as row_draft_id
 from poelis_sdk._item_filter import parent_item_filter_id
-from poelis_sdk.exceptions import HTTPError, NetworkError, PropertyLookupError
+from poelis_sdk.exceptions import AmbiguousKeyError, HTTPError, NetworkError, PropertyLookupError
 
 from ..props import _PropWrapper
-from ..utils import _is_visible_version_property, _safe_key
+from ..utils import _ambiguous_key_error, _assign_keys, _is_visible_version_property
 from .item_queries import (
     _direct_child_rows,
     _list_draft_items,
@@ -165,21 +165,8 @@ def props_key_map(node: "_Node") -> Dict[str, Dict[str, Any]]:
     if node._level != "item":
         return out
     props = node._properties()
-    used_names: Dict[str, int] = {}
-    for i, pr in enumerate(props):
-        display = (
-            pr.get("readableId")
-            or pr.get("name")
-            or pr.get("id")
-            or pr.get("category")
-            or f"property_{i}"
-        )
-        safe = _safe_key(str(display))
-        if safe in used_names:
-            used_names[safe] += 1
-            safe = f"{safe}_{used_names[safe]}"
-        else:
-            used_names[safe] = 0
+    keys, node._ambiguous_props = _assign_keys(props)
+    for safe, pr in zip(keys, props):
         out[safe] = _PropWrapper(pr, client=node._client)
     return out
 
@@ -320,9 +307,11 @@ def _fetch_property_from_item(
         use_sdk=use_sdk,
     )
     props = _filter_visible_version_properties(props, version_number)
-    for prop in props:
-        if prop.get("readableId") == readable_id:
-            return _PropWrapper(prop, client=node._client)
+    matches = [prop for prop in props if prop.get("readableId") == readable_id]
+    if len(matches) > 1:
+        raise _ambiguous_key_error("properties", readable_id, matches, version_number)
+    if matches:
+        return _PropWrapper(matches[0], client=node._client)
     raise _PropertyKeyNotFound(f"Property with key '{readable_id}' not found")
 
 
@@ -364,7 +353,7 @@ def _fetch_property_from_item_and_children_impl(
         return wrapper
     except _PropertyKeyNotFound:
         pass
-    except (HTTPError, NetworkError):
+    except (HTTPError, NetworkError, AmbiguousKeyError):
         # API and network errors keep their own type (NotFoundError,
         # UnauthorizedError, ServerError, ...) so callers may catch them by type.
         raise
