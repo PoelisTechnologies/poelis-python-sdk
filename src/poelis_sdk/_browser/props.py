@@ -312,8 +312,11 @@ class _PropWrapper:
                 - Status: string (DRAFT, UNDER_REVIEW, or DONE)
                 - Formula: read-only
                 - Matrix: 2D array (will be converted to JSON string)
-            title: Optional title/reason for history tracking (mapped to 'reason' in mutation).
-            description: Optional description for history tracking.
+            title: Change title shown in the property history (sent as 'reason').
+            description: Change description shown in the property history.
+                Both are optional unless the product requires a change title and
+                description; then a call without both raises ClientError with
+                error_code "CHANGE_TITLE_AND_DESCRIPTION_REQUIRED".
 
         Raises:
             ValueError: If property is versioned, or if value format is invalid.

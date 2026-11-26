@@ -222,8 +222,11 @@ classdef PoelisClient < handle
             %       - double: For numeric properties
             %       - string/char: For text, date, or status properties
             %       - array: For numeric 1D or matrix 2D arrays. Formula is read-only.
-            %   title (string, optional): Title/reason for history tracking
-            %   description (string, optional): Description for history tracking
+            %   title (string, optional): Change title shown in the property history
+            %   description (string, optional): Change description shown in the property history
+            %       Both are required when the product requires a change title and
+            %       description; otherwise the update is rejected with
+            %       CHANGE_TITLE_AND_DESCRIPTION_REQUIRED.
             %
             % Note: 
             %   - Only draft properties can be updated. Versioned properties

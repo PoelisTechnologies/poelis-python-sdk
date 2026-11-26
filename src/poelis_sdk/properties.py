@@ -62,8 +62,8 @@ class PropertiesClient:
             position: Optional position for ordering.
             category: Optional category (auto-normalized to uppercase snake_case).
             display_unit: Optional display unit.
-            reason: Optional reason for history tracking.
-            description: Optional description for history tracking.
+            reason: Change title. Required with description when the product requires both.
+            description: Change description. Required with reason when the product requires both.
 
         Returns:
             Dict[str, Any]: Updated property object from backend.
@@ -200,8 +200,8 @@ class PropertiesClient:
             key: Optional new key.
             readable_id: Deprecated. Use `key`. This will be removed in a future version.
             position: Optional position for ordering.
-            reason: Optional reason for history tracking.
-            description: Optional description for history tracking.
+            reason: Change title. Required with description when the product requires both.
+            description: Change description. Required with reason when the product requires both.
 
         Returns:
             Dict[str, Any]: Updated property object from backend.
@@ -328,8 +328,8 @@ class PropertiesClient:
             position: Optional position for ordering.
             category: Optional category (auto-normalized by the backend).
             display_unit: Optional display unit.
-            reason: Optional reason for history tracking.
-            description: Optional description for history tracking.
+            reason: Change title. Required with description when the product requires both.
+            description: Change description. Required with reason when the product requires both.
             changed_via: Optional source of the change.
 
         Returns:
@@ -458,8 +458,8 @@ class PropertiesClient:
             key: Optional new key.
             readable_id: Deprecated. Use `key`. This will be removed in a future version.
             position: Optional position for ordering.
-            reason: Optional reason for history tracking.
-            description: Optional description for history tracking.
+            reason: Change title. Required with description when the product requires both.
+            description: Change description. Required with reason when the product requires both.
 
         Returns:
             Dict[str, Any]: Updated property object from backend.
@@ -581,8 +581,8 @@ class PropertiesClient:
             key: Optional new key.
             readable_id: Deprecated. Use `key`. This will be removed in a future version.
             position: Optional position for ordering.
-            reason: Optional reason for history tracking.
-            description: Optional description for history tracking.
+            reason: Change title. Required with description when the product requires both.
+            description: Change description. Required with reason when the product requires both.
 
         Returns:
             Dict[str, Any]: Updated property object from backend.
